@@ -1,0 +1,28 @@
+{
+  "root": true,
+  "parserOptions": {
+    "ecmaVersion": 8
+  },
+  "plugins": [
+    "standard",
+    "promise"
+  ],
+  "extends": [
+    "standard"
+  ],
+  "globals": {
+    "fetch": true,
+    "caches": true,
+    "DOMParser": true,
+    "chai": true,
+    "expect": true,
+    "assert": true,
+    "self": true
+  },
+  "env": {
+    "browser": true,
+    "mocha": true,
+    "serviceworker": true
+  },
+  "parser": "babel-eslint"
+}
