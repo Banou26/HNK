@@ -41,24 +41,21 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const descriptor = Object.getOwnPropertyDescriptor(target, prop)
       let result
 
-      // Getter value caching
-      if (reactiveRoot.watcher && descriptor.get) reactivity.watchers.push(_ => reactivity.cache.delete(prop))
       if (descriptor.value) {
         result = Reflect.get(target, prop, receiver)
-      } else if (descriptor.get) {
+      } else if (descriptor.get) { // Getter value caching
+        if (reactiveRoot.watcher) reactivity.watchers.push(_ => reactivity.cache.delete(prop))
         if (reactivity.cache.has(prop)) {
           result = reactivity.cache.get(prop)
         } else {
-          // result = descriptor.get() // can be used for custom getters behavior
-          result = Reflect.get(target, prop, receiver)
+          result = Reflect.get(target, prop, receiver) // descriptor.get() can be used for custom getters behavior
           reactivity.cache.set(prop, result)
         }
       } else {
         result = reactify(Reflect.get(target, prop, receiver), reactiveRoot)
       }
 
-      const propReactivity = reactivity.properties[prop]
-      const propWatchers = propReactivity.watchers
+      const propWatchers = reactivity.properties[prop].watchers
       if (reactiveRoot.watcher) {
         if (!propWatchers.includes(reactiveRoot.watcher)) propWatchers.push(reactiveRoot.watcher)
         if (!reactivity.watchers.includes(reactiveRoot.watcher)) reactivity.watchers.push(reactiveRoot.watcher)
