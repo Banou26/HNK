@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://github.com/Banou26/ozjs.git"
+  },
   "scripts": {
     "dev": "node server",
     "karma": "karma start"
@@ -20,7 +24,6 @@
     "karma-mocha-reporter": "^2.2.5",
     "karma-webpack": "^2.0.5",
     "mocha": "^4.0.1",
-    "pug": "^2.0.0-rc.4",
     "puppeteer": "^0.12.0",
     "webpack": "^3.8.1"
   },
