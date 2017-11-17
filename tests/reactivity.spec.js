@@ -16,7 +16,6 @@ describe('Reactivity', _ => {
       }
       let react
       expect(_ => (react = reactify(original))).to.not.throw()
-      // console.log(react)
       react.should.have.property('$watch')
       react.should.have.property('__reactivity__')
       react.should.deep.equal(original)
