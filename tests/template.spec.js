@@ -54,7 +54,7 @@ describe('Template', function () {
 
     it('should create element node', function () {
       let propValue = {}
-      let instance = html`<${'d'}i${'v'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue}></${'d'}i${'v'}>`()
+      let instance = html`<${'d'}i${'v'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue} ${'on'}-${'click'}=${_ => console.log('click')}></${'d'}i${'v'}>`()
       container.appendChild(instance.content)
       container.innerHTML.should.equal('<div attr="foo bar"></div>')
       container.children[0].prop.should.equal(propValue)
@@ -69,18 +69,26 @@ describe('Template', function () {
     it('should create html', function () {
       let propValue = {}
       let instance
+      let value = 0
       expect(_ => (instance = html`
       <!-- ${'comment'} -->
       ${'text'}
-      <${'d'}i${'v'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue}>${html`<d${'iv'}>${'foo'}</di${'v'}>`}</${'d'}i${'v'}>`())).not.to.throw()
+      <${'d'}i${'v'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue} ${'on'}-${'click'}=${_ => (value = 5)}>
+        ${html`<d${'iv'}>${'foo'}</di${'v'}>`}
+      </${'d'}i${'v'}>`())).not.to.throw()
       container.appendChild(instance.content)
       container.innerHTML.should.equal(`
       <!-- comment -->
       text
-      <div attr="foo bar"><div>foo</div></div>`)
+      <div attr="foo bar"><div>foo</div>
+        
+      </div>`)
+      container.children[0].click()
+      value.should.equal(5)
       container.children[0].prop.should.equal(propValue)
     })
   })
+
   describe('update function', function () {
     let container
 
@@ -125,17 +133,31 @@ describe('Template', function () {
 
     it('should update html', function () {
       let propValue = {}
+      let value = 0
       let instance = html`
       <!-- ${'comment'} -->
       ${'text'}
-      <${'div'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue}>${'text'}<div></div></${'div'}>`()
+      <${'div'} at${'tr'}="foo ${'bar'}" pr${'op'}=${propValue} ${'on'}-${'click'}=${_ => (value = 5)}>
+        ${'text'}
+        <div></div>
+      </${'div'}>`()
       container.appendChild(instance.content)
       let newPropValue = {}
-      instance('comment2', 'text2', 'span', 'tr2', 'foobar', 'op2', newPropValue, 'text2', 'span')
+      container.children[0].click()
+      value.should.equal(5)
+      instance('comment2', 'text2', 'span', 'tr2', 'foobar', 'op2', newPropValue, 'on', 'focus', _ => (value = 10), 'text2', 'span')
       container.innerHTML.should.equal(`
       <!-- comment2 -->
       text2
-      <span attr2="foo foobar">text2<div></div></span>`)
+      <span attr2="foo foobar">
+        text2
+        <div></div>
+      </span>`)
+      value = 0
+      container.children[0].contentEditable = 'true'
+      container.children[0].focus()
+      container.children[0].click()
+      value.should.equal(10)
       container.children[0].prop2.should.equal(newPropValue)
     })
   })
