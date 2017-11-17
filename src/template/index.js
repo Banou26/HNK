@@ -1,6 +1,6 @@
 const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
 const templatePlaceholder = id => `oz-template-placeholder-${id}-${random}`
-const templatePlaceholderRegexAll = new RegExp(`oz-template-placeholder-(\\d)*-${random}`, 'g')
+const templatePlaceholderRegexAll = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
 
 const attribute = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
 const ncname = '[a-zA-Z_][\\w\\-\\.]*'
@@ -81,6 +81,7 @@ const parsePlaceholders = (html) => {
 
 const createInstance = (template, placeholders, _values) => {
   const nodes = new Map()
+  const listeners = new Map()
   const content = document.importNode(template.content, true)
   for (const placeholder of placeholders) {
     const { id, type, str, values } = placeholder
@@ -152,7 +153,15 @@ const createInstance = (template, placeholders, _values) => {
           } else {
             propValue = property[5].replace(templatePlaceholderRegexAll, (match, id) => values[id])
           }
-          newNode[propName] = propValue
+          if (propName.startsWith('on-')) { // Event
+            const eventType = propName.substring(3)
+            listeners.set(id, {
+              type: eventType,
+              handler: newNode.addEventListener(eventType, propValue)
+            })
+          } else { // property
+            newNode[propName] = propValue
+          }
         })
         const parent = node.parentNode || content
         while (node.childNodes.length > 0) {
@@ -171,7 +180,19 @@ const createInstance = (template, placeholders, _values) => {
           } else {
             propValue = pvalues[5].replace(templatePlaceholderRegexAll, (match, id) => values[id])
           }
-          node[propName] = propValue
+          if (propName.startsWith('on-')) { // Event
+            if (listeners.has(id)) {
+              const oldListener = listeners.get(id)
+              node.removeEventListener(oldListener.type, oldListener.handler)
+            }
+            const eventType = propName.substring(3)
+            listeners.set(id, {
+              type: eventType,
+              listener: node.addEventListener(eventType, propValue)
+            })
+          } else { // property
+            node[propName] = propValue
+          }
         } else { // Attribute
           const parentNode = node.ownerElement
           const attrName = pvalues[1].replace(templatePlaceholderRegexAll, (match, id) => values[id])
