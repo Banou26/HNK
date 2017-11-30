@@ -262,8 +262,8 @@ function updateText (placeholderInstance, values, childNodes) {
   const { splits } = placeholder
   const instanceValues = placeholderInstance.values
   const currentNodes = placeholderInstance.node
-  const firstCurrentChild = currentNodes[0]
-  const firstCurrentChildParent = firstCurrentChild.parentNode
+  let firstCurrentChild = currentNodes[0]
+  let firstCurrentChildParent = firstCurrentChild.parentNode
   const value = values[splits[0][1]]
   let newNodes = []
   const oldValue = instanceValues.value
@@ -296,13 +296,11 @@ function updateText (placeholderInstance, values, childNodes) {
   const currentNodesIndex = childNodes.indexOf(currentNodes)
   if (currentNodesIndex !== -1) childNodes.splice(currentNodesIndex, 1, newNodes)
   const nodesToKeep = []
+  firstCurrentChild = currentNodes[0]
+  firstCurrentChildParent = firstCurrentChild.parentNode
   for (const node of deconstructArray(newNodes)) {
     if (currentNodes.includes(node)) nodesToKeep.push(node)
-    try {
-      firstCurrentChildParent.insertBefore(node, firstCurrentChild)
-    } catch (err) {
-      // uh, wtf ? (remove the whitespace remover from the update html test)
-    }
+    firstCurrentChildParent.insertBefore(node, firstCurrentChild)
   }
   for (const node of currentNodes) {
     if (nodesToKeep.includes(node)) continue
