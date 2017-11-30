@@ -1,271 +1,312 @@
+export * from './html.js'
+
+const envCachesTemplates = (t => t() === t())(_ => (s => s)``)
 const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
-const templatePlaceholder = id => `oz-template-placeholder-${id}-${random}`
-const templatePlaceholderRegexAll = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
+const placeholderRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`)
+const placeholderRegexGlobal = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
 
-const attribute = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
-const ncname = '[a-zA-Z_][\\w\\-\\.]*'
-const qnameCapture = `((?:${ncname}\\:)?${ncname})`
-const startTagOpen = new RegExp(`^<${qnameCapture}`)
-const startTagClose = /^\s*(\/?)>/
-const endTag = new RegExp(`^<\\/(${qnameCapture}[^>]*)>`)
+const isBuild = value =>
+  value.hasOwnProperty('id') &&
+  value.hasOwnProperty('values')
 
-const templateCache = new Map()
+const isInstance = value =>
+  value.hasOwnProperty('id') &&
+  value.hasOwnProperty('values') &&
+  value.hasOwnProperty('update') &&
+  value.hasOwnProperty('content') &&
+  value.hasOwnProperty('childNodes') &&
+  value.hasOwnProperty('_childNodes')
 
-/**
- * Find in the string template placeholders and return an array of their ids
- * @param {string} str
- * @return {string[]} ids
- */
-const getPlaceholders = str => {
-  const ids = []
-  let match
-  while ((match = templatePlaceholderRegexAll.exec(str))) ids.push(match[1])
-  return ids
+const placeholderStr = id => `oz-template-placeholder-${id}-${random}`
+
+const split = str => str.split(placeholderRegexGlobal)
+
+const getSplitIds = split => split.filter((str, i) => i % 2)
+
+const execSplit = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
+
+const deconstructArray = arr => {
+  for (const item of arr) {
+    if (Array.isArray(item)) arr.splice(arr.indexOf(item), 1, ...item)
+  }
+  return arr
 }
 
-/**
- * Parse, find and return the html context of each placeholders
- * contexts (types): comment, endTagName, startTagName, attribute
- * @param {string} html
- * @return {object[]} placeholders
- */
-const parsePlaceholders = (html) => {
-  let placeholders = []
-  const advance = n => (html = html.substring(n))
-  const addPlaceholders = (type, str, values) => {
-    for (const id of getPlaceholders(str)) placeholders.push({id, type, str, values})
-  }
-
-  while (html) { // eslint-disable-line no-unmodified-loop-condition
-    const textEnd = html.indexOf('<')
-    if (textEnd === 0) {
-      if (html.startsWith('<!--')) { // Comment
-        const commentEnd = html.indexOf('-->')
-        if (commentEnd === -1) throw new Error(`Comment not closed, can't continue the template parsing "${html}"`)
-        addPlaceholders('comment', html.substring(4, commentEnd))
-        advance(commentEnd + 3)
-        continue
-      }
-
-      const endTagMatch = html.match(endTag)
-      if (endTagMatch) { // End tag
-        addPlaceholders('endTagName', endTagMatch[1])
-        advance(endTagMatch[0].length)
-        continue
-      }
-
-      const startTagMatch = html.match(startTagOpen)
-      if (startTagMatch) { // Start tag
-        advance(startTagMatch[0].length)
-        const attributes = []
-        let end, attr
-        while (!(end = html.match(startTagClose)) && (attr = html.match(attribute))) {
-          attributes.push(attr)
-          advance(attr[0].length)
-        }
-        if (!end) throw new Error(`Start tag not closed, can't continue the template parsing "${html}"`)
-        addPlaceholders('startTagName', startTagMatch[1], attributes)
-        for (const attr of attributes) {
-          addPlaceholders('attribute', attr[0], attr)
-        }
-        advance(end[0].length)
-        continue
-      }
+function getNodePath (node) {
+  let path = []
+  let parent = node.parentNode
+  if (parent) {
+    while (parent) {
+      path.push([...parent.childNodes].indexOf(node))
+      node = parent
+      parent = node.parentNode
     }
-    const textContent = html.substring(0, textEnd !== -1 ? textEnd : textEnd.length)
-    addPlaceholders('text', textContent)
-    advance(textContent.length)
+  } else {
+    let index = 0
+    let previousNode = node.previousSibling
+    while (previousNode) {
+      index++
+      previousNode = node.previousSibling
+    }
+    path.push(index)
   }
-  return placeholders
+  return path.reverse()
 }
 
-const createInstance = (template, placeholders, _values) => {
+const getNode = (path, rootNode) => path.reduce((currNode, i) => currNode.childNodes.item(i), rootNode)
+
+function setPlaceholdersPaths (node, placeholders, pointerArray, values) {
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, null, false)
   const nodes = new Map()
-  const listeners = new Map()
-  const content = document.importNode(template.content, true)
-  for (const placeholder of placeholders) {
-    const { id, type, str, values } = placeholder
-    if (type === 'startTagName') {
-      const placehodlerName = templatePlaceholder(id)
-      const element = content.querySelector(`[${placehodlerName}]`)
-      nodes.set(id, element)
-      element.removeAttribute(placehodlerName)
-    } else if (type === 'attribute') {
-      if (values[5]) { // Property (attribute without quotes)
-        const placehodlerName = templatePlaceholder(id)
-        const element = content.querySelector(`[${placehodlerName}]`)
-        nodes.set(id, element)
-        element.removeAttribute(placehodlerName)
-      } else { // Attribute
-        nodes.set(id, content.querySelector(`[${str}]`).getAttributeNode(values[1]))
-      }
-    }
-  }
-  const walker = document.createTreeWalker(content, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, null, false)
   while (walker.nextNode()) {
     const currentNode = walker.currentNode
-    const ids = getPlaceholders(currentNode.nodeValue)
-    for (const id of ids) {
-      const placeholderName = templatePlaceholder(id)
-      if (currentNode.nodeType === 3) { // Text
-        if (currentNode.nodeValue.indexOf(placeholderName) !== -1) {
-          const placeholderElem = currentNode.splitText(currentNode.nodeValue.indexOf(placeholderName))
-          placeholderElem.nodeValue = placeholderElem.nodeValue.replace(placeholderName, '')
-          placeholderElem.splitText(0)
-          // placeholderElem.nodeValue = _values[id]
-          nodes.set(id, [placeholderElem])
-        }
-      } else { // Comment
-        // currentNode.nodeValue = currentNode.nodeValue.replace(placeholderName, _values[id])
-        nodes.set(id, currentNode)
+    const match = currentNode.nodeValue.match(placeholderRegex)
+    if (match) {
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        const placeholderNode = currentNode.splitText(match.index)
+        nodes.set(pointerArray[match[1]], placeholderNode)
+        placeholderNode.nodeValue = placeholderNode.nodeValue.substring(match[0].length)
+        placeholderNode.splitText(0)
+      } else if (currentNode.nodeType === Node.COMMENT_NODE) {
+        nodes.set(pointerArray[match[1]], currentNode)
       }
     }
   }
-  const render = (...values) => {
-    const passed = []
-    for (let i in values) {
-      const placeholder = placeholders[i]
-      const { id, type, str } = placeholder
-      if (type === 'endTagName') continue
-      if (type !== 'text') {
-        let alreadyPassed = false
-        str.replace(templatePlaceholderRegexAll, (match, id) => {
-          if (passed.includes(id)) alreadyPassed = true
-        })
-        if (alreadyPassed) continue
-        passed.push(id)
-      }
-      const pvalues = placeholder.values
-      const node = nodes.get(id)
-      if (type === 'startTagName') {
-        const newNode = document.createElement(str.replace(templatePlaceholderRegexAll, (match, id) => values[id]))
-        for (const attr of [...node.attributes]) { // Attributes
-          node.removeAttributeNode(attr)
-          newNode.setAttributeNode(attr)
-        }
-        pvalues.filter(attr => attr[5]).map(property => { // Properties
-          getPlaceholders([...property[1], ...property[5]].join('')).map(id => nodes.set(id, newNode))
-          const propName = property[1].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          const placeholdersValue = getPlaceholders(property[5])
-          let propValue
-          if (placeholdersValue.length === 1) {
-            propValue = values[placeholdersValue[0]]
-          } else {
-            propValue = property[5].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          }
-          if (propName.startsWith('on-')) { // Event
-            const eventType = propName.substring(3)
-            listeners.set(id, {
-              type: eventType,
-              handler: newNode.addEventListener(eventType, propValue)
-            })
-          } else { // property
-            newNode[propName] = propValue
-          }
-        })
-        const parent = node.parentNode || content
-        while (node.childNodes.length > 0) {
-          newNode.appendChild(node.childNodes[0])
-        }
-        nodes.set(id, newNode)
-        parent.insertBefore(newNode, node)
-        parent.removeChild(node)
-      } else if (type === 'attribute') {
-        if (pvalues[5]) { // Property (attribute without quotes)
-          const propName = pvalues[1].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          const placeholdersValue = getPlaceholders(pvalues[5])
-          let propValue
-          if (placeholdersValue.length === 1) {
-            propValue = values[placeholdersValue[0]]
-          } else {
-            propValue = pvalues[5].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          }
-          if (propName.startsWith('on-')) { // Event
-            if (listeners.has(id)) {
-              const oldListener = listeners.get(id)
-              node.removeEventListener(oldListener.type, oldListener.handler)
-            }
-            const eventType = propName.substring(3)
-            listeners.set(id, {
-              type: eventType,
-              listener: node.addEventListener(eventType, propValue)
-            })
-          } else { // property
-            node[propName] = propValue
-          }
-        } else { // Attribute
-          const parentNode = node.ownerElement
-          const attrName = pvalues[1].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          if (parentNode.getAttributeNode(attrName) === node) {
-            node.value = pvalues[3].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-          } else {
-            const newAttr = document.createAttribute(attrName)
-            getPlaceholders([...pvalues[1], ...pvalues[3]].join('')).map(id => nodes.set(id, newAttr))
-            newAttr.value = pvalues[3].replace(templatePlaceholderRegexAll, (match, id) => values[id])
-            parentNode.removeAttributeNode(node)
-            parentNode.setAttributeNode(newAttr)
-          }
-        }
-      } else if (type === 'text') {
-        let isBuild = typeof values[id] === 'function' && Array.isArray(values[id].values)
-        let instance
-        try {
-          if (isBuild) {
-            instance = values[id]()
-          }
-        } catch (err) {
-          instance = null
-          console.error(err)
-          // throw err
-        }
-        let isInstance = isBuild && instance && instance.content && instance.content instanceof DocumentFragment
-        if (isInstance) {
-          let docFrag = instance.content
-          nodes.set(id, [...docFrag.childNodes])
-          let parent = node[0] ? node[0].parentNode : null || content
-          parent.insertBefore(docFrag, parent.childNodes[0])
-          for (const i2 in node) {
-            parent.removeChild(node[i2])
-          }
-        } else {
-          node[0].nodeValue = values[id]
-        }
-      } else if (type === 'comment') {
-        node.nodeValue = str.replace(templatePlaceholderRegexAll, (match, id) => values[id])
-      }
-    }
-    render.values = values
-    return render
+  for (const [placeholder, node] of nodes) {
+    placeholder.path = getNodePath(node)
   }
-  render.values = _values
-  render.content = content
-  render.apply(null, _values)
-  return render
+  for (const placeholder of placeholders.filter(({type}) => type === 'startTagName' || type === 'attribute' || type === 'property')) {
+    const attributeName = placeholderStr(placeholder.ids[0])
+    const foundNode = node.querySelector(`[${attributeName}]`)
+    foundNode.removeAttribute(attributeName)
+    placeholder.path = getNodePath(foundNode)
+  }
 }
 
-export const html = (strings, ..._values) => {
-  let cachedCreateInstance = templateCache.get(strings)
-  if (cachedCreateInstance) {
-    return cachedCreateInstance(_values)
+function indexToPlaceholder (placeholders) {
+  const arr = []
+  for (const placeholder of placeholders) {
+    for (const id of placeholder.ids) arr.push(placeholder) // eslint-disable-line no-unused-vars
   }
-  let html = strings[0] + [...strings].splice(1).map((str, i) => templatePlaceholder(i) + str).join('')
-  const placeholders = parsePlaceholders(html)
-  for (const { type, str, values } of placeholders) {
-    if (type === 'startTagName') {
-      const tagName = str.replace(templatePlaceholderRegexAll, (match, id) => _values[id])
-      const selectorAttributes = placeholders.filter(_placeholder => _placeholder.str === str).map(({id}) => templatePlaceholder(id)).join(' ')
-      html = html.replace(str, `${tagName} ${selectorAttributes}`)
-    } else if (type === 'endTagName') {
-      html = html.replace(str, str.replace(templatePlaceholderRegexAll, (match, id) => _values[id]))
-    } else if (type === 'attribute') {
-      if (values[5]) { // Property (attribute without quotes)
-        html = html.replace(str, ' ' + placeholders.filter(_placeholder => _placeholder.str === str).map(({id}) => templatePlaceholder(id)).join(' '))
+  return arr
+}
+
+const valuesDif = (values, values2) => {
+  let dif = []
+  const highestLength = values.length > values2.length ? values.length : values2.length
+  for (let i = 0; i < highestLength; i++) {
+    if (values[i] !== values2[i]) dif.push(i)
+  }
+  return dif
+}
+
+export function template (parser, options) {
+  const cache = new Map()
+  return (strings, ...values) => {
+    const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
+    const cached = cache.get(id)
+    if (cached) return cached(...values)
+    const src = strings[0] + [...strings].splice(1).map((str, i) => placeholderStr(i) + str).join('')
+    const { placeholders, html } = parser(src, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit })
+    const pointerArray = indexToPlaceholder(placeholders)
+    const template = document.createElement('template')
+    template.innerHTML = html
+    setPlaceholdersPaths(template.content, placeholders, pointerArray, values)
+    const createCachedInstance = (...values) => {
+      const createInstance = _ => {
+        const docFrag = document.importNode(template.content, true)
+        const childNodes = [...docFrag.childNodes]
+        const placeholdersInstances = new Map()
+        for (const placeholder of placeholders) {
+          const isText = placeholder.type === 'text'
+          let node = getNode(placeholder.path, docFrag)
+          if (isText) {
+            node = [node]
+            const firstNodeIndex = childNodes.indexOf(node[0])
+            if (firstNodeIndex !== -1) childNodes.splice(firstNodeIndex, 1, node)
+          }
+          placeholdersInstances.set(placeholder, {
+            placeholder,
+            node,
+            values: {}
+          })
+        }
+        const instance = {
+          id,
+          values: [],
+          update (...values) {
+            const dif = valuesDif(values, this.values)
+            let updated = []
+            for (const index of dif) {
+              const placeholder = pointerArray[index]
+              const placeholderInstance = placeholdersInstances.get(placeholder)
+              if (updated.includes(placeholder)) continue
+              updated.push(placeholder)
+              switch (placeholder.type) {
+                case 'attribute':
+                  updateAttribute(placeholderInstance, values)
+                  break
+                case 'property':
+                  updateProperty(placeholderInstance, values)
+                  break
+                case 'text':
+                  updateText(placeholderInstance, values, childNodes)
+                  break
+                case 'startTagName':
+                  const dependents = placeholder.dependents || []
+                  updated = [...updated, ...dependents]
+                  const dependentsInstances = []
+                  for (const dependent of dependents) {
+                    dependentsInstances.push(placeholdersInstances.get(dependent))
+                  }
+                  updateElement(placeholderInstance, values, childNodes, dependentsInstances)
+                  break
+                case 'comment':
+                  updateComment(placeholderInstance, values)
+                  break
+              }
+            }
+          },
+          _childNodes: childNodes,
+          get childNodes () {
+            return deconstructArray(this._childNodes)
+          },
+          get content () {
+            for (const node of this.childNodes) docFrag.appendChild(node)
+            return docFrag
+          }
+        }
+        instance.update(...values)
+        return instance
       }
+      createInstance.id = id
+      createInstance.values = values
+      return createInstance
+    }
+    cache.set(id, createCachedInstance)
+    return createCachedInstance(...values)
+  }
+}
+
+function updateElement (placeholderInstance, values, childNodes, dependentsInstances) {
+  const { placeholder, node } = placeholderInstance
+  const { splits } = placeholder
+  // const instanceValues = placeholderInstance.values
+  const newTagName = execSplit(splits[0], values)
+  // instanceValues.name = newTagName
+  const newElem = document.createElement(newTagName)
+  const parent = node.parentNode
+  placeholderInstance.node = newElem
+  if (parent) {
+    parent.insertBefore(newElem, node)
+    parent.removeChild(node)
+  }
+  if (node.hasAttributes()) {
+    for (const {name, value} of node.attributes) {
+      newElem.setAttribute(name, value)
     }
   }
-  const template = document.createElement('template')
-  template.innerHTML = html
-  const _createInstance = values => createInstance(template, placeholders, values)
-  templateCache.set(strings, _createInstance)
-  return _createInstance(_values)
+  const nodeIndex = childNodes.indexOf(node)
+  if (nodeIndex !== -1) childNodes.splice(nodeIndex, 1, newElem)
+  while (node.firstChild) newElem.appendChild(node.firstChild)
+  for (const dependentInstance of dependentsInstances) {
+    dependentInstance.node = newElem
+    if (dependentInstance.placeholder.type === 'attribute') {
+      updateAttribute(dependentInstance, values)
+    } else if (dependentInstance.placeholder.type === 'property') {
+      updateProperty(dependentInstance, values)
+    }
+  }
+}
+
+function updateAttribute (placeholderInstance, values) {
+  const { placeholder, node } = placeholderInstance
+  const { splits } = placeholder
+  const instanceValues = placeholderInstance.values
+  const oldName = instanceValues.name
+  const newAttributeName = execSplit(splits[0], values)
+  const newAttributeValue = execSplit(splits[1], values)
+  if (oldName && oldName !== newAttributeName) node.removeAttribute(oldName)
+  instanceValues.name = newAttributeName
+  node.setAttribute(newAttributeName, newAttributeValue)
+}
+
+const updateProperty = (placeholderInstance, values) => {
+  const { placeholder, node } = placeholderInstance
+  const { splits } = placeholder
+  const instanceValues = placeholderInstance.values
+  if (instanceValues.listenerName && instanceValues.propValue) {
+    node.removeEventListener(instanceValues.listenerName, instanceValues.propValue)
+    instanceValues.listenerName = null
+    instanceValues.propValue = null
+  }
+  const propName = execSplit(splits[0], values)
+  const propValue = values[splits[1][1]]
+  if (propName.startsWith('on-')) { // Event handling
+    const listenerName = propName.substring(3)
+    node.addEventListener(listenerName, propValue)
+    instanceValues.listenerName = listenerName
+    instanceValues.propValue = propValue
+  } else {
+    node[propName] = propValue
+  }
+}
+const updateComment = (placeholderInstance, values) => {
+  const { placeholder, node } = placeholderInstance
+  const { splits } = placeholder
+  node.nodeValue = execSplit(splits[0], values)
+}
+
+function updateText (placeholderInstance, values, childNodes) {
+  const { placeholder } = placeholderInstance
+  const { splits } = placeholder
+  const instanceValues = placeholderInstance.values
+  const currentNodes = placeholderInstance.node
+  const firstCurrentChild = currentNodes[0]
+  const firstCurrentChildParent = firstCurrentChild.parentNode
+  const value = values[splits[0][1]]
+  let newNodes = []
+  const oldValue = instanceValues.value
+  switch (typeof value) {
+    case 'string':
+      if (currentNodes.length === 1) {
+        firstCurrentChild.nodeValue = value
+        newNodes = [firstCurrentChild]
+      } else {
+        newNodes = [new Text(value)]
+      }
+      break
+    case 'object':
+      // todo: add array/node rendering
+      break
+    case 'function':
+      if (isBuild(value)) {
+        const build = value
+        if (oldValue && isInstance(oldValue) && oldValue.id === build.id) {
+          oldValue.update(...build.values)
+          newNodes = oldValue._childNodes
+        } else {
+          const instance = build()
+          instanceValues.value = instance
+          newNodes = instance._childNodes
+        }
+      }
+      break
+  }
+  const currentNodesIndex = childNodes.indexOf(currentNodes)
+  if (currentNodesIndex !== -1) childNodes.splice(currentNodesIndex, 1, newNodes)
+  const nodesToKeep = []
+  for (const node of deconstructArray(newNodes)) {
+    if (currentNodes.includes(node)) nodesToKeep.push(node)
+    try {
+      firstCurrentChildParent.insertBefore(node, firstCurrentChild)
+    } catch (err) {
+      // uh, wtf ? (remove the whitespace remover from the update html test)
+    }
+  }
+  for (const node of currentNodes) {
+    if (nodesToKeep.includes(node)) continue
+    node.parentNode.removeChild(node)
+  }
+  placeholderInstance.node = newNodes
 }
