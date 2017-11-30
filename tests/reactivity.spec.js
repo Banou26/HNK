@@ -5,7 +5,7 @@ let expect = chai.expect
 let assert = chai.assert
 
 describe('Reactivity', _ => {
-  describe('reactify', function () {
+  describe('build', function () {
     it('should build a reactive copy of the original object', function () {
       let original = {
         a: 1,
@@ -21,7 +21,7 @@ describe('Reactivity', _ => {
       react.should.deep.equal(original)
     })
   })
-  describe('watcher', function () {
+  describe('watch', function () {
     let react
 
     beforeEach(function () {
