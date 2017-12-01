@@ -251,10 +251,46 @@ const updateProperty = (placeholderInstance, values) => {
     node[propName] = propValue
   }
 }
+
 const updateComment = (placeholderInstance, values) => {
   const { placeholder, node } = placeholderInstance
   const { splits } = placeholder
   node.nodeValue = execSplit(splits[0], values)
+}
+
+function textNewNodes (instanceValues, value) {
+  const oldValue = instanceValues.value
+  instanceValues.value = value
+  let nodes = []
+  switch (typeof value) {
+    case 'string':
+      nodes = [new Text(value)]
+      break
+    case 'object':
+      if (value instanceof Node) {
+        nodes = [value]
+      } else if (Array.isArray(value)) {
+        instanceValues.arrValues = {}
+        for (const val of value) {
+          nodes = [...nodes, ...textNewNodes(instanceValues.arrValues, val)]
+        }
+      }
+      break
+    case 'function':
+      if (isBuild(value)) {
+        const build = value
+        if (oldValue && isInstance(oldValue) && oldValue.id === build.id) {
+          oldValue.update(...build.values)
+          nodes = oldValue._childNodes
+        } else {
+          const instance = build()
+          instanceValues.value = instance
+          nodes = instance._childNodes
+        }
+      }
+      break
+  }
+  return nodes
 }
 
 function updateText (placeholderInstance, values, childNodes) {
@@ -265,34 +301,7 @@ function updateText (placeholderInstance, values, childNodes) {
   let firstCurrentChild = currentNodes[0]
   let firstCurrentChildParent = firstCurrentChild.parentNode
   const value = values[splits[0][1]]
-  let newNodes = []
-  const oldValue = instanceValues.value
-  switch (typeof value) {
-    case 'string':
-      if (currentNodes.length === 1) {
-        firstCurrentChild.nodeValue = value
-        newNodes = [firstCurrentChild]
-      } else {
-        newNodes = [new Text(value)]
-      }
-      break
-    case 'object':
-      // todo: add array/node rendering
-      break
-    case 'function':
-      if (isBuild(value)) {
-        const build = value
-        if (oldValue && isInstance(oldValue) && oldValue.id === build.id) {
-          oldValue.update(...build.values)
-          newNodes = oldValue._childNodes
-        } else {
-          const instance = build()
-          instanceValues.value = instance
-          newNodes = instance._childNodes
-        }
-      }
-      break
-  }
+  let newNodes = textNewNodes(instanceValues, value)
   const currentNodesIndex = childNodes.indexOf(currentNodes)
   if (currentNodesIndex !== -1) childNodes.splice(currentNodesIndex, 1, newNodes)
   const nodesToKeep = []
