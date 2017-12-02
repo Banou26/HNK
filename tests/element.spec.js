@@ -12,7 +12,7 @@ describe('Element', _ => {
   })
 
   it('should render Element node', function () {
-    const CustomElement = class CustomElement extends Element {
+    class CustomElement extends Element {
       state () {
         return {
           foo: 'foo',
