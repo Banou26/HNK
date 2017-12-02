@@ -1,6 +1,6 @@
-import { OzElement } from './oz-element.js'
+import { Element } from './element.js'
 
-export class RouterView extends OzElement {
+export class RouterView extends Element {
   constructor () {
     super()
   }

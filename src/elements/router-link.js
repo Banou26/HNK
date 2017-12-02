@@ -1,6 +1,6 @@
-import { OzElementClass } from './oz-element.js'
+import { ElementClass } from './element.js'
 
-export class RouterLink extends OzElementClass(HTMLAnchorElement) {
+export class RouterLink extends ElementClass(HTMLAnchorElement) {
   constructor () {
     super()
   }
