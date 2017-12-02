@@ -75,28 +75,18 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
 
       // call watchers dependents of this property
       const propReactivity = reactivity.properties[prop]
-      const propWatchers = [...propReactivity.watchers]
-      const objWatchers = [...reactivity.watchers]
+      const watchers = [...propReactivity.watchers, ...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
 
       // call the cache watchers first (to get a consistant behavior)
-      const propCacheWatchers = []
-      const nonPropCacheWatchers = []
-      const objCacheWatchers = []
-      const nonObjCacheWatchers = []
-      for (const watcher of propWatchers) {
-        if (watcher.cache) propCacheWatchers.push(watcher)
-        else nonPropCacheWatchers.push(watcher)
+      const cacheWatchers = []
+      const nonCacheWatchers = []
+      for (const watcher of watchers) {
+        if (watcher.cache) cacheWatchers.push(watcher)
+        else nonCacheWatchers.push(watcher)
       }
-      for (const watcher of objWatchers) {
-        if (watcher.cache) objCacheWatchers.push(watcher)
-        else nonObjCacheWatchers.push(watcher)
-      }
-      for (const watcher of propCacheWatchers) watcher()
-      for (const watcher of objCacheWatchers) watcher()
-      for (const watcher of propWatchers) watcher()
-      for (const watcher of objWatchers) watcher()
+      for (const watcher of [...cacheWatchers, ...nonCacheWatchers]) watcher()
       return result
     },
     deleteProperty (target, prop) {
@@ -105,28 +95,18 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const result = Reflect.deleteProperty(target, prop)
 
       // call watchers dependents of this property
-      const propWatchers = [...propReactivity.watchers]
-      const objWatchers = [...reactivity.watchers]
+      const watchers = [...propReactivity.watchers, ...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
 
       // call the cache watchers first (to get a consistant behavior)
-      const propCacheWatchers = []
-      const nonPropCacheWatchers = []
-      const objCacheWatchers = []
-      const nonObjCacheWatchers = []
-      for (const watcher of propWatchers) {
-        if (watcher.cache) propCacheWatchers.push(watcher)
-        else nonPropCacheWatchers.push(watcher)
+      const cacheWatchers = []
+      const nonCacheWatchers = []
+      for (const watcher of watchers) {
+        if (watcher.cache) cacheWatchers.push(watcher)
+        else nonCacheWatchers.push(watcher)
       }
-      for (const watcher of objWatchers) {
-        if (watcher.cache) objCacheWatchers.push(watcher)
-        else nonObjCacheWatchers.push(watcher)
-      }
-      for (const watcher of propCacheWatchers) watcher()
-      for (const watcher of objCacheWatchers) watcher()
-      for (const watcher of propWatchers) watcher()
-      for (const watcher of objWatchers) watcher()
+      for (const watcher of [...cacheWatchers, ...nonCacheWatchers]) watcher()
       return result
     }
   })
