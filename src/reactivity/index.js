@@ -44,7 +44,11 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       if (descriptor.value) {
         result = Reflect.get(target, prop, receiver)
       } else if (descriptor.get) { // Getter value caching
-        if (reactiveRoot.watcher) reactivity.watchers.push(_ => reactivity.cache.delete(prop))
+        if (reactiveRoot.watcher) {
+          const watcher = _ => reactivity.cache.delete(prop)
+          watcher.cache = true
+          reactivity.watchers.push(watcher)
+        }
         if (reactivity.cache.has(prop)) {
           result = reactivity.cache.get(prop)
         } else {
@@ -54,7 +58,6 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       } else {
         result = reactify(Reflect.get(target, prop, receiver), reactiveRoot)
       }
-
       const propWatchers = reactivity.properties[prop].watchers
       if (reactiveRoot.watcher) {
         if (!propWatchers.includes(reactiveRoot.watcher)) propWatchers.push(reactiveRoot.watcher)
@@ -76,9 +79,24 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const objWatchers = [...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
-      propWatchers.map(watcher => watcher())
-      objWatchers.map(watcher => watcher())
 
+      // call the cache watchers first (to get a consistant behavior)
+      const propCacheWatchers = []
+      const nonPropCacheWatchers = []
+      const objCacheWatchers = []
+      const nonObjCacheWatchers = []
+      for (const watcher of propWatchers) {
+        if (watcher.cache) propCacheWatchers.push(watcher)
+        else nonPropCacheWatchers.push(watcher)
+      }
+      for (const watcher of objWatchers) {
+        if (watcher.cache) objCacheWatchers.push(watcher)
+        else nonObjCacheWatchers.push(watcher)
+      }
+      for (const watcher of propCacheWatchers) watcher()
+      for (const watcher of objCacheWatchers) watcher()
+      for (const watcher of propWatchers) watcher()
+      for (const watcher of objWatchers) watcher()
       return result
     },
     deleteProperty (target, prop) {
@@ -91,9 +109,24 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const objWatchers = [...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
-      propWatchers.map(watcher => watcher())
-      objWatchers.map(watcher => watcher())
 
+      // call the cache watchers first (to get a consistant behavior)
+      const propCacheWatchers = []
+      const nonPropCacheWatchers = []
+      const objCacheWatchers = []
+      const nonObjCacheWatchers = []
+      for (const watcher of propWatchers) {
+        if (watcher.cache) propCacheWatchers.push(watcher)
+        else nonPropCacheWatchers.push(watcher)
+      }
+      for (const watcher of objWatchers) {
+        if (watcher.cache) objCacheWatchers.push(watcher)
+        else nonObjCacheWatchers.push(watcher)
+      }
+      for (const watcher of propCacheWatchers) watcher()
+      for (const watcher of objCacheWatchers) watcher()
+      for (const watcher of propWatchers) watcher()
+      for (const watcher of objWatchers) watcher()
       return result
     }
   })
