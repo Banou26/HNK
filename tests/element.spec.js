@@ -47,7 +47,7 @@ describe('Element', _ => {
     container.childNodes[0].innerHTML.should.equal(`
         <div>
           bar
-          foobar
+          barbar
           bar
         </div>`)
   })
