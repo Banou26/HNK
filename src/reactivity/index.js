@@ -6,7 +6,7 @@ export let defaultReactiveRoot = {
 // In case there can be multiple windows sharing one reactiveRoot (e.g. Electron/WebExtensions)
 export const setDefaultReactiveRoot = reactiveRoot => (defaultReactiveRoot = reactiveRoot)
 
-const registerWatcher = (reactiveRoot, getter, watcher) => {
+const registerWatcher = (getter, watcher, reactiveRoot = defaultReactiveRoot) => {
   reactiveRoot.watcher = watcher
   const value = getter()
   reactiveRoot.watcher = null
@@ -107,7 +107,7 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const watcher = _ => {
         if (unwatch) return
         if (getter) {
-          let newValue = registerWatcher(reactiveRoot, getter.bind(proxy), watcher)
+          let newValue = registerWatcher(getter.bind(proxy), watcher, reactiveRoot)
           handler(newValue, oldValue)
           oldValue = newValue
         } else {
@@ -115,10 +115,22 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
           reactivity.watchers.push(watcher)
         }
       }
-      if (getter) oldValue = registerWatcher(reactiveRoot, getter.bind(proxy), watcher)
+      if (getter) oldValue = registerWatcher(getter.bind(proxy), watcher, reactiveRoot)
       else reactivity.watchers.push(watcher)
       return _ => (unwatch = true)
     }
   })
   return proxy
+}
+
+export const watch = (getter, handler, reactiveRoot = defaultReactiveRoot) => {
+  let unwatch, oldValue
+  const watcher = _ => {
+    if (unwatch) return
+    let newValue = registerWatcher(getter, watcher, reactiveRoot)
+    handler(newValue, oldValue)
+    oldValue = newValue
+  }
+  oldValue = registerWatcher(getter, watcher, reactiveRoot)
+  return _ => (unwatch = true)
 }
