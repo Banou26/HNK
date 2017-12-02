@@ -1,4 +1,4 @@
-import { template } from './index.js'
+import { htmlTemplate } from './html-template.js'
 
 const attribute = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
 const ncname = '[a-zA-Z_][\\w\\-\\.]*'
@@ -7,7 +7,7 @@ const startTagOpen = new RegExp(`^<${qnameCapture}`)
 const startTagClose = /^\s*(\/?)>/
 const endTag = new RegExp(`^<\\/(${qnameCapture}[^>]*)>`)
 
-export const html = template((source, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit }) => {
+export const html = htmlTemplate((source, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit }) => {
   let html = ''
   let placeholders = []
   const advance = (n, type, ...vals) => {
