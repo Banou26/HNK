@@ -1,29 +1,18 @@
+import {
+  envCachesTemplates, placeholderRegex, indexToPlaceholder,
+  placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
+  placeholderStr, split, getSplitIds, execSplit, valuesDif
+} from './utils.js'
+
 export * from './html.js'
 
-const envCachesTemplates = (t => t() === t())(_ => (s => s)``)
-const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
-const placeholderRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`)
-const placeholderRegexGlobal = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
-
-const isBuild = value =>
-  value.hasOwnProperty('id') &&
-  value.hasOwnProperty('values')
-
-const isInstance = value =>
+export const isInstance = value =>
   value.hasOwnProperty('id') &&
   value.hasOwnProperty('values') &&
   value.hasOwnProperty('update') &&
   value.hasOwnProperty('content') &&
   value.hasOwnProperty('childNodes') &&
   value.hasOwnProperty('_childNodes')
-
-const placeholderStr = id => `oz-template-placeholder-${id}-${random}`
-
-const split = str => str.split(placeholderRegexGlobal)
-
-const getSplitIds = split => split.filter((str, i) => i % 2)
-
-const execSplit = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
 
 const deconstructArray = arr => {
   for (const item of arr) {
@@ -75,29 +64,15 @@ function setPlaceholdersPaths (node, placeholders, pointerArray, values) {
   for (const [placeholder, node] of nodes) {
     placeholder.path = getNodePath(node)
   }
-  for (const placeholder of placeholders.filter(({type}) => type === 'startTagName' || type === 'attribute' || type === 'property')) {
-    const attributeName = placeholderStr(placeholder.ids[0])
-    const foundNode = node.querySelector(`[${attributeName}]`)
-    foundNode.removeAttribute(attributeName)
-    placeholder.path = getNodePath(foundNode)
-  }
-}
-
-function indexToPlaceholder (placeholders) {
-  const arr = []
   for (const placeholder of placeholders) {
-    for (const id of placeholder.ids) arr.push(placeholder) // eslint-disable-line no-unused-vars
+    const type = placeholder.type
+    if (type === 'attribute' || type === 'property' || type === 'startTagName') {
+      const attributeName = placeholderStr(placeholder.ids[0])
+      const foundNode = node.querySelector(`[${attributeName}]`)
+      foundNode.removeAttribute(attributeName)
+      placeholder.path = getNodePath(foundNode)
+    }
   }
-  return arr
-}
-
-const valuesDif = (values, values2) => {
-  let dif = []
-  const highestLength = values.length > values2.length ? values.length : values2.length
-  for (let i = 0; i < highestLength; i++) {
-    if (values[i] !== values2[i]) dif.push(i)
-  }
-  return dif
 }
 
 export function htmlTemplate (parser, options) {
@@ -106,8 +81,14 @@ export function htmlTemplate (parser, options) {
     const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
-    const src = strings[0] + [...strings].splice(1).map((str, i) => placeholderStr(i) + str).join('')
-    const { placeholders, html } = parser(src, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit })
+    const { placeholders, html } = parser(strings, values, { placeholderStr,
+      placeholderRegex,
+      placeholderRegexGlobal,
+      split,
+      getSplitIds,
+      execSplit,
+      joinSrcWithPlaceholders
+    })
     const pointerArray = indexToPlaceholder(placeholders)
     const template = document.createElement('template')
     template.innerHTML = html
@@ -136,6 +117,7 @@ export function htmlTemplate (parser, options) {
           values: [],
           update (...values) {
             const dif = valuesDif(values, this.values)
+            this.values = values
             let updated = []
             for (const index of dif) {
               const placeholder = pointerArray[index]
@@ -288,6 +270,9 @@ function textNewNodes (instanceValues, value) {
           nodes = instance._childNodes
         }
       }
+      break
+    default:
+      nodes = [new Comment('')]
       break
   }
   return nodes

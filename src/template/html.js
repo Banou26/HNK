@@ -7,7 +7,8 @@ const startTagOpen = new RegExp(`^<${qnameCapture}`)
 const startTagClose = /^\s*(\/?)>/
 const endTag = new RegExp(`^<\\/(${qnameCapture}[^>]*)>`)
 
-export const html = htmlTemplate((source, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit }) => {
+export const html = htmlTemplate((sourceArr, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit, joinSrcWithPlaceholders }) => {
+  let source = joinSrcWithPlaceholders(sourceArr)
   let html = ''
   let placeholders = []
   const advance = (n, type, ...vals) => {
