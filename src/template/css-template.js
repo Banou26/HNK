@@ -48,7 +48,6 @@ export const cssTemplate = (parser, options) => {
     style.innerHTML = css
     document.body.appendChild(style)
     setPlaceholdersPaths(style.sheet, placeholders, values)
-    const pointerArray = indexToPlaceholder(placeholders)
     document.body.removeChild(style)
     const createCachedInstance = (...values) => {
       const createInstance = _ => {
@@ -73,7 +72,7 @@ export const cssTemplate = (parser, options) => {
           },
           content: node
         }
-        instance.values = values
+        instance.update(...values)
         return instance
       }
       createInstance.id = id

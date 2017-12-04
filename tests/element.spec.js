@@ -1,6 +1,9 @@
-import { Element, html } from '../src/index.js'
+import { Element, html, css } from '../src/index.js'
 import * as chai from 'chai'
 chai.should()
+
+const cssPlaceholderRegex = /var\(--oz-template-placeholder-(\d*)-[\w]*?\)/g
+
 describe('Element', _ => {
   let container
   beforeEach(function () {
@@ -19,36 +22,54 @@ describe('Element', _ => {
           bar: 'bar',
           get foobar () {
             return this.foo + this.bar
-          }
+          },
+          class1Color: 'red'
         }
       }
 
-      static template (state) {
+      static template ({ foo, foobar, bar }) {
         return html`
-        <div>
-          ${state.foo}
-          ${state.foobar}
-          ${state.bar}
+        <div class="class1">
+          ${foo}
+          ${foobar}
+          ${bar}
         </div>`
+      }
+
+      static style ({ class1Color }) {
+        return css`
+        class1 {
+          color: ${class1Color};
+        }`
       }
     }
 
     const elem = document.createElement('custom-element')
     customElements.define('custom-element', CustomElement)
     container.appendChild(elem)
-
-    container.childNodes[0].innerHTML.should.equal(`
-        <div>
+    const _container = container.childNodes[0].shadowRoot || container.childNodes[0]
+    _container.innerHTML.replace(cssPlaceholderRegex, '').should.equal(`
+        <div class="class1">
           foo
           foobar
           bar
-        </div>`)
+        </div><style type="text/css">
+        class1 {
+          color: var(--oz-template-placeholder-0-abc);
+        }</style>`.replace(cssPlaceholderRegex, ''))
+    const styleNode = _container.childNodes[_container.childNodes.length - 1]
+    styleNode.sheet.rules[0].style.color.should.equal('red')
     elem.state.foo = 'bar'
-    container.childNodes[0].innerHTML.should.equal(`
-        <div>
+    elem.state.class1Color = 'cyan'
+    styleNode.sheet.rules[0].style.color.should.equal('cyan')
+    _container.innerHTML.replace(cssPlaceholderRegex, '').should.equal(`
+        <div class="class1">
           bar
           barbar
           bar
-        </div>`)
+        </div><style type="text/css">
+        class1 {
+          color: var(--oz-template-placeholder-0-abc);
+        }</style>`.replace(cssPlaceholderRegex, ''))
   })
 })
