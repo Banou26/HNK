@@ -14,7 +14,7 @@ describe('Element', _ => {
     document.body.removeChild(container)
   })
 
-  it('should render Element node', function () {
+  it('should render element node', function () {
     class CustomElement extends Element {
       state () {
         return {

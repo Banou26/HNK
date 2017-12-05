@@ -15,11 +15,32 @@ describe('Template', function () {
       document.body.removeChild(container)
     })
 
+    it('should render text nodes with a function', function () {
+      let setVal
+      let instance = html`${setValue => {
+        setVal = setValue
+        setValue('foo')
+      }} bar ${'foo2'} bar2 ${'foo3'} bar3`()
+      container.appendChild(instance.content)
+      instance.update('foobar', 'foobar2', 'foobar3')
+      container.innerHTML.should.equal('foobar bar foobar2 bar2 foobar3 bar3')
+      setVal('updatedfoo')
+      container.innerHTML.should.equal('updatedfoo bar foobar2 bar2 foobar3 bar3')
+    })
+
     it('should render text nodes', function () {
       let instance = html`${'foo'} bar ${'foo2'} bar2 ${'foo3'} bar3`()
       container.appendChild(instance.content)
       instance.update('foobar', 'foobar2', 'foobar3')
       container.innerHTML.should.equal('foobar bar foobar2 bar2 foobar3 bar3')
+    })
+
+    it('should render comment node with a function', function () {
+      let instance = html`<!-- ${setValue => setValue('foo')} bar ${'foo2'} bar2 ${'foo3'} bar3 -->`()
+      container.appendChild(instance.content)
+      container.innerHTML.should.equal('<!-- foo bar foo2 bar2 foo3 bar3 -->')
+      instance.update('foobar', 'foobar2', 'foobar3')
+      container.innerHTML.should.equal('<!-- foobar bar foobar2 bar2 foobar3 bar3 -->')
     })
 
     it('should render comment node', function () {

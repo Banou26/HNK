@@ -98,20 +98,6 @@ export function htmlTemplate (parser, options) {
         const docFrag = document.importNode(template.content, true)
         const childNodes = [...docFrag.childNodes]
         const placeholdersInstances = new Map()
-        for (const placeholder of placeholders) {
-          const isText = placeholder.type === 'text'
-          let node = getNode(placeholder.path, docFrag)
-          if (isText) {
-            node = [node]
-            const firstNodeIndex = childNodes.indexOf(node[0])
-            if (firstNodeIndex !== -1) childNodes.splice(firstNodeIndex, 1, node)
-          }
-          placeholdersInstances.set(placeholder, {
-            placeholder,
-            node,
-            values: {}
-          })
-        }
         const instance = {
           id,
           values: [],
@@ -122,17 +108,27 @@ export function htmlTemplate (parser, options) {
             for (const index of dif) {
               const placeholder = pointerArray[index]
               const placeholderInstance = placeholdersInstances.get(placeholder)
+              const value = values[index]
+              if (typeof value === 'function' && !isBuild(value)) {
+                value(val => {
+                  const { instance } = placeholderInstance
+                  const vals = [...instance.values]
+                  vals[index] = val
+                  instance.update(...vals)
+                })
+                return
+              }
               if (updated.includes(placeholder)) continue
               updated.push(placeholder)
               switch (placeholder.type) {
                 case 'attribute':
-                  updateAttribute(placeholderInstance, values)
+                  updateAttribute(placeholderInstance, values, index)
                   break
                 case 'property':
-                  updateProperty(placeholderInstance, values)
+                  updateProperty(placeholderInstance, values, index)
                   break
                 case 'text':
-                  updateText(placeholderInstance, values, childNodes)
+                  updateText(placeholderInstance, values, childNodes, index)
                   break
                 case 'startTagName':
                   const dependents = placeholder.dependents || []
@@ -141,10 +137,10 @@ export function htmlTemplate (parser, options) {
                   for (const dependent of dependents) {
                     dependentsInstances.push(placeholdersInstances.get(dependent))
                   }
-                  updateElement(placeholderInstance, values, childNodes, dependentsInstances)
+                  updateElement(placeholderInstance, values, childNodes, dependentsInstances, index)
                   break
                 case 'comment':
-                  updateComment(placeholderInstance, values)
+                  updateComment(placeholderInstance, values, index)
                   break
               }
             }
@@ -158,6 +154,21 @@ export function htmlTemplate (parser, options) {
             return docFrag
           }
         }
+        for (const placeholder of placeholders) {
+          const isText = placeholder.type === 'text'
+          let node = getNode(placeholder.path, docFrag)
+          if (isText) {
+            node = [node]
+            const firstNodeIndex = childNodes.indexOf(node[0])
+            if (firstNodeIndex !== -1) childNodes.splice(firstNodeIndex, 1, node)
+          }
+          placeholdersInstances.set(placeholder, {
+            instance,
+            placeholder,
+            node,
+            values: {}
+          })
+        }
         instance.update(...values)
         return instance
       }
@@ -170,7 +181,7 @@ export function htmlTemplate (parser, options) {
   }
 }
 
-function updateElement (placeholderInstance, values, childNodes, dependentsInstances) {
+function updateElement (placeholderInstance, values, childNodes, dependentsInstances, index) {
   const { placeholder, node } = placeholderInstance
   const { splits } = placeholder
   // const instanceValues = placeholderInstance.values
@@ -201,7 +212,7 @@ function updateElement (placeholderInstance, values, childNodes, dependentsInsta
   }
 }
 
-function updateAttribute (placeholderInstance, values) {
+function updateAttribute (placeholderInstance, values, index) {
   const { placeholder, node } = placeholderInstance
   const { splits } = placeholder
   const instanceValues = placeholderInstance.values
@@ -213,7 +224,7 @@ function updateAttribute (placeholderInstance, values) {
   node.setAttribute(newAttributeName, newAttributeValue)
 }
 
-const updateProperty = (placeholderInstance, values) => {
+const updateProperty = (placeholderInstance, values, index) => {
   const { placeholder, node } = placeholderInstance
   const { splits } = placeholder
   const instanceValues = placeholderInstance.values
@@ -234,13 +245,13 @@ const updateProperty = (placeholderInstance, values) => {
   }
 }
 
-const updateComment = (placeholderInstance, values) => {
+const updateComment = (placeholderInstance, values, index) => {
   const { placeholder, node } = placeholderInstance
   const { splits } = placeholder
   node.nodeValue = execSplit(splits[0], values)
 }
 
-function textNewNodes (instanceValues, value) {
+const textNewNodes = (instanceValues, value, index) => {
   const oldValue = instanceValues.value
   instanceValues.value = value
   let nodes = []
@@ -269,6 +280,8 @@ function textNewNodes (instanceValues, value) {
           instanceValues.value = instance
           nodes = instance._childNodes
         }
+      } else {
+
       }
       break
     default:
@@ -278,14 +291,14 @@ function textNewNodes (instanceValues, value) {
   return nodes
 }
 
-function updateText (placeholderInstance, values, childNodes) {
+const updateText = (placeholderInstance, values, childNodes, index) => {
   const { placeholder } = placeholderInstance
   const { splits } = placeholder
   const instanceValues = placeholderInstance.values
   const currentNodes = placeholderInstance.node
+  const value = values[splits[0][1]]
   let firstCurrentChild = currentNodes[0]
   let firstCurrentChildParent = firstCurrentChild.parentNode
-  const value = values[splits[0][1]]
   let newNodes = textNewNodes(instanceValues, value)
   const currentNodesIndex = childNodes.indexOf(currentNodes)
   if (currentNodesIndex !== -1) childNodes.splice(currentNodesIndex, 1, newNodes)
