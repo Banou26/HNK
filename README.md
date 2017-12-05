@@ -6,7 +6,7 @@ To see more documentation/examples you can go on [oz.js website](https://js.ozap
 
 ## Overview
 
-Oz currently weight 4kb minified/gzip'd, you can split it's weight by using only features that you need, reactivity(700bytes)/html template(~2kb)/ css template(-500bytes)
+Oz currently weight 4kb minified/gzip'd, you can split it's weight by using only features that you need, reactivity(700bytes)/html template(~2kb)/css template(-500bytes)
 
 Oz provide multiples exports:
 
@@ -19,7 +19,7 @@ Oz will also support future features like
 
 - [ ] `router`  allow your OzElements to adopt specifics behaviors in function of their placement in the app route hierarchy
 - [ ] `store` allow your OzElements to use a reactive object that will contain your application state
-- [ ] `pug` to get rid of the verbose html syntax when using templates in the element tag
+- [ ] `pug` to get rid of the verbose html syntax when using placeholders in the element tag
   ```pug
   ${'my'}-${'custom'}-element myText
   ```
