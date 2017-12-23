@@ -2,28 +2,18 @@ export const UUID = a => a ? (a ^ Math.random() * 16 >> a / 4).toString(16) : ([
 
 export const isObject = item => item && typeof item === 'object' && !Array.isArray(item)
 
-export function cloneArray (array) {
-  if (!Array.isArray(array)) throw new TypeError(`Oz cloneArray: first argument has to be an array, typeof was '${typeof original}'`)
-  return [...array.map(item => {
-    if (isObject(item)) return cloneObject(item)
-    else if (Array.isArray(item)) return cloneArray(item)
-    else return item
-  })]
-}
-
 export function cloneObject (original) {
-  if (Array.isArray(original)) return cloneArray(original)
-  else if (!isObject(original)) throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object', typeof was '${typeof original}'`)
-  let copiedProps = Object.create(Object.getPrototypeOf(original)) // to allow the clonedObject instanceof originalObject class
+  if (!original || typeof original !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof original}'`)
+  if (original instanceof Map || original instanceof Set) return new (Object.getPrototypeOf(original).constructor)(cloneObject([...original]))
+  let copiedProps = Array.isArray(original) ? [...original] : new ((Object.getPrototypeOf(original) || {}).constructor)()
   for (let i in original) {
-    const {value, ...rest} = Object.getOwnPropertyDescriptor(original, i)
-    let newValue
-    if (isObject(value)) newValue = cloneObject(value)
-    else if (Array.isArray(value)) newValue = cloneArray(value)
-    else newValue = value
-    const newPropDesc = {...rest}
-    if (newValue) newPropDesc.value = newValue
-    Object.defineProperty(copiedProps, i, newPropDesc)
+    const desc = Object.getOwnPropertyDescriptor(original, i)
+    let value, rest
+    if (desc) ({value, ...rest} = desc)
+    else value = original[i]
+    if (typeof value === 'object') value = cloneObject(value)
+    if (desc) Object.defineProperty(copiedProps, i, {...rest, ...value && {value}})
+    else copiedProps[i] = value
   }
   return copiedProps
 }
