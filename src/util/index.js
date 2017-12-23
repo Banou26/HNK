@@ -11,7 +11,7 @@ export function cloneObject (original) {
     let value, rest
     if (desc) ({value, ...rest} = desc)
     else value = original[i]
-    if (!original || typeof value === 'object') value = cloneObject(value)
+    if (value && typeof value === 'object') value = cloneObject(value)
     if (desc) Object.defineProperty(copiedProps, i, {...rest, ...value && {value}})
     else copiedProps[i] = value
   }
