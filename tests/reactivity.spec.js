@@ -4,6 +4,11 @@ chai.should()
 let expect = chai.expect
 let assert = chai.assert
 
+const isReactiveObject = obj => {
+  obj.should.have.property('$watch')
+  obj.should.have.property('__reactivity__')
+}
+
 describe('Reactivity', _ => {
   describe('build', function () {
     it('should build a reactive copy of the original object', function () {
@@ -16,9 +21,18 @@ describe('Reactivity', _ => {
       }
       let react
       expect(_ => (react = reactify(original))).to.not.throw()
-      react.should.have.property('$watch')
-      react.should.have.property('__reactivity__')
+      isReactiveObject(react)
       react.should.deep.equal(original)
+    })
+
+    it('should build Maps and Sets', function () {
+      let reactMap, reactSet
+      expect(_ => (reactMap = reactify(new Map([['elem1', {foo: 'bar'}]])))).to.not.throw()
+      expect(_ => (reactSet = reactify(new Set(['foo', 'bar'])))).to.not.throw()
+      isReactiveObject(reactMap)
+      isReactiveObject(reactSet);
+      [...reactMap].should.deep.equal([...new Map([['elem1', {foo: 'bar'}]])]);
+      [...reactSet].should.deep.equal([...new Set(['foo', 'bar'])])
     })
   })
   describe('watch', function () {
@@ -59,18 +73,26 @@ describe('Reactivity', _ => {
         return this.c
       }, newVal => (val = newVal))
       react.a = 8
+      react.e = 1
       val.should.equal(10)
     })
   })
   describe('getter', function () {
     it('should cache the value', function () {
       let react = reactify({
+        a: 1,
         get b () {
-          return {}
+          return {
+            a: this.a
+          }
         }
       })
-      let b = react.b
-      react.should.have.property('b').equal(b)
+      let preB = react.b
+      expect(preB === react.b).to.equal(true)
+      react.a = 2
+      let postB = react.b
+      expect(preB === postB).to.equal(false)
+      expect(postB === react.b).to.equal(true)
     })
   })
 })
