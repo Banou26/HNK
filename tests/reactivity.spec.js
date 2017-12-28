@@ -1,13 +1,10 @@
-import { reactify } from '../src/index.js'
+import { reactify, Reactivity } from '../src/index.js'
 import * as chai from 'chai'
 chai.should()
 let expect = chai.expect
 let assert = chai.assert
 
-const isReactiveObject = obj => {
-  obj.should.have.property('$watch')
-  obj.should.have.property('__reactivity__')
-}
+const isReactiveObject = obj => obj instanceof Reactivity
 
 describe('Reactivity', _ => {
   describe('build', function () {
@@ -21,8 +18,8 @@ describe('Reactivity', _ => {
       }
       let react
       expect(_ => (react = reactify(original))).to.not.throw()
-      isReactiveObject(react)
-      react.should.deep.equal(original)
+      isReactiveObject(react);
+      ({...react})/* react */.should.deep.equal(original)
     })
 
     it('should build Maps and Sets', function () {

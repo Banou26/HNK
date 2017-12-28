@@ -1,4 +1,4 @@
-import { cloneObject } from '../util/index.js'
+import { cloneObject, isBuiltIn as IsBuiltIn } from '../util/index.js'
 
 export let Reactivity = class Reactivity {
   constructor () {
@@ -20,10 +20,10 @@ export const setDefaultReactiveRoot = reactiveRoot => {
   Reactivity = reactiveRoot.Reactivity
 }
 
-const isObjectPropWatcherRegistered = ({obj, prop}, reactiveRoot = defaultReactiveRoot) => {
-  const { watchers } = reactiveRoot
-  for (const watcherObj of watchers) {
-    if (watcherObj.obj === obj && watcherObj.prop === prop) return true
+const includeWatcherObj = (arr, {object, prop, watcher}) => {
+  for (const item of arr) {
+    const {object: _object, prop: _prop, watcher: _watcher} = item
+    if ((object === _object && prop === _prop) || watcher === _watcher) return item
   }
 }
 
@@ -48,49 +48,61 @@ const callWatchers = watchers => {
   for (const watcherObj of [...cacheWatchers, ...nonCacheWatchers]) watcherObj.watcher()
 }
 
-const internalSetters = ['set', 'add', 'clear', 'delete']
-
 const initDefaultPropertyReactivity = (props, prop) => {
   if (!props.has(prop)) props.set(prop, { watchers: [] })
 }
 
 export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
+  if (_object.__reactivity__ instanceof Reactivity) return _object
   const object = cloneObject(_object)
+  const isBuiltIn = IsBuiltIn(object)
+  const protoProps = isBuiltIn ? Object.getOwnPropertyNames(isBuiltIn[0].prototype) : []
   const reactivity = new Reactivity()
   Object.defineProperty(object, '__reactivity__', { value: reactivity })
   for (let i in object) {
-    const value = Object.getOwnPropertyDescriptor(object, i).value
-    if (value && typeof value === 'object') object[i] = reactify(value, reactiveRoot)
+    const desc = Object.getOwnPropertyDescriptor(object, i)
+    if (desc && desc.value && typeof desc.value === 'object') object[i] = reactify(desc.value, reactiveRoot)
   }
   const proxy = new Proxy(object, {
     get (target, prop, receiver) {
       initDefaultPropertyReactivity(reactivity.properties, prop)
+      const propReactivity = reactivity.properties.get(prop)
       const desc = Object.getOwnPropertyDescriptor(target, prop)
       let value
       if (desc) {
         if (desc.value) {
-          value = Reflect.get(target, prop, receiver)
+          value = Reflect.get(target, prop, /* isBuiltIn ? target : */receiver)
         } else if (desc.get) { // Getter value caching
           if (reactivity.cache.has(prop)) value = reactivity.cache.get(prop)
           else {
-            const watcher = _ => reactivity.cache.delete(prop)
+            const watcher = _ => {
+              reactivity.cache.delete(prop)
+              // const watchers = [...propReactivity.watchers, ...reactivity.watchers]
+              // propReactivity.watchers = []
+              // reactivity.watchers = []
+              // callWatchers(watchers)
+            }
             watcher.cache = true
-            value = registerWatcher(Reflect.get.bind(target, target, prop, receiver), watcher, {object, prop, reactiveRoot})
-            if (value && typeof value === 'object') value = reactify(value, reactiveRoot)
-            reactivity.cache.set(prop, value)
+            value = registerWatcher(_ => {
+              let _value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
+              // if (_value && typeof _value === 'object') _value = reactify(_value, reactiveRoot)
+              reactivity.cache.set(prop, _value)
+              return _value
+            }, watcher, {object, prop, reactiveRoot})
           }
         }
       } else {
-        value = Reflect.get(target, prop, target)
-        const internalSettersObject = target instanceof Map || target instanceof Set
-        if (internalSettersObject && typeof value === 'function') {
+        value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
+        if (isBuiltIn && typeof value === 'function') {
           value = value.bind(target)
-          if (internalSetters.includes(prop)) {
+          if (protoProps.includes(prop)) {
             const _value = value
             value = (...args) => {
               _value(...args)
-              callWatchers(reactivity.watchers)
-              reactivity.watchers = []
+              // const watchers = [...propReactivity.watchers, ...reactivity.watchers]
+              // propReactivity.watchers = []
+              // reactivity.watchers = []
+              // callWatchers(watchers)
               return receiver
             }
           }
@@ -99,30 +111,33 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       const propWatchers = reactivity.properties.get(prop).watchers
       if (reactiveRoot.watchers.length) {
         const currentWatcher = getCurrentWatcher(reactiveRoot)
-        if (!propWatchers.includes(reactiveRoot.watcher)) propWatchers.push(currentWatcher)
-        if (!reactivity.watchers.includes(reactiveRoot.watchers)) reactivity.watchers.push(currentWatcher)
-        if (value && typeof value === 'object' && !value.__reactivity__.watchers.includes(currentWatcher)) value.__reactivity__.watchers.push(currentWatcher)
+        if (!includeWatcherObj(propWatchers, currentWatcher)) propWatchers.push(currentWatcher)
+        if (!includeWatcherObj(reactivity.watchers, currentWatcher)) reactivity.watchers.push(currentWatcher)
+        if (value && typeof value === 'object' && value.__reactivity__ && !includeWatcherObj(value.__reactivity__.watchers, currentWatcher)) value.__reactivity__.watchers.push(currentWatcher)
       }
       return value
     },
     set (target, prop, value, receiver) {
       initDefaultPropertyReactivity(reactivity.properties, prop)
-      if (value && typeof value === 'object') value = reactify(value, reactiveRoot)
+      if (value && typeof value === 'object' && !(value.__reactivity__ instanceof Reactivity)) value = reactify(value, reactiveRoot)
       const result = Reflect.set(target, prop, value, receiver)
       const propReactivity = reactivity.properties.get(prop)
-      callWatchers([...propReactivity.watchers, ...reactivity.watchers])
+      const watchers = [...propReactivity.watchers, ...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
+      callWatchers(watchers)
       return result
     },
     deleteProperty (target, prop) {
       initDefaultPropertyReactivity(reactivity.properties, prop)
       const result = Reflect.deleteProperty(target, prop)
       const propReactivity = reactivity.properties.get(prop)
-      callWatchers([...propReactivity.watchers, ...reactivity.watchers])
+      const watchers = [...propReactivity.watchers, ...reactivity.watchers]
       propReactivity.watchers = []
       reactivity.watchers = []
+      callWatchers(watchers)
       reactivity.properties.delete(prop)
+      reactivity.cache.delete(prop)
       return result
     }
   })

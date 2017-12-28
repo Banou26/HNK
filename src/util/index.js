@@ -2,18 +2,36 @@ export const UUID = a => a ? (a ^ Math.random() * 16 >> a / 4).toString(16) : ([
 
 export const isObject = item => item && typeof item === 'object' && !Array.isArray(item)
 
+// todo add more of the built-in objects, some of them are in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+export const builtInObjects = new Map([
+  [URL, url => new URL(url.href)],
+  [URLSearchParams, urlSearchparams => new URLSearchParams(urlSearchparams.toString())],
+  [RegExp, regexp => new RegExp(regexp.source, regexp.flags)],
+  [Map, map => new Map(cloneObject([...map]))],
+  [WeakMap, weakMap => new WeakMap()],
+  [Set, set => new Set(cloneObject([...set]))],
+  [WeakSet, weakSet => new WeakSet()]
+])
+
+export const isBuiltIn = obj => {
+  for (const pair of builtInObjects) {
+    if (obj instanceof pair[0]) return pair
+  }
+}
+
 export function cloneObject (original) {
   if (!original || typeof original !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof original}'`)
-  if (original instanceof Map || original instanceof Set) return new (Object.getPrototypeOf(original).constructor)(cloneObject([...original]))
-  let copiedProps = Array.isArray(original) ? [...original] : new ((Object.getPrototypeOf(original) || {}).constructor)()
+  const builtInPair = isBuiltIn(original)
+  if (builtInPair) return builtInPair[1](original)
+  let object = Array.isArray(original) ? [...original] : Object.create(Object.getPrototypeOf(original))
   for (let i in original) {
     const desc = Object.getOwnPropertyDescriptor(original, i)
     let value, rest
     if (desc) ({value, ...rest} = desc)
     else value = original[i]
     if (value && typeof value === 'object') value = cloneObject(value)
-    if (desc) Object.defineProperty(copiedProps, i, {...rest, ...value && {value}})
-    else copiedProps[i] = value
+    if (desc) Object.defineProperty(object, i, {...rest, ...value && {value}})
+    else object[i] = value
   }
-  return copiedProps
+  return object
 }
