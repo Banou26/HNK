@@ -1,60 +1,98 @@
-import { reactify, defaultReactiveRoot } from '../index.js'
+import { reactify } from '../reactivity/index.js'
 import pathToRegexp from '../libs/path-to-regexp.js'
+import { cloneObject } from '../util/index.js'
+
+const flattenRoutes = (routes, __path = '', parent) => {
+  let map = new Map()
+  for (const route of routes) {
+    const { path, children } = route
+    const childPath = __path + path
+    const keys = []
+    const _route = {...cloneObject(route), ...parent && {parent}, keys, regex: pathToRegexp(childPath, keys)}
+    map.set(childPath, _route)
+    if (children) {
+      for (const [_path, child] of flattenRoutes(children, childPath, _route)) {
+        map.set(_path, child)
+      }
+    }
+  }
+  return map
+}
 
 export const Router = class OzRouter {
-  constructor (options = {}, reactiveRoot = defaultReactiveRoot) {
+  constructor (config = {}, options = {}) {
+    this.config = config
     this.options = options
-    this.state = reactify({
-      routes: options.routes,
-      matched: null
-    })
+    this.routes = config.routes ? flattenRoutes(config.routes) : new Map()
+    this.params = {}
+    this.matched = {}
+    this.fullPath = location.href
+    this.push(location.href)
+    return reactify(this)
   }
 
-  set options (options) {
-    this._options = options
+  get url () {
+    return new URL(this.fullPath)
   }
 
-  get options () {
-    return this._options
+  get path () {
+    return this.url.pathname
   }
 
-  set state (state) {
-    this._state = state
+  get hash () {
+    return this.url.hash
   }
 
-  get state () {
-    return this._state
+  get query () {
+    const query = {}
+    for (const [key, value] of this.url.searchParams) query[key] = value
+    return query
   }
 
-  set params (params) {
-    this._params = params
+  get name () {
+    return this.matched.name
   }
 
-  get params () {
-    return this._params
+  get currentRoute () {
+    const {path, fullPath, query, params, hash, matched, name} = this
+    return {path, fullPath, query, params, hash, matched, name}
   }
 
-  set queries (queries) {
-    this._queries = queries
+  match (url) {
+
   }
 
-  get queries () {
-    return this._queries
+  back () {
+    return this.go(-1)
+  }
+
+  forward () {
+    return this.go(1)
   }
 
   go (num) {
-
+    return window.history.go(num)
   }
 
-  push (data) {
-    if (typeof data === 'string') {
-
-    } else if (data && typeof data === 'object') {
-
+  push (url) {
+    const result = window.history.pushState({}, '', url)
+    this.fullPath = location.href
+    for (const [, route] of this.routes) {
+      const match = route.regex.exec(this.url.pathname)
+      if (match) {
+        const params = {}
+        for (const i in route.keys) {
+          const key = route.keys[i]
+          params[key.name] = match[i + 1]
+        }
+        this.params = params
+        this.matched = route
+      }
     }
+    return result
   }
 
-  replace () {
-    
+  replace (url) {
+    return window.history.replaceState({}, '', url)
   }
 }
