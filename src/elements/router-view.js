@@ -30,6 +30,10 @@ export class RouterView extends Element {
     super.router = router
   }
 
+  get router () {
+    return this.state.router
+  }
+
   get components () {
     return this.state.components
   }
@@ -44,10 +48,10 @@ export class RouterView extends Element {
     }
   }
 
-  static template (state) {
+  static template ({router, components}) {
     const elems = []
-    if (state.router && state.components) {
-      for (const Component of state.components) elems.push(new Component({router: state.router}))
+    if (router && components) {
+      for (const Component of components) elems.push(new Component({router: router}))
     }
     return html`${elems.length ? elems : ''}`
   }
