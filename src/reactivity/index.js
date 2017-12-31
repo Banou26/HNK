@@ -1,4 +1,4 @@
-import { cloneObject, isBuiltIn as IsBuiltIn } from '../util/index.js'
+import { cloneObject, isBuiltIn as IsBuiltIn, getPropertyDescriptor } from '../util/index.js'
 
 export let Reactivity = class Reactivity {
   constructor () {
@@ -67,48 +67,36 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
     get (target, prop, receiver) {
       initDefaultPropertyReactivity(reactivity.properties, prop)
       const propReactivity = reactivity.properties.get(prop)
-      const desc = Object.getOwnPropertyDescriptor(target, prop)
+      const desc = getPropertyDescriptor(target, prop)
+      if (!desc) return Reflect.get(target, prop, isBuiltIn ? target : receiver)
       let value
-      if (desc) {
-        if (desc.value) {
-          value = Reflect.get(target, prop, /* isBuiltIn ? target : */receiver)
-        } else if (desc.get) { // Getter value caching
-          if (reactivity.cache.has(prop)) value = reactivity.cache.get(prop)
-          else {
-            const watcher = _ => {
-              reactivity.cache.delete(prop)
-              // const watchers = [...propReactivity.watchers, ...reactivity.watchers]
-              // propReactivity.watchers = []
-              // reactivity.watchers = []
-              // callWatchers(watchers)
+      if (Reflect.has(desc, 'value') && !isBuiltIn) { // property
+        value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
+      } else { // getter
+        if (reactivity.cache.has(prop)) value = reactivity.cache.get(prop)
+        else {
+          value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
+          if (isBuiltIn && typeof value === 'function') {
+            value = value.bind(target)
+            if (protoProps.includes(prop)) {
+              const _value = value
+              value = (...args) => {
+                _value(...args)
+                return receiver
+              }
             }
+          } else {
+            const watcher = _ => reactivity.cache.delete(prop)
             watcher.cache = true
             value = registerWatcher(_ => {
               let _value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
-              // if (_value && typeof _value === 'object') _value = reactify(_value, reactiveRoot)
               reactivity.cache.set(prop, _value)
               return _value
             }, watcher, {object, prop, reactiveRoot})
           }
         }
-      } else {
-        value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
-        if (isBuiltIn && typeof value === 'function') {
-          value = value.bind(target)
-          if (protoProps.includes(prop)) {
-            const _value = value
-            value = (...args) => {
-              _value(...args)
-              // const watchers = [...propReactivity.watchers, ...reactivity.watchers]
-              // propReactivity.watchers = []
-              // reactivity.watchers = []
-              // callWatchers(watchers)
-              return receiver
-            }
-          }
-        } else if (typeof value === 'object') value = reactify(value, reactiveRoot)
       }
-      const propWatchers = reactivity.properties.get(prop).watchers
+      const propWatchers = propReactivity.watchers
       if (reactiveRoot.watchers.length) {
         const currentWatcher = getCurrentWatcher(reactiveRoot)
         if (!includeWatcherObj(propWatchers, currentWatcher)) propWatchers.push(currentWatcher)
