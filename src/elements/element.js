@@ -24,14 +24,14 @@ export const ElementClass = (_class = HTMLElement) => class OzElement extends _c
     else this.__host__ = this
     if (this.state) this.state = reactify(this.state())
     if (hasTemplate) {
-      const templateReturn = cstr.template.apply(this, [this.state, this.store])
-      if (!isBuild(templateReturn)) throw new Error('Template should return a html-template build.')
-      const template = this.__template__ = templateReturn()
-      watch(_ => cstr.template.apply(this, [this.state, this.store]), templateBuild => {
+      let templateReturn
+      let template
+      watch(_ => (templateReturn = cstr.template.apply(this, [this.state, this.store])), templateBuild => {
         template.update(...templateBuild.values)
         if (this.router) injectRouter(this, this.router)
       })
-      if (this.router) injectRouter(this, this.router)
+      if (!isBuild(templateReturn)) throw new Error('Template should return a html-template build.')
+      template = this.__template__ = templateReturn()
     }
     if (hasStyle) {
       const style = this.__style__ = cstr.style.apply(this, [this.state, this.store])()
