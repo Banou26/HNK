@@ -19,19 +19,36 @@ export const isBuiltIn = obj => {
   }
 }
 
-export function cloneObject (original) {
+export function cloneObject (original, refs = new Map()) {
+  if (refs.has(original)) return refs.get(original)
   if (!original || typeof original !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof original}'`)
   const builtInPair = isBuiltIn(original)
   if (builtInPair) return builtInPair[1](original)
   let object = Array.isArray(original) ? [...original] : Object.create(Object.getPrototypeOf(original))
-  for (let i in original) {
-    const desc = Object.getOwnPropertyDescriptor(original, i)
-    let value, rest
-    if (desc) ({value, ...rest} = desc)
-    else value = original[i]
-    if (value && typeof value === 'object') value = cloneObject(value)
-    if (desc) Object.defineProperty(object, i, {...rest, ...value && {value}})
-    else object[i] = value
+  refs.set(original, object)
+  for (const [prop, desc] of Object.entries(Object.getOwnPropertyDescriptors(original))) {
+    let {value, ...rest} = desc
+    Object.defineProperty(object, prop, {...rest, ...value !== undefined && {value: value && typeof value === 'object' ? cloneObject(value, refs) : value}})
   }
   return object
+}
+window.cloneObject = cloneObject
+
+export const getPropertyDescriptorPair = (prototype, property) => {
+  let descriptor = Object.getOwnPropertyDescriptor(prototype, property)
+  while (!descriptor) {
+    prototype = Object.getPrototypeOf(prototype)
+    if (!prototype) return
+    descriptor = Object.getOwnPropertyDescriptor(prototype, property)
+  }
+  return {prototype, descriptor}
+}
+
+export const getPropertyDescriptor = (object, property) => {
+  const result = getPropertyDescriptorPair(object, property)
+  return result ? result.descriptor : null
+}
+export const getPropertyDescriptorPrototype = (object, property) => {
+  const result = getPropertyDescriptorPair(object, property)
+  return result ? result.prototype : null
 }
