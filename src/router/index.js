@@ -24,8 +24,6 @@ export const Router = class OzRouter {
     this.config = config
     this.options = options
     this.routes = config.routes ? flattenRoutes(config.routes) : new Map()
-    this.params = {}
-    this.matched = {}
     this.fullPath = location.href
     this.push(location.href)
     return reactify(this)
@@ -47,6 +45,27 @@ export const Router = class OzRouter {
     const query = {}
     for (const [key, value] of this.url.searchParams) query[key] = value
     return query
+  }
+
+  get params () {
+    for (const [, route] of this.routes) {
+      const match = route.regex.exec(this.url.pathname)
+      if (match) {
+        const params = {}
+        for (const i in route.keys) {
+          const key = route.keys[i]
+          params[key.name] = match[i + 1]
+        }
+        return params
+      }
+    }
+  }
+
+  get matched () {
+    for (const [, route] of this.routes) {
+      const match = route.regex.exec(this.url.pathname)
+      if (match) return route
+    }
   }
 
   get name () {
@@ -77,18 +96,6 @@ export const Router = class OzRouter {
   push (url) {
     const result = window.history.pushState({}, '', url)
     this.fullPath = location.href
-    for (const [, route] of this.routes) {
-      const match = route.regex.exec(this.url.pathname)
-      if (match) {
-        const params = {}
-        for (const i in route.keys) {
-          const key = route.keys[i]
-          params[key.name] = match[i + 1]
-        }
-        this.params = params
-        this.matched = route
-      }
-    }
     return result
   }
 
