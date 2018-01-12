@@ -5,12 +5,10 @@ export const isObject = item => item && typeof item === 'object' && !Array.isArr
 // todo add more of the built-in objects, some of them are in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
 export const builtInObjects = new Map([
   [URL, url => new URL(url.href)],
-  [URLSearchParams, urlSearchparams => new URLSearchParams(urlSearchparams.toString())],
+  [URLSearchParams, urlSearchParams => new URLSearchParams(urlSearchParams.toString())],
   [RegExp, regexp => new RegExp(regexp.source, regexp.flags)],
   [Map, map => new Map(cloneObject([...map]))],
-  [WeakMap, weakMap => new WeakMap()],
-  [Set, set => new Set(cloneObject([...set]))],
-  [WeakSet, weakSet => new WeakSet()]
+  [Set, set => new Set(cloneObject([...set]))]
 ])
 
 export const isBuiltIn = obj => {
@@ -19,9 +17,22 @@ export const isBuiltIn = obj => {
   }
 }
 
+const ignoreObjectType = [
+  WeakSet,
+  WeakMap,
+  Node
+]
+
+export const isIgnoredObjectType = obj => {
+  for (const type of ignoreObjectType) {
+    if (obj instanceof type) return obj
+  }
+}
+
 export function cloneObject (original, refs = new Map()) {
   if (refs.has(original)) return refs.get(original)
   if (!original || typeof original !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof original}'`)
+  if (isIgnoredObjectType(original)) return original
   const builtInPair = isBuiltIn(original)
   if (builtInPair) return builtInPair[1](original)
   let object = Array.isArray(original) ? [...original] : Object.create(Object.getPrototypeOf(original))
@@ -32,7 +43,6 @@ export function cloneObject (original, refs = new Map()) {
   }
   return object
 }
-window.cloneObject = cloneObject
 
 export const getPropertyDescriptorPair = (prototype, property) => {
   let descriptor = Object.getOwnPropertyDescriptor(prototype, property)
@@ -44,11 +54,15 @@ export const getPropertyDescriptorPair = (prototype, property) => {
   return {prototype, descriptor}
 }
 
+export const hasProperty = (object, property) => {
+  return !!getPropertyDescriptorPair(object, property)
+}
+
 export const getPropertyDescriptor = (object, property) => {
   const result = getPropertyDescriptorPair(object, property)
-  return result ? result.descriptor : null
+  if (result) return result.descriptor
 }
 export const getPropertyDescriptorPrototype = (object, property) => {
   const result = getPropertyDescriptorPair(object, property)
-  return result ? result.prototype : null
+  if (result) return result.prototype
 }
