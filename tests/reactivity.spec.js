@@ -109,6 +109,36 @@ describe('Reactivity', _ => {
       let react = reactify({obj})
       expect(obj).to.equal(react.obj)
     })
+
+    it('should have a optional handler in the standalone function', function () {
+      let a, b, c
+      let react = reactify({
+        a: 1,
+        b: 2,
+        get c () {
+          return this.a + this.b
+        }
+      })
+      watch(_ => {
+        if (b) c = react.c
+        else if (a) b = react.c
+        else a = react.c
+      })
+      expect(a).to.equal(3)
+      react.a = 3
+      expect(b).to.equal(5)
+      react.b = 10
+      expect(c).to.equal(13)
+    })
+
+    it('should behave the same with multiple watchers', function () {
+      let c, c2
+      watch(_ => (c = react.c))
+      watch(_ => (c2 = react.c))
+      react.a = 3
+      expect(c).to.equal(5)
+      expect(c2).to.equal(5)
+    })
   })
   describe('getter', function () {
     it('should cache the value', function () {

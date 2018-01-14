@@ -25,7 +25,7 @@ export const setDefaultReactiveRoot = reactiveRoot => {
 const includeWatcherObj = (arr, {object, prop, watcher}) => {
   for (const item of arr) {
     const {object: _object, prop: _prop, watcher: _watcher} = item
-    if ((object === _object && prop === _prop) || watcher === _watcher) return item
+    if ((object && prop && object === _object && prop === _prop) || watcher === _watcher) return item
   }
 }
 
@@ -43,9 +43,9 @@ const registerWatcher = (getter, watcher, options) => {
 const callWatchers = watchers => {
   const cacheWatchers = []
   const nonCacheWatchers = []
-  for (const watcher of watchers) {
-    if (watcher.cache) cacheWatchers.push(watcher)
-    else nonCacheWatchers.push(watcher)
+  for (const watcherObj of watchers) {
+    if (watcherObj.watcher.cache) cacheWatchers.push(watcherObj)
+    else nonCacheWatchers.push(watcherObj)
   }
   for (const watcherObj of [...cacheWatchers, ...nonCacheWatchers]) watcherObj.watcher()
 }
@@ -98,8 +98,9 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       if (desc && Reflect.has(desc, 'value')) { // property
         value = Reflect.get(target, prop, isBuiltIn ? target : receiver)
       } else { // getter
-        if (reactivity.cache.has(prop)) value = reactivity.cache.get(prop)
-        else {
+        if (reactivity.cache.has(prop)) {
+          value = reactivity.cache.get(prop)
+        } else {
           const watcher = _ => {
             reactivity.cache.delete(prop)
             callObjectsWatchers(propReactivity, reactivity)
@@ -132,6 +133,7 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       return value
     },
     set (target, prop, value, receiver) {
+      if (value === target[prop]) return true
       if (reactiveProperties.includes(prop)) return Reflect.set(target, prop, value, receiver)
       initDefaultPropertyReactivity(reactivity.properties, prop)
       if (value && typeof value === 'object') value = reactify(value, reactiveRoot)
@@ -182,7 +184,7 @@ export const watch = (getter, handler, reactiveRoot = defaultReactiveRoot) => {
   const watcher = _ => {
     if (unwatch) return
     let newValue = registerWatcher(getter, watcher, {reactiveRoot})
-    handler(newValue, oldValue)
+    if (handler) handler(newValue, oldValue)
     oldValue = newValue
   }
   oldValue = registerWatcher(getter, watcher, {reactiveRoot})
