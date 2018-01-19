@@ -81,7 +81,8 @@ export function htmlTemplate (parser, options) {
     const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
-    const { placeholders, html } = parser(strings, values, { placeholderStr,
+    const { placeholders, html } = parser(strings, values, {
+      placeholderStr,
       placeholderRegex,
       placeholderRegexGlobal,
       split,
@@ -109,7 +110,7 @@ export function htmlTemplate (parser, options) {
               const placeholder = pointerArray[index]
               const placeholderInstance = placeholdersInstances.get(placeholder)
               const value = values[index]
-              if (typeof value === 'function' && !isBuild(value)) {
+              if (typeof value === 'function' && placeholder.type !== 'property' && !isBuild(value)) {
                 value(val => {
                   const { instance } = placeholderInstance
                   const vals = [...instance.values]
@@ -152,7 +153,8 @@ export function htmlTemplate (parser, options) {
           get content () {
             for (const node of this.childNodes) docFrag.appendChild(node)
             return docFrag
-          }
+          },
+          __reactivity__: false
         }
         for (const placeholder of placeholders) {
           const isText = placeholder.type === 'text'
@@ -235,8 +237,9 @@ const updateProperty = (placeholderInstance, values, index) => {
   }
   const propName = execSplit(splits[0], values)
   const propValue = values[splits[1][1]]
-  if (propName.startsWith('on-')) { // Event handling
-    const listenerName = propName.substring(3)
+  let isEvent = propName.startsWith('on-') ? 1 : propName.startsWith('@') ? 2 : 0
+  if (isEvent) { // Event handling
+    const listenerName = propName.substring(isEvent === 1 ? 3 : 1)
     node.addEventListener(listenerName, propValue)
     instanceValues.listenerName = listenerName
     instanceValues.propValue = propValue
@@ -267,6 +270,8 @@ const textNewNodes = (instanceValues, value, index) => {
         for (const val of value) {
           nodes = [...nodes, ...textNewNodes(instanceValues.arrValues, val)]
         }
+      } else if (value === null) {
+        nodes = [new Comment('')]
       }
       break
     case 'function':
@@ -307,11 +312,11 @@ const updateText = (placeholderInstance, values, childNodes, index) => {
   firstCurrentChildParent = firstCurrentChild.parentNode
   for (const node of deconstructArray(newNodes)) {
     if (currentNodes.includes(node)) nodesToKeep.push(node)
-    firstCurrentChildParent.insertBefore(node, firstCurrentChild)
+    if (firstCurrentChildParent) firstCurrentChildParent.insertBefore(node, firstCurrentChild)
   }
   for (const node of currentNodes) {
     if (nodesToKeep.includes(node)) continue
-    node.parentNode.removeChild(node)
+    if (node.parentNode) node.parentNode.removeChild(node)
   }
   placeholderInstance.node = newNodes
 }
