@@ -3,13 +3,15 @@ import { isBuild } from '../template/utils.js'
 import { hasProperty } from '../util/index.js'
 
 const injectRouter = (elem, router) => {
+  const ozElements = []
   const walker = document.createTreeWalker(elem.shadowRoot || elem, NodeFilter.SHOW_ELEMENT, { acceptNode: node => {
-    if (node instanceof Element || node.constructor.__ozElement__) return NodeFilter.FILTER_ACCEPT
-    else return NodeFilter.FILTER_REJECT
+    if (node instanceof Element || (node.constructor.__ozElement__ && node.__context__)) {
+      ozElements.push(node)
+      return NodeFilter.FILTER_REJECT
+    } else return NodeFilter.FILTER_SKIP
   } }, false)
-  while (walker.nextNode()) {
-    walker.currentNode.$router = router
-  }
+  while (walker.nextNode()) {}
+  for (const element of ozElements) element.$router = router
 }
 
 export const ElementClass = (_class = HTMLElement) => class OzElement extends _class {
@@ -80,13 +82,13 @@ export const registerElement = ({
   watchers: _watchers = {},
   created: _created,
   connected: _connected,
-  disconnected: _disconnected
+  disconnected: _disconnected,
+  customElements = window.customElements
   }) => {
   _props = [..._props, '$router']
   class OzFunctionnalElement extends extend {
     constructor (cstrOptions = {}) {
       super()
-      console.log('cstr', this)
       const {shadowDom, router: router_} = {..._options, ...cstrOptions}
       const context = this.__context__ = reactify({
         host: shadowDom ? this.attachShadow({ mode: shadowDom }) : this,
@@ -94,7 +96,9 @@ export const registerElement = ({
         get router () {
           return this.props.$router || router_
         },
-        watchers: {}
+        watchers: {},
+        template: undefined,
+        style: undefined
       })
       const { host, router, props, watchers } = context
       context.state = reactify(typeof _state === 'function' ? _state(context) : _state || {})
@@ -118,8 +122,7 @@ export const registerElement = ({
         })
         if (!isBuild(build)) throw new Error('Template should return a html-template build.')
         template = build()
-        host.appendChild(template.content)
-        if (router) injectRouter(host, router)
+        context.template = template
       }
       if (_style) {
         let style, build
@@ -127,13 +130,10 @@ export const registerElement = ({
         watch(_ => (build = buildStyle()), styleBuild => style.update(...styleBuild.values))
         if (!isBuild(build)) throw new Error('Style should return a css-template build.')
         style = build()
-        host.appendChild(style.content)
-        style.update()
+        context.style = style
       }
       for (const [name, _watcher] of Object.entries(_watchers)) {
-        const watcher = _watcher.bind(null, context)
-        watchers[name] = watcher
-        watch(_ => watcher(), _ => {})
+        watch(watchers[name] = _watcher.bind(null, context))
       }
       if (_created) _created(context)
     }
@@ -148,6 +148,15 @@ export const registerElement = ({
 
     connectedCallback () {
       const ctx = this.__context__
+      const {host, style, router, template} = ctx
+      if (template) {
+        host.appendChild(template.content)
+        if (router) injectRouter(host, router)
+      }
+      if (style) {
+        host.appendChild(style.content)
+        style.update()
+      }
       if (_connected) _connected(ctx)
     }
 
