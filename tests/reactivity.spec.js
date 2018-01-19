@@ -50,6 +50,10 @@ describe('Reactivity', _ => {
         },
         get e () {
           return this.c
+        },
+        f: {
+          g: 5,
+          h: 10
         }
       })
     })
@@ -77,6 +81,14 @@ describe('Reactivity', _ => {
       react.a = 8
       expect(val).to.equal(10)
     })
+
+    // it('should watch deep change', function () {
+    //   let val
+    //   react.$watch(newVal => (val = newVal))
+    //   react.f.g = 2
+    //   console.log(val)
+    //   expect(val).to.equal(4)
+    // })
 
     it('should watch deep dependency', function () {
       let val
