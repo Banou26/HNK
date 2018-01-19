@@ -73,7 +73,7 @@ export const IsIgnoredObjectType = obj => {
 }
 
 export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
-  if (_object.__reactivity__ instanceof Reactivity || IsIgnoredObjectType(_object)) return _object
+  if (_object.__reactivity__ instanceof Reactivity || IsIgnoredObjectType(_object) || _object.__reactivity__ === false) return _object
   const object = cloneObject(_object)
   const isBuiltIn = IsBuiltIn(object)
   const protoProps = isBuiltIn ? Object.getOwnPropertyNames(isBuiltIn[0].prototype) : []
@@ -127,8 +127,6 @@ export const reactify = (_object = {}, reactiveRoot = defaultReactiveRoot) => {
       if (reactiveRoot.watchers.length) {
         const currentWatcher = getCurrentWatcher(reactiveRoot)
         if (!includeWatcherObj(propWatchers, currentWatcher)) propWatchers.push(currentWatcher)
-        // if (!includeWatcherObj(reactivity.watchers, currentWatcher)) reactivity.watchers.push(currentWatcher)
-        // if (value && typeof value === 'object' && value.__reactivity__ && !includeWatcherObj(value.__reactivity__.watchers, currentWatcher)) value.__reactivity__.watchers.push(currentWatcher)
       }
       return value
     },
