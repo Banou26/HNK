@@ -4,8 +4,8 @@ import {
   placeholderStr, split, getSplitIds, execSplit, valuesDif
 } from './utils.js'
 
-function setPlaceholdersPaths (sheet, placeholders, values) {
-  const rules = sheet.rules
+async function setPlaceholdersPaths (sheet, placeholders, values) {
+  const rules = sheet.cssRules
   const arrRules = [...rules]
   for (const rulesI in arrRules) {
     const rule = arrRules[rulesI]
@@ -47,7 +47,7 @@ export const cssTemplate = (parser, options) => {
     style.type = 'text/css'
     style.innerHTML = css
     document.body.appendChild(style)
-    setPlaceholdersPaths(style.sheet, placeholders, values)
+    setPlaceholdersPaths(style.sheet, placeholders, values) // setPlaceholdersPaths is async to make firefox gucci since they deal asynchronously with css parsing
     document.body.removeChild(style)
     const createCachedInstance = (...values) => {
       const createInstance = _ => {
