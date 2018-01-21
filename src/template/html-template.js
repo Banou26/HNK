@@ -262,6 +262,9 @@ const textNewNodes = (instanceValues, value, index) => {
     case 'string':
       nodes = [new Text(value)]
       break
+    case 'number':
+      nodes = [new Text(value)]
+      break
     case 'object':
       if (value instanceof Node) {
         nodes = [value]
