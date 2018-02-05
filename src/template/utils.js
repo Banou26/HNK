@@ -32,12 +32,13 @@ export const valuesDif = (values, values2) => {
   return dif
 }
 
-// export const joinSrcWithPlaceholders = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholderStr(i) + str).join('')
-export const joinSrcWithPlaceholders = strings => {
-  let str = strings[0]
-  for (const i in strings) {
-    if (i === 0) continue
-    str += placeholderStr(i) + (strings[parseInt(i) + 1] || '')
-  }
-  return str
-}
+export const joinSrcWithPlaceholders = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholderStr(i) + str).join('')
+// export const joinSrcWithPlaceholders = strings => { // ITS BUGGED, it add a placeholder at the end even without placeholders in the tag
+//   let str = strings[0]
+//   for (const i in strings) {
+//     console.log('i', i, strings[i])
+//     if (i === 0) continue
+//     str += placeholderStr(i) + (strings[parseInt(i) + 1] || '')
+//   }
+//   return str
+// }
