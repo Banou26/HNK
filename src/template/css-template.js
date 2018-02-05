@@ -12,7 +12,7 @@ async function setPlaceholdersPaths (sheet, placeholders, values) {
     if (!rule.cssText.includes('var(--oz-template-placeholder-')) continue
     for (const style of rule.style) {
       const val = rule.style[style]
-      if (rule.cssText.includes('var(--oz-template-placeholder-')) {
+      if (val.includes('var(--oz-template-placeholder-')) {
         const valSplit = split(val)
         placeholders.push({
           type: 'value',
@@ -29,19 +29,12 @@ const getStyle = (path, sheet) => path.reduce((item, i) => item[i], sheet)
 
 export const cssTemplate = (parser, options) => {
   const cache = new Map()
-  return (strings, ...values) => {
+  return (_strings, ...values) => {
+    const strings = [..._strings]
     const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
-    const { css } = parser(strings, values, {
-      placeholderStr,
-      placeholderRegex,
-      placeholderRegexGlobal,
-      split,
-      getSplitIds,
-      execSplit,
-      joinSrcWithPlaceholders
-    })
+    const { css } = parser(strings, values)
     const placeholders = []
     const style = document.createElement('style')
     style.type = 'text/css'
@@ -55,8 +48,8 @@ export const cssTemplate = (parser, options) => {
         const instance = {
           values: [],
           update (...values) {
-            if (values.length) this.values = values
-            else values = this.values
+            if (values.length) instance.values = values
+            else values = instance.values
             const { sheet } = node
             if (!sheet) return
             for (const placeholder of placeholders) {
@@ -65,7 +58,7 @@ export const cssTemplate = (parser, options) => {
               let styleDeclaration = getStyle(path, sheet)
               switch (placeholder.type) {
                 case 'value':
-                  styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1)
+                  setTimeout(_ => styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1), 0)
                   break
               }
             }
