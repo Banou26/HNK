@@ -1,3 +1,8 @@
+import {
+  envCachesTemplates, placeholderRegex, indexToPlaceholder,
+  placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
+  placeholderStr, split, getSplitIds, execSplit, valuesDif
+} from './utils.js'
 import { htmlTemplate } from './html-template.js'
 
 const attribute = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
@@ -7,7 +12,7 @@ const startTagOpen = new RegExp(`^<${qnameCapture}`)
 const startTagClose = /^\s*(\/?)>/
 const endTag = new RegExp(`^<\\/(${qnameCapture}[^>]*)>`)
 
-export const html = htmlTemplate((sourceArr, values, { placeholderStr, placeholderRegex, placeholderRegexGlobal, split, getSplitIds, execSplit, joinSrcWithPlaceholders }) => {
+export const parseHtml = (sourceArr, values) => {
   let source = joinSrcWithPlaceholders(sourceArr)
   let html = ''
   let placeholders = []
@@ -88,4 +93,6 @@ export const html = htmlTemplate((sourceArr, values, { placeholderStr, placehold
     }
   }
   return { placeholders, html }
-})
+}
+
+export const html = htmlTemplate(parseHtml)
