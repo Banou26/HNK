@@ -75,35 +75,3 @@ export const _poz = (strings, ...values) => {
 }
 
 export const poz = htmlTemplate(_poz)
-
-// export const poz = (strings, ...values) => {
-//   const pozWithPlaceholders = joinSrcWithPlaceholders(strings)
-//   const htmlWithPlaceholders = pozToHTML(pozWithPlaceholders)
-//   const htmlSplit = split(htmlWithPlaceholders)
-//   return html(htmlSplit.filter((str, i) => !(i % 2)), ...values)
-// }
-
-// poz`
-// a
-//   eh#lmao.lel.lul()
-//     lalalala
-//   he(attr=val, ttr="la") yey
-//   lol.meh(class="okay") lmao
-//     | lel
-// b
-// `
-
-// import './_pug.js'
-// import {
-//   envCachesTemplates, placeholderRegex, indexToPlaceholder,
-//   placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
-//   placeholderStr, split, getSplitIds, execSplit, valuesDif
-// } from './utils.js'
-// import { html } from './html.js'
-
-// export const pug = (strings, ...values) => {
-//   const pugWithPlaceholders = joinSrcWithPlaceholders(strings)
-//   const htmlWithPlaceholders = require('pug').render(pugWithPlaceholders)
-//   const htmlSplit = split(htmlWithPlaceholders)
-//   return html(htmlSplit, ...values)
-// }
