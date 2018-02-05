@@ -1,170 +1,112 @@
 import { reactify, watch } from '../reactivity/index.js'
 import { isBuild } from '../template/utils.js'
-import { hasProperty } from '../util/index.js'
 
-const injectRouter = (elem, router) => {
-  const ozElements = []
-  const walker = document.createTreeWalker(elem.shadowRoot || elem, NodeFilter.SHOW_ELEMENT, { acceptNode: node => {
-    if (node instanceof Element || (node.constructor.__ozElement__ && node.__context__)) {
-      ozElements.push(node)
-      return NodeFilter.FILTER_REJECT
-    } else return NodeFilter.FILTER_SKIP
-  } }, false)
-  while (walker.nextNode()) {}
-  for (const element of ozElements) element.$router = router
-}
+const mixins = []
+export const mixin = obj => mixins.push(obj)
 
-export const ElementClass = (_class = HTMLElement) => class OzElement extends _class {
-  constructor ({store, router, shadowDom}) {
-    super()
-    if (store) this.$store = store
-    if (router) this.$router = router
-    const cstr = this.constructor
-    const hasTemplate = hasProperty(cstr, 'template')
-    const hasStyle = hasProperty(cstr, 'style')
-    let state
-    if (hasProperty(this, 'state')) state = this.$state = reactify(this.state())
-    const host = this.$host = shadowDom ? this.attachShadow({ mode: shadowDom }) : this
-    if (hasTemplate) {
-      let templateReturn
-      let template
-      watch(_ => (templateReturn = cstr.template.apply(this, [{state, store}])), templateBuild => {
-        template.update(...templateBuild.values)
-        if (router) injectRouter(this, router)
-      })
-      if (!isBuild(templateReturn)) throw new Error('Template should return a html-template build.')
-      template = this.$template = templateReturn()
-      host.appendChild(template.content)
-      if (router) injectRouter(this, router)
-    }
-    if (hasStyle) {
-      const style = this.$style = cstr.style.apply(this, [{state, store}])()
-      watch(_ => cstr.style.apply(this, [{state, store}]), styleBuild => style.update(...styleBuild.values))
-      host.appendChild(this.$style.content)
-      style.update()
-    }
-  }
+const currentContexts = []
 
-  set $router (router) {
-    this._$router = router
-    injectRouter(this, this.$router)
-  }
-  get $router () {
-    return this._$router
-  }
-}
-export const Element = ElementClass()
-
-const injectGettersContext = (ctx, obj) => {
-  const descs = Object.getOwnPropertyDescriptors(obj)
-  for (const prop in descs) {
-    const desc = descs[prop]
-    const { get, value } = desc
-    if (get) {
-      Object.defineProperty(obj, prop, {...desc, get: get.bind(obj, ctx)})
-    } else if (value) {
-      injectGettersContext(ctx, value)
-    }
-  }
-  return obj
-}
-
-export const registerElement = ({
-  name,
-  extend = HTMLElement,
-  options: _options = {},
-  props: _props = [],
-  state: _state,
-  template: _template,
-  style: _style,
-  router: _router,
-  store: _store,
-  watchers: _watchers = {},
-  created: _created,
-  connected: _connected,
-  disconnected: _disconnected,
-  customElements = window.customElements
-  }) => {
-  _props = [..._props, '$router']
-  class OzFunctionnalElement extends extend {
-    constructor (cstrOptions = {}) {
+export const registerElement = options => {
+  const {
+    name,
+    extend = HTMLElement,
+    shadowDom,
+    state,
+    props,
+    methods,
+    watchers = [],
+    template: htmlTemplate,
+    style: cssTemplate,
+    created,
+    connected,
+    disconnected
+  } = options
+  class OzElement extends extend {
+    constructor () {
       super()
-      const {shadowDom, router: router_} = {..._options, ...cstrOptions}
       const context = this.__context__ = reactify({
-        host: shadowDom ? this.attachShadow({ mode: shadowDom }) : this,
+        host: shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this,
         props: {},
-        get router () {
-          return this.props.$router || router_
-        },
-        watchers: {},
+        methods: {},
         template: undefined,
         style: undefined
       })
-      const { host, router, props, watchers } = context
-      context.state = reactify(typeof _state === 'function' ? _state(context) : _state || {})
+      context.state = reactify(typeof state === 'function' ? state(context) : state || {})
+      if (methods) {
+        for (const method in methods) context.methods[method] = methods[method].bind(null, context)
+      }
       if (props) {
         const propsDescriptors = {}
-        for (const prop of _props) {
+        for (const prop of props) {
           propsDescriptors[prop] = {
             enumerable: true,
-            get: _ => props[prop],
-            set: val => (props[prop] = val)
+            get: _ => context.props[prop],
+            set: val => (context.props[prop] = val)
           }
         }
         Object.defineProperties(this, propsDescriptors)
       }
-      if (_template) {
+      for (const mixin of mixins) {
+        const parentContext = currentContexts[currentContexts.length - 1]
+        mixin({ context, ...parentContext && parentContext !== context && { parentContext: parentContext }, options })
+      }
+      if (htmlTemplate) {
         let template, build
-        const buildTemplate = _template.bind(null, context)
-        watch(_ => (build = buildTemplate(context)), build => {
-          template.update(...build.values)
-          if (router) injectRouter(host, router)
-        })
-        if (!isBuild(build)) throw new Error('Template should return a html-template build.')
+        const buildTemplate = htmlTemplate.bind(null, context)
+        watch(_ => {
+          currentContexts.push(context)
+          build = buildTemplate()
+          currentContexts.splice(currentContexts.indexOf(context), 1)
+          return build
+        }, build => template.update(...build.values))
+        if (!isBuild(build)) throw new Error('The template function should return a html-template build.')
+        currentContexts.push(context)
         template = build()
+        currentContexts.splice(currentContexts.indexOf(context), 1)
         context.template = template
       }
-      if (_style) {
-        let style, build
-        const buildStyle = _style.bind(null, context)
-        watch(_ => (build = buildStyle()), styleBuild => style.update(...styleBuild.values))
-        if (!isBuild(build)) throw new Error('Style should return a css-template build.')
-        style = build()
-        context.style = style
+      if (cssTemplate) {
+        let template, build
+        const buildTemplate = cssTemplate.bind(null, context)
+        watch(_ => (build = buildTemplate()), build => template.update(...build.values))
+        if (!isBuild(build)) throw new Error('The style function should return a css-template build.')
+        template = build()
+        context.style = template
       }
-      for (const [name, _watcher] of Object.entries(_watchers)) {
-        watch(watchers[name] = _watcher.bind(null, context))
+      for (const item of watchers) {
+        if (Array.isArray(item)) watch(item[0].bind(null, context), item[1].bind(null, context))
+        else watch(item.bind(null, context))
       }
-      if (_created) _created(context)
+      if (created) created(context)
     }
 
     static get __ozElement__ () { return true }
     static get name () { return name }
-    static get observedAttributes () { return _props }
+    static get observedAttributes () { return props }
 
     attributeChangedCallback (attr, oldValue, newValue) {
-      if (_props.includes(attr)) this[attr] = newValue
+      if (props.includes(attr)) this[attr] = newValue
     }
 
     connectedCallback () {
       const ctx = this.__context__
-      const {host, style, router, template} = ctx
-      if (template) {
-        host.appendChild(template.content)
-        if (router) injectRouter(host, router)
-      }
+      const { host, style, template } = ctx
+      if (template) host.appendChild(template.content)
       if (style) {
-        host.appendChild(style.content)
+        if (shadowDom) host.appendChild(style.content)
+        else this.ownerDocument.head.appendChild(style.content)
         style.update()
       }
-      if (_connected) _connected(ctx)
+      if (connected) connected(ctx)
     }
 
     disconnectedCallback () {
       const ctx = this.__context__
-      if (_disconnected) _disconnected(ctx)
+      const { style } = ctx
+      if (style && !shadowDom) style.content.parentElement.removeChild(style.content) // todo: check why the element is emptied but not removed
+      if (disconnected) disconnected(ctx)
     }
   }
-  customElements.define(name, OzFunctionnalElement)
-  return OzFunctionnalElement
+  customElements.define(name, OzElement)
+  return OzElement
 }
