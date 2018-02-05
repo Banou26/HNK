@@ -4,6 +4,8 @@ import {
   placeholderStr, split, getSplitIds, execSplit, valuesDif
 } from './utils.js'
 
+// todo: rework the entire template system
+
 export * from './html.js'
 
 export const isInstance = value =>
@@ -77,19 +79,12 @@ function setPlaceholdersPaths (node, placeholders, pointerArray, values) {
 
 export function htmlTemplate (parser, options) {
   const cache = new Map()
-  return (strings, ...values) => {
-    const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
+  return (_strings, ...values) => {
+    const strings = [..._strings]
+    const id = strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
-    const { placeholders, html } = parser(strings, values, {
-      placeholderStr,
-      placeholderRegex,
-      placeholderRegexGlobal,
-      split,
-      getSplitIds,
-      execSplit,
-      joinSrcWithPlaceholders
-    })
+    const { placeholders, html } = parser(strings, values)
     const pointerArray = indexToPlaceholder(placeholders)
     const template = document.createElement('template')
     template.innerHTML = html
@@ -99,6 +94,7 @@ export function htmlTemplate (parser, options) {
         const docFrag = document.importNode(template.content, true)
         const childNodes = [...docFrag.childNodes]
         const placeholdersInstances = new Map()
+        let directives = []
         const instance = {
           id,
           values: [],
@@ -106,18 +102,23 @@ export function htmlTemplate (parser, options) {
             const dif = valuesDif(values, this.values)
             this.values = values
             let updated = []
+            for (const directive of directives) directive()
+            directives = []
             for (const index of dif) {
               const placeholder = pointerArray[index]
               const placeholderInstance = placeholdersInstances.get(placeholder)
               const value = values[index]
               if (typeof value === 'function' && placeholder.type !== 'property' && !isBuild(value)) {
-                value(val => {
-                  const { instance } = placeholderInstance
-                  const vals = [...instance.values]
-                  vals[index] = val
-                  instance.update(...vals)
-                })
-                return
+                directives.push(value({
+                  element: placeholderInstance.node,
+                  update: val => {
+                    const { instance } = placeholderInstance
+                    const vals = [...instance.values]
+                    vals[index] = val
+                    instance.update(...vals)
+                  }
+                }))
+                continue
               }
               if (updated.includes(placeholder)) continue
               updated.push(placeholder)
@@ -280,7 +281,10 @@ const textNewNodes = (instanceValues, value, index) => {
     case 'function':
       if (isBuild(value)) {
         const build = value
-        if (oldValue && isInstance(oldValue) && oldValue.id === build.id) {
+        // todo: check how to update the instance instead of recreating instances each time
+        // if (oldValue) console.log(oldValue, isInstance(oldValue), oldValue.id === build.id, oldValue.id, build.id)
+        if (oldValue && isInstance(oldValue) && oldValue.id === build.id && false) {
+          console.log(oldValue)
           oldValue.update(...build.values)
           nodes = oldValue._childNodes
         } else {
