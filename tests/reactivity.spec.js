@@ -151,6 +151,24 @@ describe('Reactivity', _ => {
       expect(c).to.equal(5)
       expect(c2).to.equal(5)
     })
+
+    // it(`shouldn't watch deep reactive levels`, function () {
+    //   let result, result2
+    //   const react1 = reactify({
+    //     get a () {
+    //       return reactify({})
+    //     }
+    //   })
+    //   watch(_ => {
+    //     react1.a.b
+    //     return react1.a
+    //   }, newVal => (result = newVal))
+    //   watch(_ => react1.a.b, newVal => (result2 = newVal))
+    //   react1.a.b = 'c'
+    //   expect(react1.a).to.equal(react1.a)
+    //   expect(result).to.equal(undefined)
+    //   expect(result2).to.equal('c')
+    // })
   })
   describe('getter', function () {
     it('should cache the value', function () {
