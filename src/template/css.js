@@ -1,6 +1,11 @@
+import {
+  envCachesTemplates, placeholderRegex, indexToPlaceholder,
+  placeholderRegexGlobal, joinSrcWithPlaceholders,
+  placeholderStr, split, getSplitIds, execSplit, valuesDif
+} from './utils.js'
 import { cssTemplate } from './css-template.js'
 
-export const css = cssTemplate((source, values, { placeholderStr, joinSrcWithPlaceholders }) => {
+export const css = cssTemplate((source, values) => {
   let src = source[0]
   for (const i in values) {
     if (i === 0) continue
