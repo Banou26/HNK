@@ -1,41 +1,28 @@
 import { registerElement } from './element.js'
 import { html } from '../template/html.js'
 
-const nthRouterView = routerView => {
-  let nth = 0
-  let elem = routerView.parentElement
-  while (elem) {
-    if (elem instanceof RouterView && elem.router === routerView.router) nth++
-    elem = elem.parentElement
-  }
-  return nth
-}
+const getRouterViewPosition = ({parentElement}, n = 0) => parentElement ? getRouterViewPosition(parentElement, n + 1) : n
+const getNthElement = (routeConfig, n) => n ? getNthElement(routeConfig.parent, n - 1) : routeConfig
 
-const getRouteConfigNthParent = (routeConfig, nth) => {
-  let elem = routeConfig
-  while (nth) {
-    elem = elem.parent
-    nth--
-  }
-  return elem
-}
+const template = ({state: {childs}}) => html`${childs}`
 
-const template = ({state: {components}}) => {
-  const elems = []
-  if (components) {
-    for (const Component of components) elems.push(new (customElements.get(Component.name))())
-  }
-  return html`${elems.length ? elems : ''}`
-}
+const createComponents = components => components && components.map(Component => document.createElement(Component.name))
 
 export const RouterView = customElements.get('router-view') || registerElement({
   name: 'router-view',
   template,
   state: ctx => ({
+    childs: undefined,
     get components () {
-      const {router, host} = ctx
-      return router && router.currentRoute.matched && getRouteConfigNthParent(router.currentRoute.matched.components, nthRouterView(host))
+      const { matched } = ctx.router
+      return matched && getNthElement(matched.components, getRouterViewPosition(ctx.host))
     }
   }),
-  props: ['$router']
+  watchers: [
+    [
+      ({state: {components}}) => (components),
+      ({state}) => (state.childs = createComponents(state.components))
+    ]
+  ],
+  created: ({state}) => (state.childs = createComponents(state.components))
 })
