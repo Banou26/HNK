@@ -1,12 +1,12 @@
 import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
+  placeholderRegex, indexToPlaceholder,
+  isBuild,
+  placeholderStr, execSplit, valuesDif
 } from './utils.js'
 
 // todo: rework the entire template system
 
-export * from './html.js'
+// export * from './html.js'
 
 export const isInstance = value =>
   value.hasOwnProperty('id') &&
@@ -283,7 +283,7 @@ const textNewNodes = (instanceValues, value, index) => {
         const build = value
         // todo: check how to update the instance instead of recreating instances each time
         // if (oldValue) console.log(oldValue, isInstance(oldValue), oldValue.id === build.id, oldValue.id, build.id)
-        if (oldValue && isInstance(oldValue) && oldValue.id === build.id && false) {
+        if (oldValue && isInstance(oldValue) && oldValue.id === build.id /* && false */) {
           console.log(oldValue)
           oldValue.update(...build.values)
           nodes = oldValue._childNodes

@@ -1,8 +1,4 @@
-import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
-} from './utils.js'
+import { placeholderRegex, joinSrcWithPlaceholders, split } from './utils.js'
 import { parseHtml, html } from './html.js'
 import { htmlTemplate } from './html-template.js'
 

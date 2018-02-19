@@ -1,5 +1,4 @@
 import { reactify, watch } from '../reactivity/index.js'
-import { isBuild } from '../template/utils.js'
 
 const mixins = []
 export const mixin = obj => mixins.push(obj)
@@ -59,7 +58,7 @@ export const registerElement = options => {
           currentContexts.splice(currentContexts.indexOf(context), 1)
           return build
         }, build => template.update(...build.values))
-        if (!isBuild(build)) throw new Error('The template function should return a html-template build.')
+        if (!build.isHTMLTemplateBuild) throw new Error('The template function should return a html-template build.')
         currentContexts.push(context)
         template = build()
         currentContexts.splice(currentContexts.indexOf(context), 1)
@@ -69,7 +68,7 @@ export const registerElement = options => {
         let template, build
         const buildTemplate = cssTemplate.bind(null, context)
         watch(_ => (build = buildTemplate()), build => template.update(...build.values))
-        if (!isBuild(build)) throw new Error('The style function should return a css-template build.')
+        if (!build.isCSSTemplateBuild) throw new Error('The style function should return a css-template build.')
         template = build()
         context.style = template
       }

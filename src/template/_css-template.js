@@ -1,8 +1,4 @@
-import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
-} from './utils.js'
+import { placeholder as placeholderStr, split, getSplitIds, execSplit } from './utils.js'
 
 async function setPlaceholdersPaths (sheet, placeholders, values) {
   const rules = sheet.cssRules
@@ -31,7 +27,7 @@ export const cssTemplate = (parser, options) => {
   const cache = new Map()
   return (_strings, ...values) => {
     const strings = [..._strings]
-    const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
+    const id = strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
     const { css } = parser(strings, values)
