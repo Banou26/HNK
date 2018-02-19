@@ -1,8 +1,4 @@
-import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
-} from './utils.js'
+import { placeholderStr } from './utils.js'
 import { cssTemplate } from './css-template.js'
 
 export const css = cssTemplate((source, values) => {

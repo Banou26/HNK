@@ -1,7 +1,7 @@
 import { mixin } from '../elements/index.js'
 import { reactify } from '../reactivity/index.js'
 import pathToRegexp from '../libs/path-to-regexp.js'
-import { cloneObject } from '../util/index.js'
+import { cloneObject } from '../utils.js'
 
 mixin(({context, parentContext, options}) => {
   if (options && options.router) context.router = options.router
