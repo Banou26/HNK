@@ -1,4 +1,3 @@
-import { reactify } from '../reactivity/index.js'
 import { html as htmlUtils } from './utils.js'
 import { parsePlaceholders } from './html-placeholder-parser.js'
 const { placeholder: placeholderStr, indexPlaceholders, regex: placeholderRegex, mergeSplitWithValues } = htmlUtils
@@ -24,6 +23,14 @@ const getPlaceholderWithNodes = (node, placeholders) =>
 
 const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray(item)] : [...arr, item], [])
 
+const replaceArray = (arr, target, replacement) => arr.reduce((arr, item) => [...arr,
+  target === item
+  ? replacement
+  : Array.isArray(item)
+    ? replaceArray(item, target, replacement)
+    : item
+], [])
+
 const getPlaceholderWithPaths = (node, _placeholders) => {
   const placeholders = _placeholders.reduce((arr, placeholder) => [...arr, ...placeholder.type === 'text'
     ? [...placeholder.indexes.map(index => ({type: 'text', index}))]
@@ -39,7 +46,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
       if (currentNode.nodeType === Node.TEXT_NODE) {
         const placeholderNode = currentNode.splitText(match.index)
         placeholderNode.nodeValue = placeholderNode.nodeValue.substring(match[0].length)
-        const rightNode = placeholderNode.nodeValue.length ? placeholderNode.splitText(0) : null
+        if (placeholderNode.nodeValue.length) placeholderNode.splitText(0)
         if (!currentNode.nodeValue.length) currentNode.parentNode.removeChild(currentNode)
         paths.set(placeholderByIndex[match[1]], getNodePath({node: placeholderNode}))
       } else if (currentNode.nodeType === Node.COMMENT_NODE) {
@@ -56,21 +63,21 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
       paths.set(placeholder, getNodePath({node: foundNode}))
     }
   }
-  return [...paths].map(([placeholder, path]) => ({...placeholder, path, data: []}))
+  return [...paths].map(([placeholder, path]) => ({...placeholder, path}))
+}
+
+const patchDomArray = (newArray, oldArray) => {
+
 }
 
 const createInstance = ({ id, template, placeholders: _placeholders }, ...values) => {
   const doc = document.importNode(template.content, true)
-  const placeholders = getPlaceholderWithNodes(doc, _placeholders)
-  const placeholderByIndex = indexPlaceholders(placeholders)
-  const childNodes = reactify([...doc.childNodes])
-  for (const placeholder of placeholders.filter(({type}) => type === 'text')) {
-    const index = childNodes.indexOf(placeholder.nodes[0])
-    if (index === -1) continue
-    childNodes.splice(index, 1, placeholder.nodes)
-    if (placeholder.nodes !== childNodes[index]) placeholder.nodes = childNodes[index]
-  }
   let bypassDif = true
+  let childNodes = [...doc.childNodes]
+  let listeners = []
+  const placeholders = getPlaceholderWithNodes(doc, _placeholders) // placeholder node(s) are mutable
+  let placeholdersData = new Map(placeholders.map(placeholder => [placeholder, {}]))
+  let placeholderByIndex = indexPlaceholders(placeholders)
   const instance = {
     id,
     values,
@@ -83,42 +90,75 @@ const createInstance = ({ id, template, placeholders: _placeholders }, ...values
       return doc
     },
     update (...values) {
-      const valueIndexDifs = getValueIndexDifferences(values, instance.values)
-      const placeholdersToUpdate = valueIndexDifs.map(i => placeholderByIndex[i]).filter(elem => elem)
-      const placeholdersNewNodes = new Map((bypassDif ? placeholders : placeholdersToUpdate).map(placeholder =>
-        [
-          placeholder,
-          update[placeholder.type]({
-            instance,
-            placeholder,
-            placeholders,
-            values,
-            placeholderByIndex
-          })
+      const placeholdersToUpdate =
+      bypassDif // if bypass, update all the placeholders (first placeholder setup)
+      ? placeholders // all placeholders
+      : getValueIndexDifferences(values, instance.values) // placeholders which split values has changed
+        .map(i => placeholderByIndex[i]) // placeholders
+        .filter(item => item && (item.node || item.nodes))
+        .reduce((arr, placeholder) => [...arr,
+          ...placeholder.type === 'tag'
+          ? [placeholder, ...placeholder.attributes.map(indexes => placeholderByIndex[indexes[0]])]
+          : [placeholder]
+        ], []) // placeholders with attributes of tags that need update
+        .reduce((arr, placeholder) => [...arr,
+          ...arr.includes(placeholder)
+          ? []
+          : [placeholder]
         ]
-      ))
-      for (const [placeholder, newNode] of placeholdersNewNodes) {
-        const nodeStr = placeholder.type === 'text' ? 'nodes' : 'node'
-        if (placeholder[nodeStr] === newNode) continue
-        const index = childNodes.indexOf(placeholder.node || placeholder.nodes)
-        if (index !== -1) {
-          placeholder[nodeStr] = newNode
-          childNodes.splice(index, 1, placeholder[nodeStr])
-          if (placeholder[nodeStr] !== childNodes[index]) placeholder[nodeStr] = childNodes[index]
+        , []) // remove duplicates
+      const placeholderByOldNode = new Map(placeholdersToUpdate.map(placeholder => [placeholder.node || placeholder.nodes, placeholder]))
+      const updateResults = new Map(placeholdersToUpdate.map(placeholder => {
+        const result = update[placeholder.type]({
+          placeholder,
+          values,
+          data: placeholdersData.get(placeholder),
+          placeholderByIndex,
+          _childNodes: instance._childNodes,
+          setChildNodes: _childNodes => (childNodes = _childNodes)
+        })
+        if ((result.node || result.nodes) === (placeholder.node || placeholder.nodes)) return [placeholder, result]
+        if (placeholder.type === 'tag' || placeholder.type === 'attribute') {
+          if (placeholder.tag && placeholder.tag.length) placeholderByIndex[placeholder.tag[0]].node = result.node
+          for (const attrIndex of placeholder.attributes) {
+            placeholderByIndex[attrIndex[0]].node = result.node
+          }
         }
-      }
+        if (placeholder.type === 'text') placeholder.nodes = result.nodes
+        else placeholder.node = result.node
+        return [placeholder, result]
+      }))
+      placeholdersData = new Map([...placeholdersData].map(([placeholder, data]) => [placeholder,
+        updateResults.has(placeholder)
+        ? updateResults.get(placeholder).data
+        : data
+      ]))
+      const newChildNodes = [...childNodes].map(item => {
+        if (placeholderByOldNode.has(item)) {
+          const placeholder = placeholderByOldNode.get(item)
+          const result = updateResults.get(placeholder)
+          return result.node || result.nodes
+        } else {
+          return item
+        }
+      })
+      patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
+      const oldChildNodes = childNodes
+      childNodes = newChildNodes
+      for (const listener of listeners) listener(newChildNodes, oldChildNodes)
+    },
+    listen (func) {
+      listeners = [...listeners, func]
+      return _ => (listeners = Object.assign([...listeners], {[listeners.indexOf(func)]: undefined}).filter(item => item))
     }
   }
-  childNodes.$watch(_ => {
-    const lastNode = instance.childNodes[instance.childNodes.length - 1]
-    if (!lastNode) return
-    const insertBeforeNode = lastNode.nextSibling
-    const parent = lastNode.parentElement
-    if (!parent) return
-    if (insertBeforeNode) parent.insertBefore(instance.content, insertBeforeNode)
-    else parent.appendChild(instance.content)
-  })
-  instance.update(...values, true)
+  const textPlaceholdersByFirstNode = new Map(placeholders.filter(({type}) => type === 'text').map(placeholder => [placeholder.nodes[0], placeholder]))
+  childNodes = childNodes.reduce((arr, node) =>
+    textPlaceholdersByFirstNode.has(node)
+    ? [...arr, textPlaceholdersByFirstNode.get(node).nodes]
+    : [...arr, node]
+  , [])
+  instance.update(...values)
   bypassDif = false
   return instance
 }
@@ -147,67 +187,63 @@ export const html = (htmlArray, ...values) => {
   return build(values)
 }
 
+// values, node(s), split(s), data
+
 const update = {
-  comment (ctx) {
-    const { values, placeholder: { node, split } } = ctx
+  comment ({ values, placeholder: { node, split } }) {
     node.nodeValue = mergeSplitWithValues(split, values)
-    return node
+    return {node}
   },
-  text (ctx) {
-    const { values, placeholder, placeholder: { nodes: _nodes, index, data: _data } } = ctx
-    const value = values[index]
-    const dataValue = _data[index]
-    const data = Object.assign([..._data], {[index]: []})
-    let nodes = []
-    if (typeof value === 'string') {
-      if (_nodes[0] instanceof Text) {
-        if (_nodes[0].nodeValue !== value) _nodes[0].nodeValue = value
-        nodes = [_nodes[0]]
+  text ({ value, values, placeholder, _childNodes, setChildNodes, data: { instance: oldInstance, unlisten: oldUnlisten } = {}, placeholder: { nodes, index } }) {
+    if (values && !value) value = values[index]
+    if (typeof value === 'string' || typeof value === 'number') {
+      if (nodes[0] instanceof Text) {
+        if (nodes[0].nodeValue !== value) nodes[0].nodeValue = value
+        return { nodes: [nodes[0]] }
       } else {
-        nodes = [new Text(value)]
+        return { nodes: [new Text(value)] }
       }
     } else if (value instanceof Node) {
-      if (nodes[0] !== value) nodes = [value]
+      if (nodes[0] !== value) return { nodes: [value] }
     } else if (value.build) {
-      const build = value
-      const instance = dataValue
-      if (instance && instance.id === build.id) {
-        instance.update(...build.values)
-        nodes = instance._childNodes
+      if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
+        oldInstance.update(...value.values)
+        return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
       } else {
-        nodes = (data[index] = build())._childNodes
+        if (oldUnlisten) oldUnlisten()
+        const instance = value()
+        const unlisten = instance.listen((newChildNodes, oldChildNodes) => {
+          // const newNodes = _childNodes.slice()
+          // // console.log(newChildNodes)
+          // // console.log(oldChildNodes)
+          // // console.log(newNodes)
+          // newNodes[newNodes.indexOf(oldChildNodes)] = newChildNodes
+          // // console.log(newNodes)
+          // setChildNodes(newNodes)
+        })
+        return { nodes: instance._childNodes, data: { instance, unlisten } }
       }
     } else if (Array.isArray(value)) {
-
+      // return value.map(value => update.text({value}))
     }
-    placeholder.data = data
-    return nodes
   },
-  tag (ctx) {
-    const { instance, placeholder, placeholders, values, placeholderByIndex, placeholder: { node } } = ctx
-    const newNode = document.createElement(mergeSplitWithValues(placeholder.split, values))
-    for (const {name, value} of node.attributes) newNode.setAttribute(name, value)
-    for (const attrIndex of placeholder.attributes) {
-      const attrPlaceholder = placeholderByIndex[attrIndex[0]]
-      attrPlaceholder.node = newNode
-      update.attribute({instance, placeholder: attrPlaceholder, placeholders, values, placeholderByIndex})
-    }
-    return newNode
+  tag ({ values, placeholder: { attributes, node: _node, split }, placeholderByIndex }) {
+    const node = document.createElement(mergeSplitWithValues(split, values))
+    for (const {name, value} of _node.attributes) node.setAttribute(name, value)
+    return {node}
   },
-  attribute (ctx) {
-    const { values, placeholder, placeholder: { attributeType, node, nameSplit, valueSplit, oldName } } = ctx
+  attribute ({ values, placeholder, data: { oldName } = {}, placeholder: { attributeType, node, nameSplit, valueSplit } }) {
     const name = mergeSplitWithValues(nameSplit, values)
     const value = mergeSplitWithValues(valueSplit, values)
-    if (attributeType === 0) { // double-quote
+    if (attributeType === '"') { // double-quote
       if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)
-    } else if (attributeType === 1) {  // single-quote
+    } else if (attributeType === '\'') {  // single-quote
       if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)
-    } else if (attributeType === 2) {  // no-quote
+    } else if (attributeType === '') {  // no-quote
       node[name] = value
     }
-    placeholder.oldName = name
-    return node
+    return {node, data: { oldName: name }}
   }
 }
