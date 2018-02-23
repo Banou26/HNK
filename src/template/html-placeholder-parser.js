@@ -27,7 +27,7 @@ const parseAttributes = ({leftHTML = '', rightHTML, attributes = []}) => {
     leftHTML: `${leftHTML} ${indexes.length ? placeholder(indexes[0]) : match[0]}`,
     rightHTML: rightHTML.substring(match[0].length),
     attributes: indexes.length ? [...attributes, {
-      type: match[3] ? 0 : match[4] ? 1 : 2,
+      type: match[3] ? '"' : match[4] ? '\'' : '',
       nameSplit: attrNameSplit,
       valueSplit: attrValueSplit,
       indexes
@@ -72,6 +72,8 @@ export const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHT
     const attributePlaceholders = attributes.map(({type, ...rest}) => ({
       type: 'attribute',
       attributeType: type,
+      tag: indexes,
+      attributes: attributes.map(({indexes}) => indexes).filter(indexes => rest.indexes !== indexes),
       ...rest
     }))
     return parsePlaceholders({
