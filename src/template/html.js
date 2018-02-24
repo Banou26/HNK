@@ -14,13 +14,6 @@ const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
   ? getValueIndexDifferences(arr2, arr)
   : arr.reduce((arr, item, i) => [...arr, ...item !== arr2[i] ? [i] : []], [])
 
-const getPlaceholderWithNodes = (node, placeholders) =>
-  placeholders.map(placeholder => ({...placeholder,
-    ...placeholder.type === 'text'
-    ? {nodes: [getNode(node, placeholder.path)]}
-    : {node: getNode(node, placeholder.path)}
-  }))
-
 const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray(item)] : [...arr, item], [])
 
 const replaceArray = (arr, target, replacement) => arr.reduce((arr, item) => [...arr,
@@ -70,12 +63,22 @@ const patchDomArray = (newArray, oldArray) => {
 
 }
 
-const createInstance = ({ id, template, placeholders: _placeholders }, ...values) => {
+const newPlaceholdersNodes = (oldMap, placeholder, nodes) => {
+  const newMap = new Map(oldMap)
+  newMap.set(placeholder, nodes)
+  return newMap
+}
+
+const createInstance = ({ id, template, placeholders }, ...values) => {
   const doc = document.importNode(template.content, true)
   let bypassDif = true
   let childNodes = [...doc.childNodes]
   let listeners = []
-  const placeholders = getPlaceholderWithNodes(doc, _placeholders) // placeholder node(s) are mutable
+  let placeholdersNodes = new Map(placeholders.map(placeholder => ([placeholder,
+    placeholder.type === 'text'
+    ? [getNode(doc, placeholder.path)]
+    : getNode(doc, placeholder.path)
+  ])))
   let placeholdersData = new Map(placeholders.map(placeholder => [placeholder, {}]))
   let placeholderByIndex = indexPlaceholders(placeholders)
   const instance = {
@@ -94,8 +97,8 @@ const createInstance = ({ id, template, placeholders: _placeholders }, ...values
       bypassDif // if bypass, update all the placeholders (first placeholder setup)
       ? placeholders // all placeholders
       : getValueIndexDifferences(values, instance.values) // placeholders which split values has changed
-        .map(i => placeholderByIndex[i]) // placeholders
-        .filter(item => item && (item.node || item.nodes))
+        .map(index => placeholderByIndex[index]) // placeholders
+        .filter(placeholder => placeholder && placeholdersNodes.get(placeholder))
         .reduce((arr, placeholder) => [...arr,
           ...placeholder.type === 'tag'
           ? [placeholder, ...placeholder.attributes.map(indexes => placeholderByIndex[indexes[0]])]
@@ -107,25 +110,27 @@ const createInstance = ({ id, template, placeholders: _placeholders }, ...values
           : [placeholder]
         ]
         , []) // remove duplicates
-      const placeholderByOldNode = new Map(placeholdersToUpdate.map(placeholder => [placeholder.node || placeholder.nodes, placeholder]))
+      const placeholderByOldNode = new Map(placeholdersToUpdate.map(placeholder => [placeholdersNodes.get(placeholder), placeholder]))
       const updateResults = new Map(placeholdersToUpdate.map(placeholder => {
         const result = update[placeholder.type]({
           placeholder,
           values,
           data: placeholdersData.get(placeholder),
+          [placeholder.type === 'text' ? 'nodes' : 'node']: placeholdersNodes.get(placeholder),
           placeholderByIndex,
           _childNodes: instance._childNodes,
           setChildNodes: _childNodes => (childNodes = _childNodes)
         })
-        if ((result.node || result.nodes) === (placeholder.node || placeholder.nodes)) return [placeholder, result]
+        if ((result.node || result.nodes) === placeholdersNodes.get(placeholder)) return [placeholder, result]
         if (placeholder.type === 'tag' || placeholder.type === 'attribute') {
-          if (placeholder.tag && placeholder.tag.length) placeholderByIndex[placeholder.tag[0]].node = result.node
+          if (placeholder.tag && placeholder.tag.length) {
+            placeholdersNodes = newPlaceholdersNodes(placeholdersNodes, placeholderByIndex[placeholder.tag[0]], result.node)
+          }
           for (const attrIndex of placeholder.attributes) {
-            placeholderByIndex[attrIndex[0]].node = result.node
+            placeholdersNodes = newPlaceholdersNodes(placeholdersNodes, placeholderByIndex[attrIndex[0]], result.node)
           }
         }
-        if (placeholder.type === 'text') placeholder.nodes = result.nodes
-        else placeholder.node = result.node
+        placeholdersNodes = newPlaceholdersNodes(placeholdersNodes, placeholder, placeholder.type === 'text' ? result.nodes : result.node)
         return [placeholder, result]
       }))
       placeholdersData = new Map([...placeholdersData].map(([placeholder, data]) => [placeholder,
@@ -152,10 +157,10 @@ const createInstance = ({ id, template, placeholders: _placeholders }, ...values
       return _ => (listeners = Object.assign([...listeners], {[listeners.indexOf(func)]: undefined}).filter(item => item))
     }
   }
-  const textPlaceholdersByFirstNode = new Map(placeholders.filter(({type}) => type === 'text').map(placeholder => [placeholder.nodes[0], placeholder]))
+  const textPlaceholdersByFirstNode = new Map(placeholders.filter(({type}) => type === 'text').map(placeholder => [placeholdersNodes.get(placeholder)[0], placeholder]))
   childNodes = childNodes.reduce((arr, node) =>
     textPlaceholdersByFirstNode.has(node)
-    ? [...arr, textPlaceholdersByFirstNode.get(node).nodes]
+    ? [...arr, placeholdersNodes.get(textPlaceholdersByFirstNode.get(node))]
     : [...arr, node]
   , [])
   instance.update(...values)
@@ -190,11 +195,11 @@ export const html = (htmlArray, ...values) => {
 // values, node(s), split(s), data
 
 const update = {
-  comment ({ values, placeholder: { node, split } }) {
+  comment ({ values, node, placeholder: { split } }) {
     node.nodeValue = mergeSplitWithValues(split, values)
     return {node}
   },
-  text ({ value, values, placeholder, _childNodes, setChildNodes, data: { instance: oldInstance, unlisten: oldUnlisten } = {}, placeholder: { nodes, index } }) {
+  text ({ value, values, placeholder, _childNodes, setChildNodes, nodes, data: { instance: oldInstance, unlisten: oldUnlisten } = {}, placeholder: { index } }) {
     if (values && !value) value = values[index]
     if (typeof value === 'string' || typeof value === 'number') {
       if (nodes[0] instanceof Text) {
@@ -227,12 +232,12 @@ const update = {
       // return value.map(value => update.text({value}))
     }
   },
-  tag ({ values, placeholder: { attributes, node: _node, split }, placeholderByIndex }) {
+  tag ({ values, node: _node, placeholderByIndex, placeholder: { attributes, split } }) {
     const node = document.createElement(mergeSplitWithValues(split, values))
     for (const {name, value} of _node.attributes) node.setAttribute(name, value)
     return {node}
   },
-  attribute ({ values, placeholder, data: { oldName } = {}, placeholder: { attributeType, node, nameSplit, valueSplit } }) {
+  attribute ({ values, placeholder, node, data: { oldName } = {}, placeholder: { attributeType, nameSplit, valueSplit } }) {
     const name = mergeSplitWithValues(nameSplit, values)
     const value = mergeSplitWithValues(valueSplit, values)
     if (attributeType === '"') { // double-quote
