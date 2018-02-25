@@ -1,6 +1,6 @@
 import { html as htmlUtils } from './utils.js'
 import { parsePlaceholders } from './html-placeholder-parser.js'
-const { placeholder: placeholderStr, indexPlaceholders, regex: placeholderRegex, mergeSplitWithValues } = htmlUtils
+const { placeholder: placeholderStr, indexPlaceholders, regex: placeholderRegex, mergeSplitWithValues, mergeSplitWithPlaceholders, split } = htmlUtils
 
 const getSiblingIndex = ({previousSibling} = {}, i = 0) => previousSibling ? getSiblingIndex(previousSibling, i + 1) : i
 
@@ -183,16 +183,16 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
 
 const cache = new Map()
 
-export const html = (htmlArray, ...values) => {
-  const id = htmlArray.join(placeholderStr(''))
+export const htmlTemplate = transform => (strings, ...values) => {
+  const id = strings.join(placeholderStr(''))
   if (cache.has(id)) return cache.get(id)(values)
-  const { html, placeholders } = parsePlaceholders({htmlArray, values})
+  const { html, placeholders } = parsePlaceholders({htmlArray: split(transform(mergeSplitWithPlaceholders(strings))).filter((str, i) => !(i % 2)), values})
   const build = createBuild({ id, html, placeholders })
   cache.set(id, build)
   return build(values)
 }
 
-// values, node(s), split(s), data
+export const html = htmlTemplate(str => str)
 
 const update = {
   comment ({ values, node, placeholder: { split } }) {

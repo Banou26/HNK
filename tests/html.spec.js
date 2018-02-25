@@ -1,4 +1,4 @@
-import { html } from '../src/index.js'
+import { html, poz } from '../src/index.js'
 
 const structureTests = build => {
   let template
@@ -155,6 +155,13 @@ describe('html', function () {
         expect(instance.childNodes[0].nodeValue).to.equal('some other ')
         expect(instance.childNodes[2].nodeValue).to.equal(' sub template')
       })
+    })
+  })
+
+  describe('poz', function () {
+    it('should work', function () {
+      const instance = poz`div`()
+      expect(instance.childNodes[0]).to.instanceOf(HTMLDivElement)
     })
   })
 })
