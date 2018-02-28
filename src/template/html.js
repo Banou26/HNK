@@ -135,9 +135,22 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           placeholderByIndex,
           _childNodes: instance._childNodes,
           setChildNodes: _childNodes => {
-            childNodes = _childNodes
-            patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
-            for (const listener of listeners) listener(newChildNodes, oldChildNodes)
+            // work but isn't doing the job(it's useless code)
+            // patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
+            // const oldChildNodes = childNodes
+            // childNodes = newChildNodes
+            // for (const listener of listeners) listener(newChildNodes, oldChildNodes)
+            //
+            // should work ?
+            // patchDomArray(flattenArray(_childNodes), flattenArray(childNodes))
+            // const oldChildNodes = childNodes
+            // childNodes = _childNodes
+            // for (const listener of listeners) listener(_childNodes, oldChildNodes)
+            //
+            // old
+            // childNodes = _childNodes
+            // patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
+            // for (const listener of listeners) listener(newChildNodes, oldChildNodes)
           }
         })
         if ((result.node || result.nodes) === placeholdersNodes.get(placeholder)) return [placeholder, result]
@@ -218,7 +231,15 @@ const update = {
     node.nodeValue = mergeSplitWithValues(split, values)
     return {node}
   },
-  text ({ value, values, placeholder, _childNodes, setChildNodes, nodes, data: { instance: oldInstance, unlisten: oldUnlisten } = {}, placeholder: { index } }) {
+  text ({
+    value,
+    values,
+    _childNodes,
+    setChildNodes,
+    nodes = [],
+    data: { instance: oldInstance, unlisten: oldUnlisten, textArray: oldTextArray = [] } = {},
+    placeholder: { index } = {}
+  }) {
     if (values && !value) value = values[index]
     if (typeof value === 'string' || typeof value === 'number') {
       if (nodes[0] instanceof Text) {
@@ -248,7 +269,17 @@ const update = {
         return { nodes: instance._childNodes, data: { instance, unlisten } }
       }
     } else if (Array.isArray(value)) {
-      // return value.map(value => update.text({value}))
+      // todo: add more of the parameters to cover all of the simple text features
+      const textArray = value.map((value, i) => {
+        const oldText = oldTextArray[i]
+        const text = update.text({
+          value,
+          nodes: oldText && oldText.nodes,
+          data: oldText && oldText.data
+        })
+        return text
+      })
+      return { nodes: textArray.map(({nodes}) => nodes), data: { textArray } }
     }
   },
   tag ({ values, node: _node, placeholderByIndex, placeholder: { attributes, split } }) {

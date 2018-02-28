@@ -177,6 +177,37 @@ describe('html', function () {
         testValue(2, ' sub template')
       })
     })
+    describe('array', function () {
+      let instance, container
+
+      before(function () {
+        instance = html`${['first', 'second', document.createElement('div')]}`()
+        container = document.createElement('div')
+        container.appendChild(instance.content)
+        document.body.appendChild(container)
+      })
+      after(function () {
+        document.body.removeChild(container)
+      })
+      const test = testChildNode(_ => ([instance, container]))
+      const testValue = (n, val) => test(n, node => node.nodeValue, expect => expect.to.equal(val))
+
+      it('behave like a normal text placeholder but with multiple items', function () {
+        test(0, node => node, expect => expect.to.instanceOf(Text))
+        testValue(0, 'first')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'second')
+        test(2, node => node, expect => expect.to.instanceOf(HTMLDivElement))
+      })
+      it('update the array', function () {
+        instance.update(['first modified', 'second modified', document.createElement('span')])
+        test(0, node => node, expect => expect.to.instanceOf(Text))
+        testValue(0, 'first modified')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'second modified')
+        test(2, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+      })
+    })
   })
 
   describe('poz', function () {
