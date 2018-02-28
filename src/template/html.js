@@ -60,7 +60,22 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
 }
 
 const patchDomArray = (newArray, oldArray) => {
-
+  const nodesToRemove = oldArray.filter(node => !newArray.includes(node))
+  for (const i in newArray) {
+    const newNode = newArray[i]
+    const oldNode = oldArray[i]
+    if (newNode !== oldNode) {
+      if (oldNode) {
+        oldNode.parentNode.insertBefore(newNode, oldNode)
+      } else {
+        const previousNewNode = newArray[i - 1]
+        previousNewNode.parentNode.insertBefore(newNode, previousNewNode.nextSibling)
+      }
+    }
+  }
+  for (const node of nodesToRemove) {
+    if (node.parentNode) node.parentNode.removeChild(node)
+  }
 }
 
 const newPlaceholdersNodes = (oldMap, placeholder, nodes) => {
@@ -119,7 +134,11 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           [placeholder.type === 'text' ? 'nodes' : 'node']: placeholdersNodes.get(placeholder),
           placeholderByIndex,
           _childNodes: instance._childNodes,
-          setChildNodes: _childNodes => (childNodes = _childNodes)
+          setChildNodes: _childNodes => {
+            childNodes = _childNodes
+            patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
+            for (const listener of listeners) listener(newChildNodes, oldChildNodes)
+          }
         })
         if ((result.node || result.nodes) === placeholdersNodes.get(placeholder)) return [placeholder, result]
         if (placeholder.type === 'tag' || placeholder.type === 'attribute') {
