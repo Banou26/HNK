@@ -1,5 +1,7 @@
 import { html, poz } from '../src/index.js'
 
+const testChildNode = arr => (n, func, cb) => arr().map(item => cb(expect(func(item.childNodes[n]))))
+
 const structureTests = build => {
   let template
   before(function () {
@@ -37,22 +39,28 @@ describe('html', function () {
     structureTests(false)
   })
   describe('tag placeholder', function () {
-    let instance
+    let instance, container
     before(function () {
       instance = html`<${'div'} staticAttribute="staticValue" ${'dynamicAttribute'}="${'dynamicValue'}"></${'div'}>`()
+      container = document.createElement('div')
+      container.appendChild(instance.content)
+      document.body.appendChild(container)
     })
+    after(function () {
+      document.body.removeChild(container)
+    })
+    const test = testChildNode(_ => ([instance, container]))
+
     it('create a div', function () {
-      const node = instance.childNodes[0]
-      expect(node.getAttribute('staticAttribute')).to.equal('staticValue')
-      expect(node.getAttribute('dynamicAttribute')).to.equal('dynamicValue')
-      expect(node).to.instanceof(HTMLDivElement)
+      test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
+      test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal('dynamicValue'))
+      test(0, node => node, expect => expect.to.instanceOf(HTMLDivElement))
     })
     it('replace the div with a span', function () {
       instance.update('span', 'anotherDynamicAttribute', 'anotherDynamicValue', 'span')
-      const node = instance.childNodes[0]
-      expect(node.getAttribute('staticAttribute')).to.equal('staticValue')
-      expect(node.getAttribute('anotherDynamicAttribute')).to.equal('anotherDynamicValue')
-      expect(instance.childNodes[0]).to.instanceof(HTMLSpanElement)
+      test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
+      test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal('anotherDynamicValue'))
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
     })
   })
   describe('comment placeholder', function () {
@@ -72,25 +80,31 @@ describe('html', function () {
     })
   })
   describe('attribute placeholder', function () {
-    let instance
+    let instance, container
     before(function () {
       instance = html`<div ${'attribute'}="${'value'}" ${'attribute2'}='${'value2'}' ${'property'}=${'value3'}></div>`()
+      container = document.createElement('div')
+      container.appendChild(instance.content)
+      document.body.appendChild(container)
     })
+    after(function () {
+      document.body.removeChild(container)
+    })
+    const test = testChildNode(_ => ([instance, container]))
+
     it('create a div with attributes and properties', function () {
-      const node = instance.childNodes[0]
-      expect(node.getAttribute('attribute')).to.equal('value')
-      expect(node.getAttribute('attribute2')).to.equal('value2')
-      expect(node['property']).to.equal('value3')
+      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal('value'))
+      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal('value2'))
+      test(0, node => node.property, expect => expect.to.equal('value3'))
     })
     it('replace the div attributes and properties by other attributes and properties', function () {
-      const node = instance.childNodes[0]
       instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3')
-      expect(node.getAttribute('attribute')).to.equal(null)
-      expect(node.getAttribute('attribute2')).to.equal(null)
-      expect(node['property']).to.equal('value3')
-      expect(node.getAttribute('anotherAttribute')).to.equal('anotherValue')
-      expect(node.getAttribute('anotherAttribute2')).to.equal('anotherValue2')
-      expect(node['anotherProperty3']).to.equal('anotherValue3')
+      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal(null))
+      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal(null))
+      test(0, node => node.property, expect => expect.to.equal('value3'))
+      test(0, node => node.getAttribute('anotherAttribute'), expect => expect.to.equal('anotherValue'))
+      test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
+      test(0, node => node.anotherProperty3, expect => expect.to.equal('anotherValue3'))
     })
   })
   describe('text placeholder', function () {
@@ -126,34 +140,41 @@ describe('html', function () {
       })
     })
     describe('template', function () {
-      let instance
+      let instance, container
       const subTemplate = text => html`some ${text} template`
       const subTemplate2 = text => html`some other ${text} sub template`
+
       before(function () {
         instance = html`${subTemplate('text')}`()
+        container = document.createElement('div')
+        container.appendChild(instance.content)
+        document.body.appendChild(container)
       })
+      after(function () {
+        document.body.removeChild(container)
+      })
+      const test = testChildNode(_ => ([instance, container]))
+      const testValue = (n, val) => test(n, node => node.nodeValue, expect => expect.to.equal(val))
+
       it('create a template instance', function () {
-        const node = instance.childNodes[1]
-        expect(node).to.instanceof(Text)
-        expect(node.nodeValue).to.equal('text')
-        expect(instance.childNodes[0].nodeValue).to.equal('some ')
-        expect(instance.childNodes[2].nodeValue).to.equal(' template')
+        testValue(0, 'some ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'text')
+        testValue(2, ' template')
       })
       it('update the template instance', function () {
         instance.update(subTemplate('another text'))
-        const node = instance.childNodes[1]
-        expect(node).to.instanceof(Text)
-        expect(node.nodeValue).to.equal('another text')
-        expect(instance.childNodes[0].nodeValue).to.equal('some ')
-        expect(instance.childNodes[2].nodeValue).to.equal(' template')
+        testValue(0, 'some ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'another text')
+        testValue(2, ' template')
       })
       it('replace the template instance', function () {
         instance.update(subTemplate2('some new other text'))
-        const node = instance.childNodes[1]
-        expect(node).to.instanceof(Text)
-        expect(node.nodeValue).to.equal('some new other text')
-        expect(instance.childNodes[0].nodeValue).to.equal('some other ')
-        expect(instance.childNodes[2].nodeValue).to.equal(' sub template')
+        testValue(0, 'some other ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'some new other text')
+        testValue(2, ' sub template')
       })
     })
   })
