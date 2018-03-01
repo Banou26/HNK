@@ -181,7 +181,7 @@ describe('html', function () {
       let instance, container
 
       before(function () {
-        instance = html`${['first', 'second', document.createElement('div')]}`()
+        instance = html`${['first', 'second', document.createElement('div'), html`<span></span>`, html`<div>${['text1', 'text2']}</div>`]}`()
         container = document.createElement('div')
         container.appendChild(instance.content)
         document.body.appendChild(container)
@@ -198,14 +198,28 @@ describe('html', function () {
         test(1, node => node, expect => expect.to.instanceOf(Text))
         testValue(1, 'second')
         test(2, node => node, expect => expect.to.instanceOf(HTMLDivElement))
+        test(3, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+        const node4 = instance.childNodes[4]
+        const [text1, text2] = node4.childNodes
+        expect(text1).to.instanceOf(Text)
+        expect(text1.nodeValue).to.equal('text1')
+        expect(text2).to.instanceOf(Text)
+        expect(text2.nodeValue).to.equal('text2')
       })
       it('update the array', function () {
-        instance.update(['first modified', 'second modified', document.createElement('span')])
+        instance.update(['first modified', 'second modified', document.createElement('span'), html`<div></div>`, html`<div>${['another text1', 'another text2']}</div>`])
         test(0, node => node, expect => expect.to.instanceOf(Text))
         testValue(0, 'first modified')
         test(1, node => node, expect => expect.to.instanceOf(Text))
         testValue(1, 'second modified')
         test(2, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+        test(3, node => node, expect => expect.to.instanceOf(HTMLDivElement))
+        const node4 = instance.childNodes[4]
+        const [text1, text2] = node4.childNodes
+        expect(text1).to.instanceOf(Text)
+        expect(text1.nodeValue).to.equal('another text1')
+        expect(text2).to.instanceOf(Text)
+        expect(text2.nodeValue).to.equal('another text2')
       })
     })
   })

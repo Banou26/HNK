@@ -65,10 +65,11 @@ const patchDomArray = (newArray, oldArray) => {
     const newNode = newArray[i]
     const oldNode = oldArray[i]
     if (newNode !== oldNode) {
-      if (oldNode) {
+      if (oldNode && oldNode.parentNode) {
         oldNode.parentNode.insertBefore(newNode, oldNode)
       } else {
         const previousNewNode = newArray[i - 1]
+        if (!previousNewNode || !previousNewNode.parentNode) continue
         previousNewNode.parentNode.insertBefore(newNode, previousNewNode.nextSibling)
       }
     }
@@ -170,6 +171,15 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
         ? updateResults.get(placeholder).data
         : data
       ]))
+      // =======================================RECODE THIS PART=======================================
+      const oldNodeByPlaceholder = new Map([...placeholderByOldNode].map(([node, placeholder]) => [placeholder, node]))
+      for (const [placeholder, updateResult] of [...updateResults].filter(([placeholder]) => placeholder.type === 'text')) {
+        patchDomArray(flattenArray(updateResult.nodes), flattenArray(oldNodeByPlaceholder.get(placeholder)))
+      }
+      for (const [placeholder, updateResult] of [...updateResults].filter(([placeholder]) => placeholder.type !== 'text')) {
+        const oldNode = oldNodeByPlaceholder.get(placeholder)
+        if (oldNode && oldNode.parentNode) oldNode.parentNode.insertBefore(updateResult.node, oldNode)
+      }
       const newChildNodes = [...childNodes].map(item => {
         if (placeholderByOldNode.has(item)) {
           const placeholder = placeholderByOldNode.get(item)
@@ -180,6 +190,7 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
         }
       })
       patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
+            // =======================================/RECODE THIS PART/=======================================
       const oldChildNodes = childNodes
       childNodes = newChildNodes
       for (const listener of listeners) listener(newChildNodes, oldChildNodes)
@@ -250,7 +261,7 @@ const update = {
       }
     } else if (value instanceof Node) {
       if (nodes[0] !== value) return { nodes: [value] }
-    } else if (value.build) {
+    } else if (value && value.build) {
       if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
         oldInstance.update(...value.values)
         return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
@@ -280,6 +291,8 @@ const update = {
         return text
       })
       return { nodes: textArray.map(({nodes}) => nodes), data: { textArray } }
+    } else {
+      return { nodes: [ nodes[0] instanceof Comment ? nodes[0] : new Comment('') ] }
     }
   },
   tag ({ values, node: _node, placeholderByIndex, placeholder: { attributes, split } }) {
