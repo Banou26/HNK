@@ -1,4 +1,5 @@
-import { placeholder as placeholderStr, split, getSplitIds, execSplit } from './utils.js'
+import { css as cssUtils } from './utils.js'
+const { placeholder: placeholderStr, split, getSplitValueIndexes: getSplitIds, mergeSplitWithValues: execSplit } = cssUtils
 
 async function setPlaceholdersPaths (sheet, placeholders, values) {
   const rules = sheet.cssRules
@@ -54,7 +55,7 @@ export const cssTemplate = (parser, options) => {
               let styleDeclaration = getStyle(path, sheet)
               switch (placeholder.type) {
                 case 'value':
-                  setTimeout(_ => styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1), 0)
+                  setTimeout(_ => (styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1)), 0)
                   break
               }
             }
