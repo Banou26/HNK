@@ -1,11 +1,12 @@
-import { placeholderStr } from './utils.js'
 import { cssTemplate } from './css-template.js'
+import { css as cssUtils } from './utils.js'
+const { placeholder } = cssUtils
 
 export const css = cssTemplate((source, values) => {
   let src = source[0]
   for (const i in values) {
     if (i === 0) continue
-    src += `var(--${placeholderStr(i)})${source[parseInt(i) + 1]}`
+    src += `var(--${placeholder(i)})${source[parseInt(i) + 1]}`
   }
   return {css: src}
 })
