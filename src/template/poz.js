@@ -1,10 +1,6 @@
-import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, isBuild, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
-} from './utils.js'
-import { parseHtml, html } from './html.js'
-import { htmlTemplate } from './html-template.js'
+import { html } from './utils.js'
+import { htmlTemplate } from './html.js'
+const { regex: placeholderRegex } = html
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 
@@ -67,11 +63,4 @@ const pozToHTML = str => {
   return html
 }
 
-export const _poz = (strings, ...values) => {
-  const pozWithPlaceholders = joinSrcWithPlaceholders(strings)
-  const htmlWithPlaceholders = pozToHTML(pozWithPlaceholders)
-  const htmlSplit = split(htmlWithPlaceholders)
-  return parseHtml(htmlSplit.filter((str, i) => !(i % 2)), ...values)
-}
-
-export const poz = htmlTemplate(_poz)
+export const poz = htmlTemplate(pozToHTML)
