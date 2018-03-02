@@ -1,4 +1,4 @@
-import { cloneObject, isBuiltIn as IsBuiltIn, getPropertyDescriptor } from '../util/index.js'
+import { cloneObject, isBuiltIn as IsBuiltIn, getPropertyDescriptor } from '../utils.js'
 
 export let Reactivity = class Reactivity {
   constructor () {

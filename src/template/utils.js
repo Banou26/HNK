@@ -1,44 +1,49 @@
-export const envCachesTemplates = (t => t() === t())(_ => (s => s)``)
-export const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
-export const placeholderRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`)
-export const placeholderRegexGlobal = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
-
-export const isBuild = value =>
-  value.hasOwnProperty('id') &&
-  value.hasOwnProperty('values')
-
-export const placeholderStr = id => `oz-template-placeholder-${id}-${random}`
-
-export const split = str => str.split(placeholderRegexGlobal)
-
-export const getSplitIds = split => split.filter((str, i) => i % 2)
-
-export const execSplit = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
-
-export const indexToPlaceholder = (placeholders) => {
-  const arr = []
-  for (const placeholder of placeholders) {
-    for (const id of placeholder.ids) arr.push(placeholder) // eslint-disable-line no-unused-vars
+export const html = (_ => {
+  const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
+  const regex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`)
+  const globalRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
+  const placeholder = id => `oz-template-placeholder-${id}-${random}`
+  const split = str => str.split(globalRegex)
+  const getSplitValueIndexes = split => split.filter((str, i) => i % 2)
+  const mergeSplitWithValues = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
+  const mergeSplitWithPlaceholders = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholder(i) + str).join('')
+  const indexPlaceholders = placeholders => placeholders.reduce((arr, placeholder) => [...arr, ...(placeholder.indexes || [placeholder.index]).map(id => placeholder)], [])
+  const differenceIndexes = (arr1, arr2) => arr1.length >= arr2.length ? arr1.reduce((arr, val, i) => [...arr, ...val === arr2[i] ? [] : [i]], []) : differenceIndexes(arr2, arr1)
+  return {
+    random,
+    regex,
+    globalRegex,
+    placeholder,
+    split,
+    getSplitValueIndexes,
+    mergeSplitWithValues,
+    mergeSplitWithPlaceholders,
+    indexPlaceholders,
+    differenceIndexes
   }
-  return arr
-}
+})()
 
-export const valuesDif = (values, values2) => {
-  let dif = []
-  const highestLength = values.length > values2.length ? values.length : values2.length
-  for (let i = 0; i < highestLength; i++) {
-    if (values[i] !== values2[i]) dif.push(i)
+export const css = (_ => {
+  const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16)
+  const regex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`)
+  const globalRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g')
+  const placeholder = id => `oz-template-placeholder-${id}-${random}`
+  const split = str => str.split(globalRegex)
+  const getSplitValueIndexes = split => split.filter((str, i) => i % 2)
+  const mergeSplitWithValues = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
+  const mergeSplitWithPlaceholders = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholder(i) + str).join('')
+  const indexPlaceholders = placeholders => placeholders.reduce((arr, placeholder) => [...arr, ...(placeholder.indexes || [placeholder.index]).map(id => placeholder)], [])
+  const differenceIndexes = (arr1, arr2) => arr1.length >= arr2.length ? arr1.reduce((arr, val, i) => [...arr, ...val === arr2[i] ? [] : [i]], []) : differenceIndexes(arr2, arr1)
+  return {
+    random,
+    regex,
+    globalRegex,
+    placeholder,
+    split,
+    getSplitValueIndexes,
+    mergeSplitWithValues,
+    mergeSplitWithPlaceholders,
+    indexPlaceholders,
+    differenceIndexes
   }
-  return dif
-}
-
-export const joinSrcWithPlaceholders = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholderStr(i) + str).join('')
-// export const joinSrcWithPlaceholders = strings => { // ITS BUGGED, it add a placeholder at the end even without placeholders in the tag
-//   let str = strings[0]
-//   for (const i in strings) {
-//     console.log('i', i, strings[i])
-//     if (i === 0) continue
-//     str += placeholderStr(i) + (strings[parseInt(i) + 1] || '')
-//   }
-//   return str
-// }
+})()

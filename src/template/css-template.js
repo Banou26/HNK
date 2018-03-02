@@ -1,8 +1,5 @@
-import {
-  envCachesTemplates, placeholderRegex, indexToPlaceholder,
-  placeholderRegexGlobal, joinSrcWithPlaceholders,
-  placeholderStr, split, getSplitIds, execSplit, valuesDif
-} from './utils.js'
+import { css as cssUtils } from './utils.js'
+const { placeholder: placeholderStr, split, getSplitValueIndexes: getSplitIds, mergeSplitWithValues: execSplit } = cssUtils
 
 async function setPlaceholdersPaths (sheet, placeholders, values) {
   const rules = sheet.cssRules
@@ -31,7 +28,7 @@ export const cssTemplate = (parser, options) => {
   const cache = new Map()
   return (_strings, ...values) => {
     const strings = [..._strings]
-    const id = envCachesTemplates ? strings : strings.join(placeholderStr(''))
+    const id = strings.join(placeholderStr(''))
     const cached = cache.get(id)
     if (cached) return cached(...values)
     const { css } = parser(strings, values)
@@ -58,7 +55,7 @@ export const cssTemplate = (parser, options) => {
               let styleDeclaration = getStyle(path, sheet)
               switch (placeholder.type) {
                 case 'value':
-                  setTimeout(_ => styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1), 0)
+                  setTimeout(_ => (styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1)), 0)
                   break
               }
             }
