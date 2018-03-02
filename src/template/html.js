@@ -293,6 +293,8 @@ const update = {
         })
         return { nodes: instance._childNodes, data: { instance, unlisten } }
       }
+    } else if (value && value.instance) {
+      return { nodes: value._childNodes, data: { instance: value } }
     } else if (Array.isArray(value)) {
       // todo: add more of the parameters to cover all of the simple text features
       const textArray = value.map((value, i) => {
@@ -315,8 +317,9 @@ const update = {
     for (const childNode of _node.childNodes) node.appendChild(childNode)
     return {node}
   },
-  attribute ({ values, placeholder, node, data: { oldName } = {}, placeholder: { attributeType, nameSplit, valueSplit } }) {
+  attribute ({ values, placeholder, node, data: { name: oldName, listener: oldListener, value: oldValue } = {}, placeholder: { attributeType, nameSplit, valueSplit } }) {
     // todo: add event listeners feature
+    if (oldListener) node.removeEventListener(oldName, oldValue)
     const name = mergeSplitWithValues(nameSplit, values)
     const value = attributeType === '' ? values[valueSplit[1]] : mergeSplitWithValues(valueSplit, values) // mergeSplitWithValues(valueSplit, values)
     if (attributeType === '"') { // double-quote
@@ -326,8 +329,15 @@ const update = {
       if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)
     } else if (attributeType === '') {  // no-quote
-      node[name] = value
+      let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0
+      if (isEvent) { // Event handling
+        const listenerName = name.substring(isEvent === 1 ? 3 : 1)
+        const listener = node.addEventListener(listenerName, value)
+        return { node, data: { name, listener, value } }
+      } else {
+        node[name] = value
+      }
     }
-    return {node, data: { oldName: name }}
+    return {node, data: { name }}
   }
 }
