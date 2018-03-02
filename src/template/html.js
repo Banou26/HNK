@@ -31,7 +31,9 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
   , [])
   const placeholderByIndex = indexPlaceholders(placeholders)
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, null, false)
+  const nodes = new Map()
   const paths = new Map()
+  const nodesToRemove = []
   while (walker.nextNode()) {
     const currentNode = walker.currentNode
     const match = currentNode.nodeValue.match(placeholderRegex)
@@ -40,15 +42,18 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
         const placeholderNode = currentNode.splitText(match.index)
         placeholderNode.nodeValue = placeholderNode.nodeValue.substring(match[0].length)
         if (placeholderNode.nodeValue.length) placeholderNode.splitText(0)
-        if (!currentNode.nodeValue.length) currentNode.parentNode.removeChild(currentNode)
-        paths.set(placeholderByIndex[match[1]], getNodePath({node: placeholderNode}))
+        if (!currentNode.nodeValue.length) nodesToRemove.push(currentNode) // currentNode.parentNode.removeChild(currentNode)
+        nodes.set(placeholderByIndex[match[1]], placeholderNode)
       } else if (currentNode.nodeType === Node.COMMENT_NODE) {
-        paths.set(placeholderByIndex[match[1]], getNodePath({node: currentNode}))
+        nodes.set(placeholderByIndex[match[1]], currentNode)
       }
     }
   }
+  for (const node of nodesToRemove) node.parentNode.removeChild(node)
   for (const placeholder of placeholders) {
     const type = placeholder.type
+    const index = placeholder.index || placeholder.indexes[0]
+    paths.set(placeholder, getNodePath({node: nodes.get(placeholder)}))
     if (type === 'attribute' || type === 'tag') {
       const attributeName = placeholderStr(placeholder.indexes[0])
       const foundNode = node.querySelector(`[${attributeName}]`)
@@ -58,7 +63,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
   }
   return [...paths].map(([placeholder, path]) => ({...placeholder, path}))
 }
-
+// =======================================RECODE THIS PART=======================================
 const patchDomArray = (newArray, oldArray) => {
   const nodesToRemove = oldArray.filter(node => !newArray.includes(node))
   for (const i in newArray) {
@@ -67,18 +72,21 @@ const patchDomArray = (newArray, oldArray) => {
     if (newNode !== oldNode) {
       if (oldNode && oldNode.parentNode) {
         oldNode.parentNode.insertBefore(newNode, oldNode)
+        oldNode.parentNode.removeChild(oldNode)
       } else {
         const previousNewNode = newArray[i - 1]
-        if (!previousNewNode || !previousNewNode.parentNode) continue
-        previousNewNode.parentNode.insertBefore(newNode, previousNewNode.nextSibling)
+        if (previousNewNode && previousNewNode.parentNode) {
+          previousNewNode.parentNode.insertBefore(newNode, previousNewNode.nextSibling)
+          if (oldNode && oldNode.parentNode) oldNode.parentNode.removeChild(oldNode)
+        }
       }
     }
   }
   for (const node of nodesToRemove) {
-    if (node.parentNode) node.parentNode.removeChild(node)
+    if (node && node.parentNode) node.parentNode.removeChild(node)
   }
 }
-
+// =======================================/RECODE THIS PART/=======================================
 const newPlaceholdersNodes = (oldMap, placeholder, nodes) => {
   const newMap = new Map(oldMap)
   newMap.set(placeholder, nodes)
@@ -126,6 +134,7 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           : [placeholder]
         ]
         , []) // remove duplicates
+      instance.values = values
       const placeholderByOldNode = new Map(placeholdersToUpdate.map(placeholder => [placeholdersNodes.get(placeholder), placeholder]))
       const updateResults = new Map(placeholdersToUpdate.map(placeholder => {
         const result = update[placeholder.type]({
@@ -190,7 +199,7 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
         }
       })
       patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
-            // =======================================/RECODE THIS PART/=======================================
+      // =======================================/RECODE THIS PART/=======================================
       const oldChildNodes = childNodes
       childNodes = newChildNodes
       for (const listener of listeners) listener(newChildNodes, oldChildNodes)
@@ -230,7 +239,12 @@ export const htmlTemplate = transform => (strings, ...values) => {
   const id = strings.join(placeholderStr(''))
   if (cache.has(id)) return cache.get(id)(values)
   const { html, placeholders } = parsePlaceholders({htmlArray: split(transform(mergeSplitWithPlaceholders(strings))).filter((str, i) => !(i % 2)), values})
-  const build = createBuild({ id, html, placeholders })
+  const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
+    ...placeholder.type === 'text'
+    ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
+    : [placeholder]
+  ], [])
+  const build = createBuild({ id, html, placeholders: placeholdersWithFixedTextPlaceholders })
   cache.set(id, build)
   return build(values)
 }
@@ -298,11 +312,13 @@ const update = {
   tag ({ values, node: _node, placeholderByIndex, placeholder: { attributes, split } }) {
     const node = document.createElement(mergeSplitWithValues(split, values))
     for (const {name, value} of _node.attributes) node.setAttribute(name, value)
+    for (const childNode of _node.childNodes) node.appendChild(childNode)
     return {node}
   },
   attribute ({ values, placeholder, node, data: { oldName } = {}, placeholder: { attributeType, nameSplit, valueSplit } }) {
+    // todo: add event listeners feature
     const name = mergeSplitWithValues(nameSplit, values)
-    const value = mergeSplitWithValues(valueSplit, values)
+    const value = attributeType === '' ? values[valueSplit[1]] : mergeSplitWithValues(valueSplit, values) // mergeSplitWithValues(valueSplit, values)
     if (attributeType === '"') { // double-quote
       if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)

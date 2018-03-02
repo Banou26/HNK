@@ -41,7 +41,7 @@ describe('html', function () {
   describe('tag placeholder', function () {
     let instance, container
     before(function () {
-      instance = html`<${'div'} staticAttribute="staticValue" ${'dynamicAttribute'}="${'dynamicValue'}"></${'div'}>`()
+      instance = html`<${'div'} staticAttribute="staticValue" ${'dynamicAttribute'}="${'dynamicValue'}">${'child'}</${'div'}>`()
       container = document.createElement('div')
       container.appendChild(instance.content)
       document.body.appendChild(container)
@@ -52,15 +52,35 @@ describe('html', function () {
     const test = testChildNode(_ => ([instance, container]))
 
     it('create a div', function () {
+      test(0, node => node, expect => expect.to.instanceOf(HTMLDivElement))
       test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
       test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal('dynamicValue'))
-      test(0, node => node, expect => expect.to.instanceOf(HTMLDivElement))
+      expect(instance.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(instance.childNodes[0].childNodes[0].nodeValue).to.equal('child')
+      expect(container.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(container.childNodes[0].childNodes[0].nodeValue).to.equal('child')
     })
     it('replace the div with a span', function () {
-      instance.update('span', 'anotherDynamicAttribute', 'anotherDynamicValue', 'span')
+      instance.update('span', 'anotherDynamicAttribute', 'anotherDynamicValue', 'child changed', 'span')
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
       test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
       test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal('anotherDynamicValue'))
-      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+      test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal(null))
+      expect(instance.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(instance.childNodes[0].childNodes[0].nodeValue).to.equal('child changed')
+      expect(container.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(container.childNodes[0].childNodes[0].nodeValue).to.equal('child changed')
+    })
+    it('replace again the div with a span', function () {
+      instance.update('div', 'dynamicAttribute', 'dynamicValue', 'child', 'div')
+      test(0, node => node, expect => expect.to.instanceOf(HTMLDivElement))
+      test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
+      test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal(null))
+      test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal('dynamicValue'))
+      expect(instance.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(instance.childNodes[0].childNodes[0].nodeValue).to.equal('child')
+      expect(container.childNodes[0].childNodes[0]).to.instanceOf(Text)
+      expect(container.childNodes[0].childNodes[0].nodeValue).to.equal('child')
     })
   })
   describe('comment placeholder', function () {
@@ -109,14 +129,24 @@ describe('html', function () {
   })
   describe('text placeholder', function () {
     describe('string', function () {
-      let instance
+      let instance, container
       before(function () {
-        instance = html`${'text'}`()
+        instance = html`${'text'} ${'another text'}`()
+        container = document.createElement('div')
+        container.appendChild(instance.content)
+        document.body.appendChild(container)
       })
+      after(function () {
+        document.body.removeChild(container)
+      })
+      const test = testChildNode(_ => ([instance, container]))
+      const testValue = (n, val) => test(n, node => node.nodeValue, expect => expect.to.equal(val))
+
       it('create a text node', function () {
-        const textNode = instance.childNodes[0]
-        expect(textNode).to.instanceof(Text)
-        expect(textNode.nodeValue).to.equal('text')
+        test(0, node => node, expect => expect.to.instanceOf(Text))
+        testValue(0, 'text')
+        test(2, node => node, expect => expect.to.instanceOf(Text))
+        testValue(2, 'another text')
       })
       it('create a span and replace the div', function () {
         const textNode = instance.childNodes[0]
