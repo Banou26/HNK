@@ -126,6 +126,7 @@ describe('html', function () {
       test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
       test(0, node => node.anotherProperty3, expect => expect.to.equal('anotherValue3'))
     })
+    // todo: add event listener tests
   })
   describe('text placeholder', function () {
     describe('string', function () {
@@ -173,6 +174,44 @@ describe('html', function () {
       let instance, container
       const subTemplate = text => html`some ${text} template`
       const subTemplate2 = text => html`some other ${text} sub template`
+
+      before(function () {
+        instance = html`${subTemplate('text')}`()
+        container = document.createElement('div')
+        container.appendChild(instance.content)
+        document.body.appendChild(container)
+      })
+      after(function () {
+        document.body.removeChild(container)
+      })
+      const test = testChildNode(_ => ([instance, container]))
+      const testValue = (n, val) => test(n, node => node.nodeValue, expect => expect.to.equal(val))
+
+      it('create a template instance', function () {
+        testValue(0, 'some ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'text')
+        testValue(2, ' template')
+      })
+      it('update the template instance', function () {
+        instance.update(subTemplate('another text'))
+        testValue(0, 'some ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'another text')
+        testValue(2, ' template')
+      })
+      it('replace the template instance', function () {
+        instance.update(subTemplate2('some new other text'))
+        testValue(0, 'some other ')
+        test(1, node => node, expect => expect.to.instanceOf(Text))
+        testValue(1, 'some new other text')
+        testValue(2, ' sub template')
+      })
+    })
+    describe('template instance', function () {
+      let instance, container
+      const subTemplate = text => html`some ${text} template`()
+      const subTemplate2 = text => html`some other ${text} sub template`()
 
       before(function () {
         instance = html`${subTemplate('text')}`()
