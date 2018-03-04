@@ -52,7 +52,6 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
   for (const node of nodesToRemove) node.parentNode.removeChild(node)
   for (const placeholder of placeholders) {
     const type = placeholder.type
-    const index = placeholder.index || placeholder.indexes[0]
     paths.set(placeholder, getNodePath({node: nodes.get(placeholder)}))
     if (type === 'attribute' || type === 'tag') {
       const attributeName = placeholderStr(placeholder.indexes[0])
@@ -128,14 +127,10 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           ? [placeholder, ...placeholder.attributes.map(indexes => placeholderByIndex[indexes[0]])]
           : [placeholder]
         ], []) // placeholders with attributes of tags that need update
-        .reduce((arr, placeholder) => [...arr,
-          ...arr.includes(placeholder)
-          ? []
-          : [placeholder]
-        ]
-        , []) // remove duplicates
+        .reduce((arr, placeholder) => [...arr, ...arr.includes(placeholder) ? [] : [placeholder]], []) // remove duplicates
       instance.values = values
       const placeholderByOldNode = new Map(placeholdersToUpdate.map(placeholder => [placeholdersNodes.get(placeholder), placeholder]))
+      const oldNodeByPlaceholder = new Map([...placeholderByOldNode].map(([node, placeholder]) => [placeholder, node]))
       const updateResults = new Map(placeholdersToUpdate.map(placeholder => {
         const result = update[placeholder.type]({
           placeholder,
@@ -143,24 +138,12 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           data: placeholdersData.get(placeholder),
           [placeholder.type === 'text' ? 'nodes' : 'node']: placeholdersNodes.get(placeholder),
           placeholderByIndex,
-          _childNodes: instance._childNodes,
+          getChildNodes () { return instance._childNodes },
           setChildNodes: _childNodes => {
-            // work but isn't doing the job(it's useless code)
-            // patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
-            // const oldChildNodes = childNodes
-            // childNodes = newChildNodes
-            // for (const listener of listeners) listener(newChildNodes, oldChildNodes)
-            //
-            // should work ?
             // patchDomArray(flattenArray(_childNodes), flattenArray(childNodes))
-            // const oldChildNodes = childNodes
-            // childNodes = _childNodes
-            // for (const listener of listeners) listener(_childNodes, oldChildNodes)
-            //
-            // old
-            // childNodes = _childNodes
-            // patchDomArray(flattenArray(newChildNodes), flattenArray(childNodes))
-            // for (const listener of listeners) listener(newChildNodes, oldChildNodes)
+            const oldChildNodes = childNodes
+            childNodes = _childNodes
+            for (const listener of listeners) listener(_childNodes, oldChildNodes)
           }
         })
         if ((result.node || result.nodes) === placeholdersNodes.get(placeholder)) return [placeholder, result]
@@ -170,9 +153,19 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
           }
           for (const attrIndex of placeholder.attributes) {
             placeholdersNodes = newPlaceholdersNodes(placeholdersNodes, placeholderByIndex[attrIndex[0]], result.node)
+            // const oldNode = oldNodeByPlaceholder.get(placeholderByIndex[attrIndex[0]])
+            // if (childNodes.includes(oldNode)) {
+            //   childNodes = [...childNodes]
+            //   childNodes.splice(childNodes.indexOf(oldNode), 1, result.node)
+            // }
           }
         }
         placeholdersNodes = newPlaceholdersNodes(placeholdersNodes, placeholder, placeholder.type === 'text' ? result.nodes : result.node)
+        // const oldNode = oldNodeByPlaceholder.get(placeholder)
+        // if (childNodes.includes(oldNode)) {
+        //   childNodes = [...childNodes]
+        //   childNodes.splice(childNodes.indexOf(oldNode), 1, result.node)
+        // }
         return [placeholder, result]
       }))
       placeholdersData = new Map([...placeholdersData].map(([placeholder, data]) => [placeholder,
@@ -181,7 +174,6 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
         : data
       ]))
       // =======================================RECODE THIS PART=======================================
-      const oldNodeByPlaceholder = new Map([...placeholderByOldNode].map(([node, placeholder]) => [placeholder, node]))
       for (const [placeholder, updateResult] of [...updateResults].filter(([placeholder]) => placeholder.type === 'text')) {
         patchDomArray(flattenArray(updateResult.nodes), flattenArray(oldNodeByPlaceholder.get(placeholder)))
       }
@@ -259,12 +251,13 @@ const update = {
   text ({
     value,
     values,
-    _childNodes,
+    getChildNodes,
     setChildNodes,
     nodes = [],
     data: { instance: oldInstance, unlisten: oldUnlisten, textArray: oldTextArray = [] } = {},
     placeholder: { index } = {}
   }) {
+    if (oldUnlisten) oldUnlisten()
     if (values && !value) value = values[index]
     if (typeof value === 'string' || typeof value === 'number') {
       if (nodes[0] instanceof Text) {
@@ -280,21 +273,21 @@ const update = {
         oldInstance.update(...value.values)
         return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
       } else {
-        if (oldUnlisten) oldUnlisten()
         const instance = value()
         const unlisten = instance.listen((newChildNodes, oldChildNodes) => {
-          // const newNodes = _childNodes.slice()
-          // // console.log(newChildNodes)
-          // // console.log(oldChildNodes)
-          // // console.log(newNodes)
-          // newNodes[newNodes.indexOf(oldChildNodes)] = newChildNodes
-          // // console.log(newNodes)
-          // setChildNodes(newNodes)
+          const newNodes = getChildNodes().slice()
+          newNodes[newNodes.indexOf(oldChildNodes)] = newChildNodes
+          setChildNodes(newNodes)
         })
         return { nodes: instance._childNodes, data: { instance, unlisten } }
       }
     } else if (value && value.instance) {
-      return { nodes: value._childNodes, data: { instance: value } }
+      const unlisten = value.listen((newChildNodes, oldChildNodes) => {
+        const newNodes = getChildNodes().slice()
+        newNodes[newNodes.indexOf(oldChildNodes)] = newChildNodes
+        setChildNodes(newNodes)
+      })
+      return { nodes: value._childNodes, data: { instance: value, unlisten } }
     } else if (Array.isArray(value)) {
       // todo: add more of the parameters to cover all of the simple text features
       const textArray = value.map((value, i) => {
@@ -338,6 +331,7 @@ const update = {
         node[name] = value
       }
     }
+    // todo: what about directives and attributes without values ?
     return {node, data: { name }}
   }
 }

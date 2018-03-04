@@ -101,8 +101,9 @@ describe('html', function () {
   })
   describe('attribute placeholder', function () {
     let instance, container
+    let eventValue = 0
     before(function () {
-      instance = html`<div ${'attribute'}="${'value'}" ${'attribute2'}='${'value2'}' ${'property'}=${'value3'}></div>`()
+      instance = html`<div ${'attribute'}="${'value'}" ${'attribute2'}='${'value2'}' ${'property'}=${'value3'} on-click=${ev => (eventValue++)}></div>`()
       container = document.createElement('div')
       container.appendChild(instance.content)
       document.body.appendChild(container)
@@ -116,6 +117,8 @@ describe('html', function () {
       test(0, node => node.getAttribute('attribute'), expect => expect.to.equal('value'))
       test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal('value2'))
       test(0, node => node.property, expect => expect.to.equal('value3'))
+      test(0, node => node['on-input'], expect => undefined)
+      expect(eventValue).to.equal(0)
     })
     it('replace the div attributes and properties by other attributes and properties', function () {
       instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3')
@@ -125,8 +128,10 @@ describe('html', function () {
       test(0, node => node.getAttribute('anotherAttribute'), expect => expect.to.equal('anotherValue'))
       test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
       test(0, node => node.anotherProperty3, expect => expect.to.equal('anotherValue3'))
+      instance.childNodes[0].click(instance.childNodes[0])
+      expect(eventValue).to.equal(1)
     })
-    // todo: add event listener tests
+    // todo: add directives tests
   })
   describe('text placeholder', function () {
     describe('string', function () {
@@ -225,7 +230,7 @@ describe('html', function () {
       const test = testChildNode(_ => ([instance, container]))
       const testValue = (n, val) => test(n, node => node.nodeValue, expect => expect.to.equal(val))
 
-      it('create a template instance', function () {
+      it('use the template instance', function () {
         testValue(0, 'some ')
         test(1, node => node, expect => expect.to.instanceOf(Text))
         testValue(1, 'text')
@@ -244,6 +249,11 @@ describe('html', function () {
         test(1, node => node, expect => expect.to.instanceOf(Text))
         testValue(1, 'some new other text')
         testValue(2, ' sub template')
+      })
+      it('update its own childNodes when a child placeholder template update itself', function () {
+        const newNode = document.createElement('div')
+        instance.values[0].update(newNode)
+        test(1, node => node, expect => expect.to.equal(newNode))
       })
     })
     describe('array', function () {
