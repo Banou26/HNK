@@ -134,7 +134,6 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
       replaceNode(newElement, element)
       for (const placeholder of elementPlaceholders) updatePlaceholder({values, placeholder})
     }
-
     if (placeholder.type === 'attribute' && placeholder.indexes.length === 1 && directive && directive.directive) { // placeholder value is a directive
       placeholdersData = new Map([...placeholdersData, [
         placeholder,
@@ -302,15 +301,12 @@ const update = {
     }
   },
   attribute ({ values, placeholder, node, data: { name: oldName, listener: oldListener, value: oldValue } = {}, placeholder: { attributeType, nameSplit, valueSplit } }) {
-    // todo: add event listeners feature
     if (oldListener) node.removeEventListener(oldName, oldValue)
     const name = mergeSplitWithValues(nameSplit, values)
     const value = attributeType === '' ? values[valueSplit[1]] : mergeSplitWithValues(valueSplit, values) // mergeSplitWithValues(valueSplit, values)
     if (attributeType === '"') { // double-quote
-      if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)
     } else if (attributeType === '\'') {  // single-quote
-      if (oldName) node.removeAttribute(oldName)
       node.setAttribute(name, value)
     } else if (attributeType === '') {  // no-quote
       let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0
@@ -322,7 +318,6 @@ const update = {
         node[name] = value
       }
     }
-    // todo: what about directives and attributes without values ?
     return {node, data: { name }}
   }
 }
