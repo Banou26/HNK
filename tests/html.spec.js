@@ -65,17 +65,17 @@ describe('html', function () {
       test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
       test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
       test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal('anotherDynamicValue'))
-      test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal(null))
+      test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal('dynamicValue'))
       expect(instance.childNodes[0].childNodes[0]).to.instanceOf(Text)
       expect(instance.childNodes[0].childNodes[0].nodeValue).to.equal('child changed')
       expect(container.childNodes[0].childNodes[0]).to.instanceOf(Text)
       expect(container.childNodes[0].childNodes[0].nodeValue).to.equal('child changed')
     })
-    it('replace again the div with a span', function () {
+    it('replace the span with a div', function () {
       instance.update('div', 'dynamicAttribute', 'dynamicValue', 'child', 'div')
       test(0, node => node, expect => expect.to.instanceOf(HTMLDivElement))
       test(0, node => node.getAttribute('staticAttribute'), expect => expect.to.equal('staticValue'))
-      test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal(null))
+      test(0, node => node.getAttribute('anotherDynamicAttribute'), expect => expect.to.equal('anotherDynamicValue'))
       test(0, node => node.getAttribute('dynamicAttribute'), expect => expect.to.equal('dynamicValue'))
       expect(instance.childNodes[0].childNodes[0]).to.instanceOf(Text)
       expect(instance.childNodes[0].childNodes[0].nodeValue).to.equal('child')
@@ -99,21 +99,22 @@ describe('html', function () {
       expect(node.nodeValue).to.equal(' some other comment text ')
     })
   })
-  describe.only('attribute placeholder', function () {
+  describe('attribute placeholder', function () {
     let instance, container, directiveNode
     let eventValue = 0
     const directive = ({getElement, setElement}) => {
-      getElement().propertySetByDirective = true
-      // todo: work on setElement
-      // setElement((directiveNode = document.createElement('span')))
+      const elem = directiveNode = document.createElement('span')
+      elem.propertySetByDirective = true
+      setElement(elem)
     }
+    const clickListener = ev => (eventValue++)
     directive.directive = true
     before(function () {
       instance = html`<div
         ${'attribute'}="${'value'}"
         ${'attribute2'}='${'value2'}'
         ${'property'}=${'value3'}
-        on-click=${ev => (eventValue++)}
+        on-click=${clickListener}
         ${directive}
       ></div>`()
       container = document.createElement('div')
@@ -126,6 +127,8 @@ describe('html', function () {
     const test = testChildNode(_ => ([instance, container]))
 
     it('create a div with attributes and properties', function () {
+      test(0, node => node, expect => expect.to.equal(directiveNode))
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
       test(0, node => node.propertySetByDirective, expect => expect.to.equal(true))
       test(0, node => node.getAttribute('attribute'), expect => expect.to.equal('value'))
       test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal('value2'))
@@ -134,9 +137,11 @@ describe('html', function () {
       expect(eventValue).to.equal(0)
     })
     it('replace the div attributes and properties by other attributes and properties', function () {
-      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', directive)
-      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal(null))
-      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal(null))
+      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', clickListener, directive)
+      test(0, node => node, expect => expect.to.equal(directiveNode))
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal('value'))
+      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal('value2'))
       test(0, node => node.property, expect => expect.to.equal('value3'))
       test(0, node => node.getAttribute('anotherAttribute'), expect => expect.to.equal('anotherValue'))
       test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
@@ -145,10 +150,11 @@ describe('html', function () {
       expect(eventValue).to.equal(1)
     })
     it('directive replace the div by a span', function () {
-      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', directive)
-      // test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
-      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal(null))
-      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal(null))
+      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', clickListener, directive)
+      test(0, node => node, expect => expect.to.equal(directiveNode))
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal('value'))
+      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal('value2'))
       test(0, node => node.property, expect => expect.to.equal('value3'))
       test(0, node => node.getAttribute('anotherAttribute'), expect => expect.to.equal('anotherValue'))
       test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
