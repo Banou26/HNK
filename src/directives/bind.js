@@ -1,7 +1,8 @@
 import { watch } from '../reactivity/index.js'
 
 export const bind = (obj, prop, event) => {
-  const func = ({element}) => {
+  const func = ({getElement}) => {
+    const element = getElement()
     element.value = obj[prop]
     let unwatch = watch(_ => obj[prop], value => (element.value = value))
     const listener = ({target: {value}}) => event ? undefined : (obj[prop] = value)
