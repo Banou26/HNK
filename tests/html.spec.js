@@ -99,11 +99,21 @@ describe('html', function () {
       expect(node.nodeValue).to.equal(' some other comment text ')
     })
   })
-  describe('attribute placeholder', function () {
-    let instance, container
+  describe.skip('attribute placeholder', function () {
+    let instance, container, directiveNode
     let eventValue = 0
+    const directive = ({element, setElement}) => {
+      setElement((directiveNode = document.createElement('span')))
+    }
+    directive.directive = true
     before(function () {
-      instance = html`<div ${'attribute'}="${'value'}" ${'attribute2'}='${'value2'}' ${'property'}=${'value3'} on-click=${ev => (eventValue++)}></div>`()
+      instance = html`<div
+        ${'attribute'}="${'value'}"
+        ${'attribute2'}='${'value2'}'
+        ${'property'}=${'value3'}
+        on-click=${ev => (eventValue++)}
+        ${directive}
+      ></div>`()
       container = document.createElement('div')
       container.appendChild(instance.content)
       document.body.appendChild(container)
@@ -121,7 +131,7 @@ describe('html', function () {
       expect(eventValue).to.equal(0)
     })
     it('replace the div attributes and properties by other attributes and properties', function () {
-      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3')
+      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', directive)
       test(0, node => node.getAttribute('attribute'), expect => expect.to.equal(null))
       test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal(null))
       test(0, node => node.property, expect => expect.to.equal('value3'))
@@ -131,7 +141,18 @@ describe('html', function () {
       instance.childNodes[0].click(instance.childNodes[0])
       expect(eventValue).to.equal(1)
     })
-    // todo: add directives tests
+    it('directive replace the div by a span', function () {
+      instance.update('anotherAttribute', 'anotherValue', 'anotherAttribute2', 'anotherValue2', 'anotherProperty3', 'anotherValue3', directive)
+      test(0, node => node, expect => expect.to.instanceOf(HTMLSpanElement))
+      test(0, node => node.getAttribute('attribute'), expect => expect.to.equal(null))
+      test(0, node => node.getAttribute('attribute2'), expect => expect.to.equal(null))
+      test(0, node => node.property, expect => expect.to.equal('value3'))
+      test(0, node => node.getAttribute('anotherAttribute'), expect => expect.to.equal('anotherValue'))
+      test(0, node => node.getAttribute('anotherAttribute2'), expect => expect.to.equal('anotherValue2'))
+      test(0, node => node.anotherProperty3, expect => expect.to.equal('anotherValue3'))
+      instance.childNodes[0].click(instance.childNodes[0])
+      expect(eventValue).to.equal(1)
+    })
   })
   describe('text placeholder', function () {
     describe('string', function () {
@@ -161,18 +182,25 @@ describe('html', function () {
       })
     })
     describe('node', function () {
-      let instance
+      let instance, container
       before(function () {
         instance = html`${document.createElement('div')}`()
+        container = document.createElement('div')
+        container.appendChild(instance.content)
+        document.body.appendChild(container)
       })
+      after(function () {
+        document.body.removeChild(container)
+      })
+      const test = testChildNode(_ => ([instance, container]))
+
       it('create a div', function () {
-        const node = instance.childNodes[0]
-        expect(node).to.equal(instance.values[0])
+        test(0, node => node, expect => expect.to.equal(instance.values[0]))
       })
       it('replace a div with a span', function () {
         const newNode = document.createElement('span')
         instance.update(newNode)
-        expect(instance.childNodes[0]).to.equal(newNode)
+        test(0, node => node, expect => expect.to.equal(newNode))
       })
     })
     describe('template', function () {
