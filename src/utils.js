@@ -2,13 +2,27 @@ export const UUID = a => a ? (a ^ Math.random() * 16 >> a / 4).toString(16) : ([
 
 export const isObject = item => item && typeof item === 'object' && !Array.isArray(item)
 
+export const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray(item)] : [...arr, item], [])
+
+const replaceObject = (object, replace) => replace ? replace(object) : object
+
 // todo add more of the built-in objects, some of them are in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
 export const builtInObjects = new Map([
   [URL, url => new URL(url.href)],
   [URLSearchParams, urlSearchParams => new URLSearchParams(urlSearchParams.toString())],
   [RegExp, regexp => new RegExp(regexp.source, regexp.flags)],
-  [Map, map => new Map(cloneObject([...map]))],
-  [Set, set => new Set(cloneObject([...set]))]
+  [Map, (map, {refs, replaceObjects, ...rest}) => {
+    const newMap = replaceObject(new Map(), replaceObjects)
+    refs.set(map, newMap)
+    for (const [key, val] of cloneObject([...map], { refs, ...rest, registerRef: false, replaceObjects })) newMap.set(key, val)
+    return newMap
+  }],
+  [Set, (set, {refs, replaceObjects, ...rest}) => {
+    const newSet = replaceObject(new Set(), replaceObjects)
+    refs.set(set, newSet)
+    for (const val of cloneObject([...set], { refs, ...rest, registerRef: false, replaceObjects })) newSet.add(val)
+    return newSet
+  }]
 ])
 
 export const isBuiltIn = obj => {
@@ -29,17 +43,25 @@ export const isIgnoredObjectType = obj => {
   }
 }
 
-export function cloneObject (original, refs = new Map()) {
-  if (refs.has(original)) return refs.get(original)
-  if (!original || typeof original !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof original}'`)
-  if (isIgnoredObjectType(original)) return original
-  const builtInPair = isBuiltIn(original)
-  if (builtInPair) return builtInPair[1](original)
-  let object = Array.isArray(original) ? [...original] : Object.create(Object.getPrototypeOf(original))
-  refs.set(original, object)
-  for (const [prop, desc] of Object.entries(Object.getOwnPropertyDescriptors(original))) {
+export function cloneObject (_object = {}, { refs = new Map(), registerRef = true, replaceObjects } = {}) {
+  if (refs.has(_object)) return refs.get(_object)
+  if (!_object || typeof _object !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof _object}'`)
+  if (isIgnoredObjectType(_object)) return _object
+  const builtInPair = isBuiltIn(_object)
+  if (builtInPair) return builtInPair[1](_object, { refs, replaceObjects })
+  const object = replaceObject(Array.isArray(_object) ? [..._object] : Object.create(Object.getPrototypeOf(_object)), replaceObjects)
+  if (registerRef) refs.set(_object, object)
+  for (const [prop, desc] of Object.entries(Object.getOwnPropertyDescriptors(_object))) {
     let {value, ...rest} = desc
-    Object.defineProperty(object, prop, {...rest, ...value !== undefined && {value: value && typeof value === 'object' ? cloneObject(value, refs) : value}})
+    if (desc.writable === false) continue
+    Object.defineProperty(object, prop, {
+      ...rest,
+      ...value !== undefined && {
+        value: value && typeof value === 'object'
+          ? cloneObject(value, { refs, replaceObjects })
+          : value
+      }
+    })
   }
   return object
 }
