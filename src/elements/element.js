@@ -2,8 +2,22 @@ import { reactify, watch } from '../reactivity/index.js'
 
 const mixins = []
 export const mixin = obj => mixins.push(obj)
+let currentContexts = []
 
-const currentContexts = []
+const callMixin = (context, options, mixin) => {
+  const parentContext = currentContexts[currentContexts.length - 1]
+  mixin({ context, options, ...parentContext && parentContext !== context && { parentContext: parentContext } })
+}
+
+export const pushContext = (context, func) => {
+  const _currentContexts = [...currentContexts]
+  currentContexts = [...currentContexts, context]
+  try {
+    return func()
+  } finally {
+    currentContexts = [..._currentContexts]
+  }
+}
 
 export const registerElement = options => {
   const {
@@ -45,23 +59,13 @@ export const registerElement = options => {
         }
         Object.defineProperties(this, propsDescriptors)
       }
-      for (const mixin of mixins) {
-        const parentContext = currentContexts[currentContexts.length - 1]
-        mixin({ context, ...parentContext && parentContext !== context && { parentContext: parentContext }, options })
-      }
+      mixins.forEach(callMixin.bind(null, context, options))
       if (htmlTemplate) {
         let template, build
         const buildTemplate = htmlTemplate.bind(null, context)
-        watch(_ => {
-          currentContexts.push(context)
-          build = buildTemplate()
-          currentContexts.splice(currentContexts.indexOf(context), 1)
-          return build
-        }, build => template.update(...build.values))
+        watch(_ => pushContext(context, _ => (build = buildTemplate())), build => template.update(...build.values))
         if (!build.build) throw new Error('The template function should return a html-template build.')
-        currentContexts.push(context)
-        template = build()
-        currentContexts.splice(currentContexts.indexOf(context), 1)
+        pushContext(context, _ => (template = build()))
         context.template = template
       }
       if (cssTemplate) {
@@ -88,22 +92,21 @@ export const registerElement = options => {
     }
 
     connectedCallback () {
-      const ctx = this.__context__
-      const { host, style, template } = ctx
-      if (template) host.appendChild(template.content)
+      const { __context__: context, __context__: { host, style, template } } = this
+      mixins.forEach(callMixin.bind(null, context, options))
+      if (template) pushContext(context, _ => host.appendChild(template.content))
       if (style) {
         if (shadowDom) host.appendChild(style.content)
         else this.ownerDocument.head.appendChild(style.content)
         style.update()
       }
-      if (connected) connected(ctx)
+      if (connected) connected(context)
     }
 
     disconnectedCallback () {
-      const ctx = this.__context__
-      const { style } = ctx
+      const { __context__: context, __context__: { style } } = this
       if (style && !shadowDom) style.content.parentElement.removeChild(style.content) // todo: check why the element is emptied but not removed
-      if (disconnected) disconnected(ctx)
+      if (disconnected) disconnected(context)
     }
   }
   customElements.define(name, OzElement)
