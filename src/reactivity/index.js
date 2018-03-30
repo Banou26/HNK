@@ -74,7 +74,10 @@ export const IsIgnoredObjectType = obj => {
 
 export const reactify = (_object = {}, { reactiveRoot = defaultReactiveRoot, clone = true } = {}) => {
   if (_object.__reactivity__ instanceof Reactivity || IsIgnoredObjectType(_object) || _object.__reactivity__ === false) return _object
-  const object = clone ? cloneObject(_object, { replaceObjects: object => reactify(object, { reactiveRoot, clone: false }) }) : _object
+  const object = clone ? cloneObject(_object, {
+    replaceObjects: object => reactify(object, { reactiveRoot, clone: false }),
+    doNotCopyObjects: object => object.__reactivity__
+  }) : _object
   if (clone) return object
   const isBuiltIn = IsBuiltIn(object)
   // const protoProps = isBuiltIn ? Object.getOwnPropertyNames(isBuiltIn[0].prototype) : []
