@@ -1,6 +1,5 @@
 process.env.CHROME_BIN = require('puppeteer').executablePath()
 
-var webpack = require('webpack')
 var webpackConfig = {
   module: {
     rules: [
