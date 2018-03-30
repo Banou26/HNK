@@ -43,10 +43,11 @@ export const isIgnoredObjectType = obj => {
   }
 }
 
-export function cloneObject (_object = {}, { refs = new Map(), registerRef = true, replaceObjects } = {}) {
+export function cloneObject (_object = {}, { refs = new Map(), registerRef = true, replaceObjects, doNotCopyObjects } = {}) {
   if (refs.has(_object)) return refs.get(_object)
   if (!_object || typeof _object !== 'object') throw new TypeError(`Oz cloneObject: first argument has to be typeof 'object' & non null, typeof was '${typeof _object}'`)
   if (isIgnoredObjectType(_object)) return _object
+  if (doNotCopyObjects && doNotCopyObjects(_object)) return _object
   const builtInPair = isBuiltIn(_object)
   if (builtInPair) return builtInPair[1](_object, { refs, replaceObjects })
   const object = replaceObject(Array.isArray(_object) ? [..._object] : Object.create(Object.getPrototypeOf(_object)), replaceObjects)
@@ -58,7 +59,7 @@ export function cloneObject (_object = {}, { refs = new Map(), registerRef = tru
       ...rest,
       ...value !== undefined && {
         value: value && typeof value === 'object'
-          ? cloneObject(value, { refs, replaceObjects })
+          ? cloneObject(value, { refs, replaceObjects, doNotCopyObjects })
           : value
       }
     })

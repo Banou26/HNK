@@ -116,7 +116,10 @@ describe('Reactivity', _ => {
     it('should not reactify a reactive object', function () {
       let obj = reactify({})
       let react = reactify({obj})
+      react.obj2 = obj
       expect(obj).to.equal(react.obj)
+      expect(obj).to.equal(react.obj2)
+      expect(reactify(obj)).to.equal(obj)
     })
 
     it('should have a optional handler in the standalone function', function () {
