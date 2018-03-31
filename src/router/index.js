@@ -92,7 +92,7 @@ export const Router = options => {
     const { url, route } = resolve(to)
     const matched = flattenRoute(route)
     const { currentRoutesComponents, currentRoute } = state
-    console.log('state', state, currentRoutesComponents)
+    // console.log('state', state, currentRoutesComponents)
     const newRoute = {
       url,
       path: url.pathname,
@@ -107,8 +107,8 @@ export const Router = options => {
     const reusedRoutes = currentRoute ? matched.filter(route => currentRoute.matched.includes(route)) : []
     const deactivatedRoutes = currentRoute ? currentRoute.matched.filter(route => !matched.includes(route)) : []
 
-    const reusedComponents = new Map(reusedRoutes.map(route => [route, [...state.currentRoutesComponents.get(route).values()]]))
-    const deactivatedComponents = new Map(deactivatedRoutes.map(route => [route, [...state.currentRoutesComponents.get(route).values()]]))
+    const reusedComponents = new Map(reusedRoutes.map(route => [route, [...currentRoutesComponents.get(route).values()]]))
+    const deactivatedComponents = new Map(deactivatedRoutes.map(route => [route, [...currentRoutesComponents.get(route).values()]]))
 
     const abortResults = (results, guardFunctionName, reverse) => {
       const abort = results.find(result => reverse ? !result : result)
@@ -116,15 +116,12 @@ export const Router = options => {
     }
 
     const callComponentsGuards = async (components, guardFunctionName) => {
-      console.log('components', components)
       abortResults(await Promise.all(components.map(component => {
-        console.log('component', component)
         const { __context__: context } = component
         if (!component[guardFunctionName]) return
         return /* currentRoutesComponents.get(component) */component[guardFunctionName](context || newRoute, context ? newRoute : currentRoute, context ? currentRoute : undefined)
       }).filter(elem => elem)), guardFunctionName)
     }
-    console.log(deactivatedComponents)
     await callComponentsGuards(flattenArray([...deactivatedComponents.values()]), 'beforeRouteLeave')
 
     const beforeEachAbort = (await Promise.all(beforeEachGuards.map(guard => guard(newRoute, currentRoute)))).find(result => result)
@@ -146,6 +143,9 @@ export const Router = options => {
     ))), 'beforeRouteEnter', true)
 
     const activatedComponents = pushContext(state.___rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
+
+    // for (const [key] of deactivatedComponents) state.currentRoutesComponents.delete(key)
+    // for (const [key, val] of activatedComponents) state.currentRoutesComponents.set(key, val)
 
     state.currentRoutesComponents = new Map([...reusedComponents, ...activatedComponents])
     // console.log('state.currentRoutesComponents', state.currentRoutesComponents)
