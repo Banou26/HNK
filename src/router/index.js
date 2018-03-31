@@ -4,7 +4,6 @@ import pathToRegexp, { compile } from '../libs/path-to-regexp.js'
 import { cloneObject, flattenArray } from '../utils.js'
 
 mixin(({context, parentContext, options}) => {
-  // console.log('mixin', context, parentContext)
   if (options && options.router) {
     context.router = options.router
     context.router.__rootElementContext__ = context
@@ -30,23 +29,9 @@ const flattenRoutes = (routes, __path = '', parent) => {
 
 const getRouterViewPositionElement = (route, n) => n ? getRouterViewPositionElement(route.parent, n - 1) : route
 
-// const createComponents = components => components.map(Component => document.createElement(Component.name))
-
-// const getRouteComponents = route =>
-//   Object.entries((route.components || {}))
-//     .reduce((components, [Component, name]) => ({...components, [name]: Component}), {...route.component ? {default: route.component} : {}})
-
 const getRouteComponents = route => [...route.component ? [['default', route.component]] : [], ...route.components ? Object.entries(route.components) : []]
 
 const createRouteComponents = route => new Map([...getRouteComponents(route)].map(([name, Component]) => ([name, document.createElement(Component.name)])))
-
-// const getRouteComponents = matched => new Map(Object.entries((matched.components || {})).map(([Component, name]) => [name, Component]))
-
-// const createComponents = components =>
-//   Object.entries(components)
-//     .reduce((components, [Component, name]) => ({...components, [name]: document.createElement(Component.name)}), {})
-
-// const createRouteComponents = components => new Map(Object.entries(components).map(([Component, name]) => ([name, document.createElement(Component.name)])))
 
 const flattenRoute = (route, arr = [route]) => route.parent ? flattenRoute(route.parent, [route.parent, ...arr]) : arr
 
@@ -73,8 +58,8 @@ export const Router = options => {
   const resolve = (to, { append, relative } = {}) => {
     const { origin, pathname } = window.location
     const _base = append || relative ? origin + pathname : originBase
-    const isString = typeof to === 'string' // ?
-    const { name, path, params, query = [] } = to || {} // ?
+    const isString = typeof to === 'string'
+    const { name, path, params, query = [] } = to || {}
     const [, route] = isString
       ? matchPath(to)
       : name
@@ -84,7 +69,7 @@ export const Router = options => {
       route,
       url: isString
         ? new URL(to, _base)
-        : new URL(`${path || route.toPath(params)}?${query.map((val, key) => `${key}=${val}`).join('&')}`, _base)
+        : new URL(`${path || route.toPath(params)}${query.map(([key, val], i) => `${!i ? '?' : ''}${key}=${val}`).join('&')}`, _base)
     }
   }
 
@@ -92,7 +77,7 @@ export const Router = options => {
     const { url, route } = resolve(to)
     const matched = flattenRoute(route)
     const { currentRoutesComponents, currentRoute } = state
-    // console.log('state', state, currentRoutesComponents)
+
     const newRoute = {
       url,
       path: url.pathname,
@@ -107,8 +92,8 @@ export const Router = options => {
     const reusedRoutes = currentRoute ? matched.filter(route => currentRoute.matched.includes(route)) : []
     const deactivatedRoutes = currentRoute ? currentRoute.matched.filter(route => !matched.includes(route)) : []
 
-    const reusedComponents = new Map(reusedRoutes.map(route => [route, [...currentRoutesComponents.get(route).values()]]))
-    const deactivatedComponents = new Map(deactivatedRoutes.map(route => [route, [...currentRoutesComponents.get(route).values()]]))
+    const reusedComponents = new Map(reusedRoutes.map(route => [route, currentRoutesComponents.get(route)]))
+    const deactivatedComponents = new Map(deactivatedRoutes.map(route => [route, currentRoutesComponents.get(route)]))
 
     const abortResults = (results, guardFunctionName, reverse) => {
       const abort = results.find(result => reverse ? !result : result)
@@ -144,11 +129,8 @@ export const Router = options => {
 
     const activatedComponents = pushContext(state.___rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
 
-    // for (const [key] of deactivatedComponents) state.currentRoutesComponents.delete(key)
-    // for (const [key, val] of activatedComponents) state.currentRoutesComponents.set(key, val)
-
     state.currentRoutesComponents = new Map([...reusedComponents, ...activatedComponents])
-    // console.log('state.currentRoutesComponents', state.currentRoutesComponents)
+
     const beforeResolveAbort = (await Promise.all(beforeResolveGuards.map(guard => guard(newRoute, currentRoute)))).find(result => result)
     if (beforeResolveAbort) throw new Error(`OzRouter: naviguation aborted, beforeResolve returned:\n${JSON.stringify(beforeResolveAbort)}`)
 
@@ -198,13 +180,6 @@ export const Router = options => {
     get currentRoutesComponents () {
       return state.currentRoutesComponents
     },
-    match (location) {
-      if (typeof location === 'object') {
-
-      } else {
-
-      }
-    },
     back () {
       return router.go(-1)
     },
@@ -214,9 +189,11 @@ export const Router = options => {
     go (num) {
       return window.history.go(num)
     },
+    match: resolve,
     push: goTo.bind(null, false),
     replace: goTo.bind(null, true)
   })
+  window.addEventListener('popstate', ev => router.replace(location.pathname))
   router.replace(location.pathname)
   return router
 }
