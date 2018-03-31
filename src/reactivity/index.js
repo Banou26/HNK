@@ -80,7 +80,6 @@ export const reactify = (_object = {}, { reactiveRoot = defaultReactiveRoot, clo
   }) : _object
   if (clone) return object
   const isBuiltIn = IsBuiltIn(object)
-  // const protoProps = isBuiltIn ? Object.getOwnPropertyNames(isBuiltIn[0].prototype) : []
   const reactivity = new Reactivity()
   if (!object.__reactivity__) Object.defineProperty(object, '__reactivity__', { value: reactivity })
   for (let i in object) {
@@ -117,29 +116,30 @@ export const reactify = (_object = {}, { reactiveRoot = defaultReactiveRoot, clo
           }, watcher, {object, prop, reactiveRoot})
         }
       }
+      // if (value && typeof value === 'object' && value.__reactivity__ instanceof Reactivity) {
+      //   // reactivity.watchers.push({object, watcher, reactiveRoot})
+      //   // value.$watch(currentWatcher.watcher)
+      //   const watcherObject = getCurrentWatcher(reactiveRoot)
+      //   console.log('watcherObject', watcherObject)
+      //   if (watcherObject) value.__reactivity__.watchers.push(watcherObject)
+      // }
       if (isBuiltIn && typeof value === 'function') {
-        // value = value.bind(target)
-        // if (protoProps.includes(prop)) {
-        //   const _value = value
-        //   value = (...args) => {
-        //     let result = _value(...args)
-        //     callObjectsWatchers(propReactivity, reactivity)
-        //     return result
-        //   }
-        // }
         value = new Proxy(value, {
           apply (_target, thisArg, argumentsList) {
             try {
               return Reflect.apply(_target, target, argumentsList)
             } finally {
-              callObjectsWatchers(propReactivity, reactivity)
+              // if (isBuiltIn[1].setters && isBuiltIn[1].setters.includes(prop)) callObjectsWatchers(propReactivity, reactivity)
+              if (isBuiltIn[1].setters && isBuiltIn[1].setters.includes(prop)) callObjectsWatchers(propReactivity, reactivity)
             }
           }
         })
+        reactivity.cache.set(prop, value)
       }
       if (reactiveRoot.watchers.length) {
         const currentWatcher = getCurrentWatcher(reactiveRoot)
         if (!includeWatcherObj(propWatchers, currentWatcher)) propWatchers.push(currentWatcher)
+        if (value && typeof value === 'object' && value.__reactivity__ instanceof Reactivity && !value.__reactivity__.watchers.includes(getCurrentWatcher(reactiveRoot))) value.__reactivity__.watchers.push(getCurrentWatcher(reactiveRoot))
       }
       return value
     },
@@ -190,14 +190,16 @@ export const reactify = (_object = {}, { reactiveRoot = defaultReactiveRoot, clo
   return proxy
 }
 
-export const watch = (getter, handler, reactiveRoot = defaultReactiveRoot) => {
+export const watch = (getter, handler, {reactiveRoot = defaultReactiveRoot} = {}) => {
   let unwatch, oldValue
   const watcher = _ => {
     if (unwatch) return
     let newValue = registerWatcher(getter, watcher, {reactiveRoot})
+    if (newValue && typeof newValue === 'object' && newValue.__reactivity__ instanceof Reactivity && !newValue.__reactivity__.watchers.find(obj => obj.watcher === watcher)) newValue.__reactivity__.watchers.push({watcher})
     if (handler) handler(newValue, oldValue)
     oldValue = newValue
   }
   oldValue = registerWatcher(getter, watcher, {reactiveRoot})
+  if (oldValue && typeof oldValue === 'object' && oldValue.__reactivity__ instanceof Reactivity && !oldValue.__reactivity__.watchers.find(obj => obj.watcher === watcher)) oldValue.__reactivity__.watchers.push({watcher})
   return _ => (unwatch = true)
 }
