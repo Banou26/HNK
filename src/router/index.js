@@ -104,7 +104,7 @@ export const Router = options => {
       abortResults(await Promise.all(components.map(component => {
         const { __context__: context } = component
         if (!component[guardFunctionName]) return
-        return /* currentRoutesComponents.get(component) */component[guardFunctionName](context || newRoute, context ? newRoute : currentRoute, context ? currentRoute : undefined)
+        return component[guardFunctionName](context || newRoute, context ? newRoute : currentRoute, context ? currentRoute : undefined)
       }).filter(elem => elem)), guardFunctionName)
     }
     await callComponentsGuards(flattenArray([...deactivatedComponents.values()]), 'beforeRouteLeave')
@@ -146,49 +146,15 @@ export const Router = options => {
     get url () { return new URL(state.fullPath) },
     get path () { return router.url.pathname },
     get hash () { return router.url.hash },
-
-    get query () {
-      const query = {}
-      for (const [key, value] of router.url.searchParams) query[key] = value
-      return query
-    },
-    get params () {
-      for (const [, route] of state.routes) {
-        const match = route.regex.exec(router.url.pathname)
-        if (match) {
-          const params = {}
-          for (const i in route.keys) {
-            const key = route.keys[i]
-            params[key.name] = match[i + 1]
-          }
-          return params
-        }
-      }
-    },
-    get matched () {
-      for (const [, route] of state.routes) {
-        const match = route.regex.exec(router.url.pathname)
-        if (match) return route
-      }
-    },
-    get name () {
-      return router.matched && router.matched.name
-    },
-    get currentRoute () {
-      return state.currentRoute
-    },
-    get currentRoutesComponents () {
-      return state.currentRoutesComponents
-    },
-    back () {
-      return router.go(-1)
-    },
-    forward () {
-      return router.go(1)
-    },
-    go (num) {
-      return window.history.go(num)
-    },
+    get query () { return state.currentRoute.query },
+    get params () { return state.currentRoute.params },
+    get matched () { return state.currentRoute.matched },
+    get name () { return state.currentRoute.matched[state.currentRoute.matched.length - 1].name },
+    get currentRoute () { return state.currentRoute },
+    get currentRoutesComponents () { return state.currentRoutesComponents },
+    back () { return router.go(-1) },
+    forward () { return router.go(1) },
+    go (num) { return window.history.go(num) },
     match: resolve,
     push: goTo.bind(null, false),
     replace: goTo.bind(null, true)
