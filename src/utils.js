@@ -6,22 +6,34 @@ export const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item)
 
 const replaceObject = (object, replace) => replace ? replace(object) : object
 
-// todo add more of the built-in objects, some of them are in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+// todo: add more of the built-in objects, some of them are in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
 export const builtInObjects = new Map([
-  [URL, url => new URL(url.href)],
-  [URLSearchParams, urlSearchParams => new URLSearchParams(urlSearchParams.toString())],
-  [RegExp, regexp => new RegExp(regexp.source, regexp.flags)],
-  [Map, (map, {refs, replaceObjects, ...rest}) => {
-    const newMap = replaceObject(new Map(), replaceObjects)
-    refs.set(map, newMap)
-    for (const [key, val] of cloneObject([...map], { refs, ...rest, registerRef: false, replaceObjects })) newMap.set(key, val)
-    return newMap
+  [URL, {
+    copy: url => new URL(url.href)
   }],
-  [Set, (set, {refs, replaceObjects, ...rest}) => {
-    const newSet = replaceObject(new Set(), replaceObjects)
-    refs.set(set, newSet)
-    for (const val of cloneObject([...set], { refs, ...rest, registerRef: false, replaceObjects })) newSet.add(val)
-    return newSet
+  [URLSearchParams, {
+    copy: urlSearchParams => new URLSearchParams(urlSearchParams.toString())
+  }],
+  [RegExp, {
+    copy: regexp => new RegExp(regexp.source, regexp.flags)
+  }],
+  [Map, {
+    setters: ['clear', 'delete', 'set'],
+    copy (map, {refs, replaceObjects, ...rest}) {
+      const newMap = replaceObject(new Map(), replaceObjects)
+      refs.set(map, newMap)
+      for (const [key, val] of cloneObject([...map], { refs, ...rest, registerRef: false, replaceObjects })) newMap.set(key, val)
+      return newMap
+    }
+  }],
+  [Set, {
+    setters: ['add', 'clear', 'delete'],
+    copy (set, {refs, replaceObjects, ...rest}) {
+      const newSet = replaceObject(new Set(), replaceObjects)
+      refs.set(set, newSet)
+      for (const val of cloneObject([...set], { refs, ...rest, registerRef: false, replaceObjects })) newSet.add(val)
+      return newSet
+    }
   }]
 ])
 
@@ -49,7 +61,7 @@ export function cloneObject (_object = {}, { refs = new Map(), registerRef = tru
   if (isIgnoredObjectType(_object)) return _object
   if (doNotCopyObjects && doNotCopyObjects(_object)) return _object
   const builtInPair = isBuiltIn(_object)
-  if (builtInPair) return builtInPair[1](_object, { refs, replaceObjects })
+  if (builtInPair) return builtInPair[1].copy(_object, { refs, replaceObjects })
   const object = replaceObject(Array.isArray(_object) ? [..._object] : Object.create(Object.getPrototypeOf(_object)), replaceObjects)
   if (registerRef) refs.set(_object, object)
   for (const [prop, desc] of Object.entries(Object.getOwnPropertyDescriptors(_object))) {

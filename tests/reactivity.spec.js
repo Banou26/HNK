@@ -1,4 +1,4 @@
-import { reactify, Reactivity } from '../src/index.js'
+import { reactify, Reactivity, watch } from '../src/index.js'
 
 const isProxyResult = function (object) {
   let react
@@ -8,7 +8,7 @@ const isProxyResult = function (object) {
   it('is a copy', function () {
     expect(react).to.eql(object)
   })
-  describe('#watch()', function () {
+  describe('#$watch()', function () {
     it('is defined', function () {
       expect(typeof react.$watch).to.equal('function')
     })
@@ -40,7 +40,80 @@ describe('reactify', function () {
     describe('array', isProxyResult.bind(null, array))
   })
   describe('mutable', function () {
-
+    describe('watch', function () {
+      let react
+      beforeEach(function () {
+        react = reactify({
+          a: 1,
+          b: 2,
+          get c () {
+            return this.a + this.b
+          },
+          someMap: new Map(),
+          get d () {
+            return this.someMap
+          }
+        })
+      })
+      describe('#$watch()', function () {
+        it('return watched object value to the watcher function', function () {
+          let object
+          react.$watch(obj => (object = obj))
+          react.b = 3
+          expect(object).to.equal(react)
+        })
+        it('return watched property value to the watcher function', function () {
+          let property
+          react.$watch(_ => react.c, prop => (property = prop))
+          react.b = 3
+          expect(property).to.equal(react.c)
+        })
+        it('return an unwatch function', function () {
+          let i = 0
+          const unwatch = react.$watch(obj => i++)
+          react.b = 3
+          expect(i).to.equal(1)
+          unwatch()
+          react.b = 4
+          expect(i).to.equal(1)
+        })
+        it('watch a built-in object', function () {
+          let map
+          react.someMap.$watch(_map => (map = _map))
+          react.someMap.set('a', 1)
+          expect(map).to.equal(react.someMap)
+        })
+      })
+      describe('#watch()', function () {
+        it('return watched object value to the watcher function', function () {
+          let object
+          watch(_ => react, obj => (object = obj))
+          react.b = 3
+          expect(object).to.equal(react)
+        })
+        it('return watched property value to the watcher function', function () {
+          let property
+          watch(_ => react.c, prop => (property = prop))
+          react.b = 3
+          expect(property).to.equal(react.c)
+        })
+        it('return an unwatch function', function () {
+          let i = 0
+          const unwatch = watch(_ => react, obj => i++)
+          react.b = 3
+          expect(i).to.equal(1)
+          unwatch()
+          react.b = 4
+          expect(i).to.equal(1)
+        })
+        it('watch a built-in object', function () {
+          let map
+          watch(_ => react.someMap, _map => (map = _map))
+          react.someMap.set('a', 1)
+          expect(map).to.equal(react.someMap)
+        })
+      })
+    })
   })
   describe.skip('immutable', function () {
 
