@@ -5,15 +5,20 @@ const isReactiveObject = obj => obj instanceof Reactivity
 describe('Reactivity', _ => {
   describe('build', function () {
     it('should build a reactive copy of the original object', function () {
+      const subObject = {}
       let original = {
         a: 1,
         b: 2,
         get c () {
           return this.a + this.b
-        }
+        },
+        d: subObject
       }
+      subObject.orig = original
       let react
       expect(_ => (react = reactify(original))).to.not.throw()
+      expect(original.d).to.equal(subObject)
+      expect(react.d).to.not.equal(subObject)
       isReactiveObject(react)
       expect(react).to.deep.equal(original)
     })

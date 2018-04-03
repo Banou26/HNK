@@ -86,8 +86,8 @@ export const reactify = (_object = {}, { reactiveRoot = defaultReactiveRoot, clo
     const desc = getPropertyDescriptor(object, i)
     const { value } = desc
     if (value && typeof value === 'object') {
-      if (value.__reactivity__ instanceof Reactivity) object[i] = _object[i]
-      else object[i] = reactify(value, { reactiveRoot, clone })
+      if (value.__reactivity__ instanceof Reactivity) Object.defineProperty(object, i, {...desc, value: _object[i]})
+      else Object.defineProperty(object, i, {...desc, value: reactify(value, { reactiveRoot, clone })})
     }
   }
   const proxy = new Proxy(object, {
@@ -203,3 +203,5 @@ export const watch = (getter, handler, {reactiveRoot = defaultReactiveRoot} = {}
   if (oldValue && typeof oldValue === 'object' && oldValue.__reactivity__ instanceof Reactivity && !oldValue.__reactivity__.watchers.find(obj => obj.watcher === watcher)) oldValue.__reactivity__.watchers.push({watcher})
   return _ => (unwatch = true)
 }
+window.reactify = reactify
+window.cloneObject = cloneObject
