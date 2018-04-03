@@ -46,7 +46,8 @@ export const isBuiltIn = obj => {
 const ignoreObjectType = [
   WeakSet,
   WeakMap,
-  Node
+  Node,
+  Promise
 ]
 
 export const isIgnoredObjectType = obj => {
