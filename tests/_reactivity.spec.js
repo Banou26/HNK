@@ -5,6 +5,16 @@ const isReactiveObject = obj => obj instanceof Reactivity
 describe('Reactivity', _ => {
   describe('build', function () {
     it('should build a reactive copy of the original object', function () {
+      const p = o => new Proxy(o, {
+        set (...args) {
+          console.log('set', args)
+          return (args[0][args[1]] = args[2])
+        },
+        defineProperty (...args) {
+          console.log('define', args)
+          return Object.defineProperty(args[0], args[1], args[2])
+        }
+      })
       const subObject = {}
       let original = {
         a: 1,
@@ -18,7 +28,9 @@ describe('Reactivity', _ => {
       let react
       expect(_ => (react = reactify(original))).to.not.throw()
       expect(original.d).to.equal(subObject)
+      expect(subObject.orig).to.equal(original)
       expect(react.d).to.not.equal(subObject)
+      expect(react.d.orig).to.equal(react)
       isReactiveObject(react)
       expect(react).to.deep.equal(original)
     })
