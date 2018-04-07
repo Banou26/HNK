@@ -45,7 +45,8 @@ export const Router = options => {
     routesComponentsConstructors: new Map([...flattenedRoutes].map(([route]) => [route, getRouteComponents(route)])),
     base,
     currentRoute: undefined,
-    currentRoutesComponents: new Map()
+    currentRoutesComponents: new Map(),
+    __rootElementContext__: undefined
   })
 
   let beforeEachGuards = []
@@ -85,8 +86,7 @@ export const Router = options => {
       query: [...url.searchParams],
       hash: url.hash,
       fullPath: url.href,
-      matched,
-      __rootElementContext__: undefined
+      matched
     }
     const activatedRoutes = currentRoute ? matched.filter(route => !currentRoute.matched.includes(route)) : matched
     const reusedRoutes = currentRoute ? matched.filter(route => currentRoute.matched.includes(route)) : []
@@ -127,7 +127,7 @@ export const Router = options => {
       .map(Component => Object.getPrototypeOf(Component).beforeRouteEnter.apply(null, null, newRoute, currentRoute))
     ))), 'beforeRouteEnter', true)
 
-    const activatedComponents = pushContext(state.___rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
+    const activatedComponents = pushContext(state.__rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
 
     state.currentRoutesComponents = new Map([...reusedComponents, ...activatedComponents])
 
@@ -141,15 +141,15 @@ export const Router = options => {
   }
 
   const router = reactify({
-    set __rootElementContext__ (__rootElementContext__) { state.___rootElementContext__ = __rootElementContext__ },
-    get __rootElementContext__ () { return state.___rootElementContext__ },
+    set __rootElementContext__ (__rootElementContext__) { state.__rootElementContext__ = __rootElementContext__ },
+    get __rootElementContext__ () { return state.__rootElementContext__ },
     get url () { return new URL(state.fullPath) },
     get path () { return router.url.pathname },
     get hash () { return router.url.hash },
-    get query () { return state.currentRoute.query },
-    get params () { return state.currentRoute.params },
-    get matched () { return state.currentRoute.matched },
-    get name () { return state.currentRoute.matched[state.currentRoute.matched.length - 1].name },
+    get query () { return state.currentRoute && state.currentRoute.query },
+    get params () { return state.currentRoute && state.currentRoute.params },
+    get matched () { return state.currentRoute && state.currentRoute.matched },
+    get name () { return state.currentRoute && state.currentRoute.matched[state.currentRoute.matched.length - 1].name },
     get currentRoute () { return state.currentRoute },
     get currentRoutesComponents () { return state.currentRoutesComponents },
     back () { return router.go(-1) },
