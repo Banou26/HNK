@@ -103,20 +103,12 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
             }, watcher, {object, prop, reactiveRoot})
           }
         }
-        // if (value && typeof value === 'object' && value.__reactivity__ instanceof Reactivity) {
-        //   // reactivity.watchers.push({object, watcher, reactiveRoot})
-        //   // value.$watch(currentWatcher.watcher)
-        //   const watcherObject = getCurrentWatcher(reactiveRoot)
-        //   console.log('watcherObject', watcherObject)
-        //   if (watcherObject) value.__reactivity__.watchers.push(watcherObject)
-        // }
         if (isBuiltIn && typeof value === 'function') {
           value = new Proxy(value, {
             apply (_target, thisArg, argumentsList) {
               try {
                 return Reflect.apply(_target, target, argumentsList)
               } finally {
-                // if (isBuiltIn[1].setters && isBuiltIn[1].setters.includes(prop)) callObjectsWatchers(propReactivity, reactivity)
                 if (isBuiltIn[1].setters && isBuiltIn[1].setters.includes(prop)) callObjectsWatchers(propReactivity, reactivity)
               }
             }
@@ -159,6 +151,7 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
           handler = getter
           getter = null
         }
+        if (typeof getter === 'string') getter = _ => proxy[getter]
         let unwatch, oldValue
         const watcher = _ => {
           if (unwatch) return
@@ -193,32 +186,13 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
         return proxy
       } else {
         const _proxy = reactify(_original, { reactiveRoot, refs })
-        // console.log('..........', _original, proxy)
         if (!reactiveRoot.objects.has(_original)) reactiveRoot.objects.set(_original, proxy)
         return _proxy
       }
     },
-    // after: _original => {
-    //   const _proxy = reactify(_original, { reactiveRoot, refs })
-    //   reactiveRoot.objects.set(_original, proxy)
-    //   return _proxy
-    // },
     filter: _original => ignoreObject(_original)
   })
   return object
-
-  proxy = createProxy(object)
-
-  // for (let i in object) {
-  //   const desc = getPropertyDescriptor(object, i)
-  //   const { value } = desc
-  //   if (value && typeof value === 'object') {
-  //     if (value.__reactivity__ instanceof Reactivity) Object.defineProperty(object, i, {...desc, value: original[i]})
-  //     else Object.defineProperty(object, i, {...desc, value: reactify(value, { reactiveRoot, clone })})
-  //   }
-  // }
-
-  return proxy
 }
 
 export const watch = (getter, handler, {reactiveRoot = defaultReactiveRoot} = {}) => {
