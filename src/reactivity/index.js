@@ -151,7 +151,11 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
           handler = getter
           getter = null
         }
-        if (typeof getter === 'string') getter = _ => proxy[getter]
+        console.log(typeof getter === 'string', getter)
+        if (typeof getter === 'string') {
+          const property = getter
+          getter = _ => proxy[property]
+        }
         let unwatch, oldValue
         const watcher = _ => {
           if (unwatch) return
