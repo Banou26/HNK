@@ -151,7 +151,6 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
           handler = getter
           getter = null
         }
-        console.log(typeof getter === 'string', getter)
         if (typeof getter === 'string') {
           const property = getter
           getter = _ => proxy[property]
