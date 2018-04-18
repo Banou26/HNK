@@ -218,7 +218,7 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
 const cache = new Map()
 
 export const htmlTemplate = transform => (strings, ...values) => {
-  const id = strings.join(placeholderStr(''))
+  const id = 'html' + strings.join(placeholderStr(''))
   if (cache.has(id)) return cache.get(id)(values)
   const { html, placeholders } = parsePlaceholders({htmlArray: split(transform(mergeSplitWithPlaceholders(strings))).filter((str, i) => !(i % 2)), values})
   const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
@@ -277,6 +277,7 @@ const update = {
       })
       return { nodes: value._childNodes, data: { instance: value, unlisten } }
     } else if (Array.isArray(value)) {
+      if (value.length === 0) value = [undefined]
       // todo: add more of the parameters to cover all of the simple text features
       const textArray = value.map((value, i) => {
         const oldText = oldTextArray[i]
