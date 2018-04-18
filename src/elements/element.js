@@ -37,8 +37,9 @@ export const registerElement = options => {
   class OzElement extends extend {
     constructor () {
       super()
+      const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this
       const context = this.__context__ = reactify({
-        host: shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this,
+        host,
         props: {},
         methods: {},
         template: undefined,
@@ -63,7 +64,17 @@ export const registerElement = options => {
       if (htmlTemplate) {
         let template, build
         const buildTemplate = htmlTemplate.bind(null, context)
-        watch(_ => pushContext(context, _ => (build = buildTemplate())), build => template.update(...build.values))
+        watch(_ => pushContext(context, _ => (build = buildTemplate())), build => {
+          if (template.id === build.id) template.update(...build.values)
+          else {
+            pushContext(context, _ => {
+              template.content // eslint-disable-line
+              template = build()
+              context.template = template
+              host.appendChild(template.content)
+            })
+          }
+        })
         if (!build.build) throw new Error('The template function should return a html-template build.')
         pushContext(context, _ => (template = build()))
         context.template = template
