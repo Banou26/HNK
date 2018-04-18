@@ -4,7 +4,7 @@ export const isObject = item => item && typeof item === 'object' && !Array.isArr
 
 export const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray(item)] : [...arr, item], [])
 
-const ignoreObjectTypes = [
+export const ignoreObjectTypes = [
   Error,
   WeakSet,
   WeakMap,
@@ -62,7 +62,6 @@ export const isIgnoredObjectType = obj => ignoreObjectTypes.some(type => obj ins
 export const isBuiltIn = obj => [...builtInObjects].find(([type]) => obj instanceof type)
 
 export function cloneObject (original = {}, { refs = new Map(), filter, before, during, after } = {}) {
-  if (isIgnoredObjectType(original) || (filter && filter(original))) return original
   const args = { refs, filter, before, during, after }
   if (refs.has(original)) return refs.get(original)
   if (before) {
@@ -72,6 +71,7 @@ export function cloneObject (original = {}, { refs = new Map(), filter, before, 
       return beforeReturn
     }
   }
+  if (isIgnoredObjectType(original) || (filter && filter(original))) return original
   const builtInPair = isBuiltIn(original)
   if (builtInPair) return builtInPair[1].copy(original, args)
   const _object = Array.isArray(original) ? [...original] : Object.create(Object.getPrototypeOf(original))
