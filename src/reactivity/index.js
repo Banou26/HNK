@@ -180,7 +180,11 @@ export const reactify = (original = {}, { reactiveRoot = defaultReactiveRoot, re
     refs,
     before: _original => {
       if (reactiveRoot.objects.has(_original)) return reactiveRoot.objects.get(_original)
-      if (_original instanceof Promise) return promify(_original)
+      if (_original instanceof Promise) {
+        const prom = promify(_original)
+        reactiveRoot.objects.set(_original, prom)
+        return prom
+      }
     },
     during: (_original, _object) => {
       if (_original === original) {
