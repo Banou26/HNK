@@ -1,4 +1,4 @@
-import { reactify, Reactivity, watch } from '../src/index.js'
+import { reactify, Reactivity, watch, reactivitySymbol } from '../src/index.js'
 
 const isProxyResult = function (object) {
   let react
@@ -15,7 +15,8 @@ const isProxyResult = function (object) {
   })
   describe('#__reactivity__', function () {
     it('instance of Reactivity', function () {
-      expect(react.__reactivity__).to.instanceOf(Reactivity)
+      // expect(react).to.instanceOf(Reactivity)
+      expect(!!react[reactivitySymbol]).to.equal(true)
     })
   })
 }
@@ -100,6 +101,7 @@ describe('reactify', function () {
         it('return an unwatch function', function () {
           let i = 0
           const unwatch = watch(_ => react, obj => i++)
+          expect(i).to.equal(0)
           react.b = 3
           expect(i).to.equal(1)
           unwatch()
