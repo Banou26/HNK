@@ -30,7 +30,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
     : [placeholder]]
   , [])
   const placeholderByIndex = indexPlaceholders(placeholders)
-  const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, null, false)
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, undefined, false)
   const nodes = new Map()
   const paths = new Map()
   const nodesToRemove = []
@@ -207,7 +207,7 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
   template.innerHTML = html
   const placeholders = getPlaceholderWithPaths(template.content, _placeholders)
   return values => {
-    const _createInstance = createInstance.bind(null, { id, template, placeholders }, ...values)
+    const _createInstance = createInstance.bind(undefined, { id, template, placeholders }, ...values)
     _createInstance.build = true
     _createInstance.id = id
     _createInstance.values = values

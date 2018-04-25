@@ -47,7 +47,7 @@ export const registerElement = options => {
       })
       context.state = reactify(typeof state === 'function' ? state(context) : state || {})
       if (methods) {
-        for (const method in methods) context.methods[method] = methods[method].bind(null, context)
+        for (const method in methods) context.methods[method] = methods[method].bind(undefined, context)
       }
       if (props) {
         const propsDescriptors = {}
@@ -60,10 +60,10 @@ export const registerElement = options => {
         }
         Object.defineProperties(this, propsDescriptors)
       }
-      mixins.forEach(callMixin.bind(null, context, options))
+      mixins.forEach(callMixin.bind(undefined, context, options))
       if (htmlTemplate) {
         let template, build
-        const buildTemplate = htmlTemplate.bind(null, context)
+        const buildTemplate = htmlTemplate.bind(undefined, context)
         watch(_ => pushContext(context, _ => (build = buildTemplate())), build => {
           if (template.id === build.id) template.update(...build.values)
           else {
@@ -81,15 +81,15 @@ export const registerElement = options => {
       }
       if (cssTemplate) {
         let template, build
-        const buildTemplate = cssTemplate.bind(null, context)
+        const buildTemplate = cssTemplate.bind(undefined, context)
         watch(_ => (build = buildTemplate()), build => template.update(...build.values))
         // if (!build.build) throw new Error('The style function should return a css-template build.')
         template = build()
         context.style = template
       }
       for (const item of watchers) {
-        if (Array.isArray(item)) watch(item[0].bind(null, context), item[1].bind(null, context))
-        else watch(item.bind(null, context))
+        if (Array.isArray(item)) watch(item[0].bind(undefined, context), item[1].bind(undefined, context))
+        else watch(item.bind(undefined, context))
       }
       if (created) created(context)
     }
@@ -104,7 +104,7 @@ export const registerElement = options => {
 
     connectedCallback () {
       const { __context__: context, __context__: { host, style, template } } = this
-      mixins.forEach(callMixin.bind(null, context, options))
+      mixins.forEach(callMixin.bind(undefined, context, options))
       if (template) pushContext(context, _ => host.appendChild(template.content))
       if (style) {
         if (shadowDom) host.appendChild(style.content)

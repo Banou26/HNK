@@ -124,7 +124,7 @@ export const Router = options => {
     abortResults(await Promise.all(flattenArray(activatedRoutes.map(route =>
       [...getRouteComponents(route)]
       .filter(Component => Object.getPrototypeOf(Component).beforeRouteEnter)
-      .map(Component => Object.getPrototypeOf(Component).beforeRouteEnter.apply(null, null, newRoute, currentRoute))
+      .map(Component => Object.getPrototypeOf(Component).beforeRouteEnter.apply(undefined, [newRoute, currentRoute]))
     ))), 'beforeRouteEnter', true)
 
     const activatedComponents = pushContext(state.__rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
@@ -156,8 +156,8 @@ export const Router = options => {
     forward () { return router.go(1) },
     go (num) { return window.history.go(num) },
     match: resolve,
-    push: goTo.bind(null, false),
-    replace: goTo.bind(null, true)
+    push: goTo.bind(undefined, false),
+    replace: goTo.bind(undefined, true)
   })
   window.addEventListener('popstate', ev => router.replace(location.pathname))
   router.replace(location.pathname)

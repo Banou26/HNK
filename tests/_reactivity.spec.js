@@ -1,6 +1,6 @@
-import { reactify, Reactivity, watch } from '../src/index.js'
+import { reactify, watch, reactivitySymbol } from '../src/index.js'
 
-const isReactiveObject = obj => obj instanceof Reactivity
+const isReactiveObject = obj => obj[reactivitySymbol]
 
 describe('Reactivity', _ => {
   describe('build', function () {
