@@ -1,8 +1,8 @@
-import { reactivitySymbol } from '../index.js'
+import { setObjectReactivity } from '../index.js'
 
 export const type = RegExp
 
 export default regexp => {
-  regexp[reactivitySymbol] = false
+  setObjectReactivity({target: regexp, unreactive: true})
   return regexp
 }
