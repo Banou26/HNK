@@ -1,8 +1,8 @@
-import { reactivitySymbol } from '../index.js'
+import { setObjectReactivity } from '../index.js'
 
 export const type = Node
 
 export default node => {
-  node[reactivitySymbol] = false
+  setObjectReactivity({target: node, unreactive: true})
   return node
 }

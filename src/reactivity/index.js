@@ -56,10 +56,6 @@ export const registerWatcher = (getter, watcher, {object, property} = {}) => {
   return value
 }
 
-const includeWatcher = (arr, watcher) => arr.some((_watcher) =>
-  watcher === _watcher ||
-  (watcher.object === _watcher.object && watcher.property === _watcher.property))
-
 export const propertyReactivity = (target, property) => {
   const properties = target[reactivitySymbol].properties
   if (properties.has(property)) return properties.get(property)
@@ -71,14 +67,17 @@ export const propertyReactivity = (target, property) => {
   return propertyReactivity
 }
 
+export const includeWatcher = (arr, watcher) => arr.some((_watcher) => watcher === _watcher ||
+  (watcher.object && watcher.property && watcher.object === _watcher.object && watcher.property === _watcher.property))
+
 const pushCurrentWatcher = ({watchers}) => {
   const currentWatcher = reactiveRoot.watchers[reactiveRoot.watchers.length - 1]
-  if (!includeWatcher(watchers, currentWatcher)) watchers.push(currentWatcher)
+  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) watchers.push(currentWatcher)
 }
 
 export const registerDependency = ({ target, property }) => {
-  if (!reactiveRoot.watchers.length || !target[reactivitySymbol]) return
   const reactivity = target[reactivitySymbol]
+  if (!reactiveRoot.watchers.length || !reactivity) return
   if (property) pushCurrentWatcher(propertyReactivity(target, property))
   else pushCurrentWatcher(reactivity)
 }
@@ -86,7 +85,7 @@ export const registerDependency = ({ target, property }) => {
 const pushWatcher = (object, watcher) =>
   object &&
   typeof object === 'object' &&
-  reactivitySymbol in object &&
+  object[reactivitySymbol] &&
   !object[reactivitySymbol].watchers.some(_watcher => _watcher === watcher) &&
   object[reactivitySymbol].watchers.push(watcher)
 
