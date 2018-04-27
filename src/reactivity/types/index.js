@@ -3,6 +3,7 @@ import * as map from './map.js'
 import * as set from './set.js'
 import * as node from './node.js'
 import * as regexp from './regexp.js'
+import * as promise from './promise.js'
 import * as array from './array.js'
 import * as object from './object.js'
 
@@ -10,6 +11,7 @@ const builtIn = [
   map,
   set,
   node,
+  promise,
   regexp
 ]
 
