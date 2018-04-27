@@ -23,13 +23,20 @@ export default object => new Proxy(object, {
       }
     }
     registerDependency({ target, property })
-    if (typeof value === 'object' && value[reactivitySymbol]) registerDependency({ target: value })
+    if ((typeof value === 'object' || typeof value === 'function') && value[reactivitySymbol]) registerDependency({ target: value })
     return value
   },
   set (target, property, _value, receiver) {
     if (_value === target[property]) return true
     if (reactivityProperties.includes(property)) return Reflect.set(target, property, _value, receiver)
-    const value = r(_value)
+    let value = r(_value)
+    if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue
+    else if (typeof value === 'function' && value.$promise) {
+      value.$promise.then(val =>
+        target[property] === value
+        ? (receiver[property] = val)
+        : undefined)
+    }
     try {
       return Reflect.set(target, property, value, receiver)
     } finally {
