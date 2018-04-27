@@ -1,7 +1,7 @@
 {
   "name": "oz.js",
-  "version": "0.0.4",
-  "main": "index.js",
+  "version": "0.0.5",
+  "main": "dist/index.js",
   "license": "MIT",
   "repository": {
     "type": "git",
