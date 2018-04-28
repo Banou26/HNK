@@ -31,6 +31,8 @@ export const notify = ({ target, property, value }) => {
   const reactivity = target[reactivitySymbol]
   if (!reactivity) return
   const callWatchers = watchers => {
+    const currentWatcher = reactiveRoot.watchers[reactiveRoot.watchers.length - 1]
+    if (watchers.includes(currentWatcher)) watchers.splice(watchers.indexOf(currentWatcher), 1)
     const cacheWatchers = watchers.filter(({cache}) => cache)/* .filter(({_target, _property}) => (target === _target && property === _property)) */
     cacheWatchers.forEach(({propertyReactivity}) => delete propertyReactivity.cache)
     cacheWatchers.forEach(watcher => watcher({ target, property, value }))
