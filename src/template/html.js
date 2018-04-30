@@ -313,8 +313,8 @@ const update = {
       let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0
       if (isEvent) { // Event handling
         const listenerName = name.substring(isEvent === 1 ? 3 : 1)
-        const listener = node.addEventListener(listenerName, value)
-        return { node, data: { name, listener, value } }
+        node.addEventListener(listenerName, value)
+        return { node, data: { name: listenerName, listener: true, value } }
       } else {
         node[name] = value
       }
