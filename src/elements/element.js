@@ -32,13 +32,15 @@ export const registerElement = options => {
     style: cssTemplate,
     created,
     connected,
-    disconnected
+    disconnected,
+    ...rest
   } = options
   class OzElement extends extend {
     constructor () {
       super()
       const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this
       const context = this.__context__ = reactify({
+        ...rest,
         host,
         props: {},
         methods: {},
