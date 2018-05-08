@@ -19,4 +19,3 @@ export const promify = promise => {
   })
   return proxy
 }
-window.promify = promify
