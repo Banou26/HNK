@@ -12,7 +12,11 @@ const getNode = (node, path) => path.reduce((currNode, i) => currNode.childNodes
 
 const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
   ? getValueIndexDifferences(arr2, arr)
-  : arr.reduce((arr, item, i) => [...arr, ...item !== arr2[i] ? [i] : []], [])
+  : arr.reduce((arr, item, i) =>
+    [
+      ...arr,
+      ...item !== arr2[i] ? [i] : []
+    ], [])
 
 const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray(item)] : [...arr, item], [])
 
@@ -205,6 +209,7 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
 const createBuild = ({id, html, placeholders: _placeholders}) => {
   const template = document.createElement('template')
   template.innerHTML = html
+  if (!template.content.childNodes.length) template.content.appendChild(new Comment())
   const placeholders = getPlaceholderWithPaths(template.content, _placeholders)
   return values => {
     const _createInstance = createInstance.bind(undefined, { id, template, placeholders }, ...values)
@@ -218,6 +223,7 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
 const cache = new Map()
 
 export const htmlTemplate = transform => (strings, ...values) => {
+  if (typeof strings === 'string') strings = [strings]
   const id = 'html' + strings.join(placeholderStr(''))
   if (cache.has(id)) return cache.get(id)(values)
   const { html, placeholders } = parsePlaceholders({htmlArray: split(transform(mergeSplitWithPlaceholders(strings))).filter((str, i) => !(i % 2)), values})
@@ -230,6 +236,11 @@ export const htmlTemplate = transform => (strings, ...values) => {
   cache.set(id, build)
   return build(values)
 }
+
+export const ref = name => ({
+  ref: true,
+  name
+})
 
 export const html = htmlTemplate(str => str)
 
