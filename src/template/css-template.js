@@ -33,8 +33,21 @@ export const cssTemplate = (parser, options) => {
     if (cached) return cached(...values)
     const { css } = parser(strings, values)
     const placeholders = []
+    // For non-in-shadow elements
+    // const style = document.createElement('link')
+    // const blob = new Blob([css], { type: 'text/css' })
+    // const url = window.URL.createObjectURL(blob)
+    // style.type = 'text/css'
+    // style.rel = 'stylesheet'
+    // style.href = url
+
+    // For in-shadow elements
+    // const blob = new Blob([css], { type: 'text/css' })
+    // const url = window.URL.createObjectURL(blob)
+    // style.type = 'text/css'
+    // style.innerHTML = `@import url('${url}')`
+
     const style = document.createElement('style')
-    style.type = 'text/css'
     style.innerHTML = css
     document.body.appendChild(style)
     setPlaceholdersPaths(style.sheet, placeholders, values) // setPlaceholdersPaths is async to make firefox gucci since they deal asynchronously with css parsing
