@@ -15,7 +15,7 @@ export const reactivePrototype = new Map([
   }]
 ])
 
-// Todo: Make a system to improve notify calls by specifying a property   
+// Todo: Make a system to improve notify calls by specifying a property
 
 export const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
