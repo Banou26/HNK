@@ -7,6 +7,7 @@ const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 
 // todo: rework this file + add way to escape '.' in tag name
 
 const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\((.*)\))?)(?: (.*))?/
+// const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\(([\s\S]*?)\))?)(?: (.*))?/gm
 
 const identifiersRegex = /([#.])([a-z0-9-]*)/g
 const classRegex = /class="(.*)"/
