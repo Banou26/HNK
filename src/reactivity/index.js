@@ -122,9 +122,6 @@ const _watch = target => (getter, handler) => {
 
 export const watch = _watch()
 
-window.r = reactify
-window.watch = watch
-
 export {
   reactify as r,
   reactify as react
