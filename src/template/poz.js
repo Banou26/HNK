@@ -1,6 +1,5 @@
-import { html } from './utils.js'
-import { htmlTemplate } from './html.js'
-const { regex: placeholderRegex } = html
+import { regex as placeholderRegex } from './html/utils.js'
+import { tag as htmlTemplate } from './html/index.js'
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 

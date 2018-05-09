@@ -208,7 +208,7 @@ const reactivePrototype = new Map([
   }]
 ]);
 
-// Todo: Make a system to improve notify calls by specifying a property   
+// Todo: Make a system to improve notify calls by specifying a property
 
 const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
@@ -459,6 +459,8 @@ const notify = ({ target, property, value }) => {
   const reactivity = target[exports.reactivitySymbol];
   if (!reactivity) return
   const callWatchers = watchers => {
+    const currentWatcher = exports.reactiveRoot.watchers[exports.reactiveRoot.watchers.length - 1];
+    if (watchers.includes(currentWatcher)) watchers.splice(watchers.indexOf(currentWatcher), 1);
     const cacheWatchers = watchers.filter(({cache}) => cache);/* .filter(({_target, _property}) => (target === _target && property === _property)) */
     cacheWatchers.forEach(({propertyReactivity}) => delete propertyReactivity.cache);
     cacheWatchers.forEach(watcher => watcher({ target, property, value }));
@@ -548,9 +550,6 @@ const _watch = target => (getter, handler) => {
 
 const watch = _watch();
 
-window.r = reactify;
-window.watch = watch;
-
 const mixins = [];
 const mixin = obj => mixins.push(obj);
 let currentContexts = [];
@@ -583,13 +582,15 @@ const registerElement = options => {
     style: cssTemplate,
     created,
     connected,
-    disconnected
+    disconnected,
+    ...rest
   } = options;
   class OzElement extends extend {
     constructor () {
       super();
       const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this;
       const context = this.__context__ = reactify({
+        ...rest,
         host,
         props: {},
         methods: {},
@@ -675,48 +676,6 @@ const registerElement = options => {
   return OzElement
 };
 
-// import { Element } from './element.js'
-// import { html } from '../template/html.js'
-// import { css } from '../template/css.js'
-
-// export class RouterLink extends Element {
-//   constructor (href, router) {
-//     super({ shadowDom: 'open' })
-//     this.router = router
-//     this.href = href
-//     this.addEventListener('click', ev => {
-//       if (!this.router) throw new Error('No router defined for this router-link')
-//       this.router.push(this.href)
-//     })
-//   }
-
-//   static get observedAttributes () { return ['href'] }
-
-//   attributeChangedCallback (attr, oldValue, newValue) {
-//     if (attr === 'href') this.href = newValue
-//   }
-
-//   static template () {
-//     return html`<slot></slot>`
-//   }
-
-//   static style () {
-//     return css`
-//     :host {
-//       cursor: pointer;
-//     }
-//     `
-//   }
-
-//   set href (href) {
-//     this._href = href
-//   }
-
-//   get href () {
-//     return this._href
-//   }
-// }
-
 const html = (_ => {
   const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16);
   const regex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`);
@@ -767,9 +726,114 @@ const css = (_ => {
   }
 })();
 
+const { placeholder: placeholderStr, split, getSplitValueIndexes: getSplitIds, mergeSplitWithValues: execSplit } = css;
+
+async function setPlaceholdersPaths (sheet, placeholders, values) {
+  const rules = sheet.cssRules;
+  const arrRules = [...rules];
+  for (const rulesI in arrRules) {
+    const rule = arrRules[rulesI];
+    if (!rule.cssText.includes('var(--oz-template-placeholder-')) continue
+    for (const style of rule.style) {
+      const val = rule.style[style];
+      if (val.includes('var(--oz-template-placeholder-')) {
+        const valSplit = split(val);
+        placeholders.push({
+          type: 'value',
+          ids: getSplitIds(valSplit),
+          path: ['rules', rulesI, 'style', style],
+          split: valSplit
+        });
+      }
+    }
+  }
+}
+
+const getStyle = (path, sheet) => path.reduce((item, i) => item[i], sheet);
+
+const cssTemplate = (parser, options) => {
+  const cache = new Map();
+  return (_strings, ...values) => {
+    const strings = [..._strings];
+    const id = strings.join(placeholderStr(''));
+    const cached = cache.get(id);
+    if (cached) return cached(...values)
+    const { css: css$$1 } = parser(strings, values);
+    const placeholders = [];
+    // For non-in-shadow elements
+    // const style = document.createElement('link')
+    // const blob = new Blob([css], { type: 'text/css' })
+    // const url = window.URL.createObjectURL(blob)
+    // style.type = 'text/css'
+    // style.rel = 'stylesheet'
+    // style.href = url
+
+    // For in-shadow elements
+    // const blob = new Blob([css], { type: 'text/css' })
+    // const url = window.URL.createObjectURL(blob)
+    // style.type = 'text/css'
+    // style.innerHTML = `@import url('${url}')`
+
+    const style = document.createElement('style');
+    style.innerHTML = css$$1;
+    document.body.appendChild(style);
+    setPlaceholdersPaths(style.sheet, placeholders, values); // setPlaceholdersPaths is async to make firefox gucci since they deal asynchronously with css parsing
+    document.body.removeChild(style);
+    const createCachedInstance = (...values) => {
+      const createInstance = _ => {
+        const node = style.cloneNode(true);
+        const instance = {
+          values: [],
+          update (...values) {
+            if (values.length) instance.values = values;
+            else values = instance.values;
+            const { sheet } = node;
+            if (!sheet) return
+            for (const placeholder of placeholders) {
+              const path = [...placeholder.path];
+              const name = path.splice(-1, 1);
+              let styleDeclaration = getStyle(path, sheet);
+              switch (placeholder.type) {
+                case 'value':
+                  setTimeout(_ => (styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1)), 0);
+                  break
+              }
+            }
+          },
+          content: node
+        };
+        instance.update(...values);
+        return instance
+      };
+      createInstance.id = id;
+      createInstance.values = values;
+      return createInstance
+    };
+    cache.set(id, createCachedInstance);
+    return createCachedInstance(...values)
+  }
+};
+
+const { placeholder } = css;
+
+const css$1 = cssTemplate((source, values) => {
+  let src = source[0];
+  for (const i in values) {
+    if (i === 0) continue
+    src += `var(--${placeholder(i)})${source[parseInt(i) + 1]}`;
+  }
+  return {css: src}
+});
+// todo: add features with a css parser, https://github.com/reworkcss/css/blob/master/lib/parse/index.js
+
+registerElement({
+  name: 'router-link',
+  style: _ => css$1`router-link { cursor: pointer; }`
+})
+
 const {
-  placeholder,
-  split,
+  placeholder: placeholder$1,
+  split: split$1,
   getSplitValueIndexes,
   mergeSplitWithValues,
   mergeSplitWithPlaceholders
@@ -787,12 +851,12 @@ const parseAttributes = ({leftHTML = '', rightHTML, attributes = []}) => {
   if (tagCloseMatch) return { attributes: attributes, leftHTML: leftHTML, rightHTML }
   const match = rightHTML.match(attribute);
   if (!match) throw new SyntaxError(`Oz html template attribute parsing: tag isn't closed.`)
-  const attrNameSplit = split(match[1]);
+  const attrNameSplit = split$1(match[1]);
   const attributeValue = match[3] || match[4] || match[5];
-  const attrValueSplit = attributeValue ? split(attributeValue) : [''];
+  const attrValueSplit = attributeValue ? split$1(attributeValue) : [''];
   const indexes = [...getSplitValueIndexes(attrNameSplit), ...getSplitValueIndexes(attrValueSplit)];
   return parseAttributes({
-    leftHTML: `${leftHTML} ${indexes.length ? placeholder(indexes[0]) : match[0]}`,
+    leftHTML: `${leftHTML} ${indexes.length ? placeholder$1(indexes[0]) : match[0]}`,
     rightHTML: rightHTML.substring(match[0].length),
     attributes: indexes.length ? [...attributes, {
       type: match[3] ? '"' : match[4] ? '\'' : '',
@@ -813,7 +877,7 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
     const commentEnd = isComment ? rightHTML.indexOf('-->') : undefined;
     if (isComment && commentEnd === -1) throw new Error(`Comment not closed, can't continue the template parsing "${rightHTML.substring(0, textEnd)}"`)
     const textContent = rightHTML.substring(isComment ? 4 : 0, isComment ? commentEnd : textEnd);
-    const textSplit = split(textContent);
+    const textSplit = split$1(textContent);
     const hasPlaceholder = textSplit.length > 1;
     const indexes = getSplitValueIndexes(textSplit);
     return parsePlaceholders({
@@ -823,13 +887,13 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
         indexes: getSplitValueIndexes(textSplit),
         split: textSplit
       }] : placeholders,
-      leftHTML: leftHTML + (isComment ? `<!--${hasPlaceholder ? placeholder(indexes[0]) : textContent}-->` : textContent),
+      leftHTML: leftHTML + (isComment ? `<!--${hasPlaceholder ? placeholder$1(indexes[0]) : textContent}-->` : textContent),
       rightHTML: rightHTML.substring(isComment ? commentEnd + 3 : textEnd)
     })
   }
   const startTagMatch = rightHTML.match(startTagOpen);
   if (startTagMatch) {
-    const tagSplit = split(startTagMatch[1]);
+    const tagSplit = split$1(startTagMatch[1]);
     const hasPlaceholder = tagSplit.length > 1;
     const indexes = getSplitValueIndexes(tagSplit);
     const {
@@ -853,13 +917,13 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
         attributes: attributes.map(({indexes}) => indexes)
       }] : [],
         ...attributePlaceholders.length ? attributePlaceholders : []],
-      leftHTML: `${leftHTML}<${mergeSplitWithValues(tagSplit, values)}${hasPlaceholder ? ` ${placeholder(indexes[0])} ` : ''}${_leftHTML}`,
+      leftHTML: `${leftHTML}<${mergeSplitWithValues(tagSplit, values)}${hasPlaceholder ? ` ${placeholder$1(indexes[0])} ` : ''}${_leftHTML}`,
       rightHTML: _rightHTML
     })
   }
   const endTagMatch = rightHTML.match(endTag);
   if (endTagMatch) {
-    const tagSplit = split(endTagMatch[1]);
+    const tagSplit = split$1(endTagMatch[1]);
     return parsePlaceholders({
       values,
       placeholders,
@@ -869,7 +933,7 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
   }
 };
 
-const { placeholder: placeholderStr, indexPlaceholders, regex: placeholderRegex, mergeSplitWithValues: mergeSplitWithValues$1, mergeSplitWithPlaceholders: mergeSplitWithPlaceholders$1, split: split$1 } = html;
+const { placeholder: placeholderStr$1, indexPlaceholders, regex: placeholderRegex, mergeSplitWithValues: mergeSplitWithValues$1, mergeSplitWithPlaceholders: mergeSplitWithPlaceholders$1, split: split$2 } = html;
 
 const getSiblingIndex = ({previousSibling} = {}, i = 0) => previousSibling ? getSiblingIndex(previousSibling, i + 1) : i;
 
@@ -881,7 +945,11 @@ const getNode = (node, path) => path.reduce((currNode, i) => currNode.childNodes
 
 const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
   ? getValueIndexDifferences(arr2, arr)
-  : arr.reduce((arr, item, i) => [...arr, ...item !== arr2[i] ? [i] : []], []);
+  : arr.reduce((arr, item, i) =>
+    [
+      ...arr,
+      ...item !== arr2[i] ? [i] : []
+    ], []);
 
 const flattenArray$1 = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray$1(item)] : [...arr, item], []);
 
@@ -915,7 +983,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
     const type = placeholder.type;
     paths.set(placeholder, getNodePath({node: nodes.get(placeholder)}));
     if (type === 'attribute' || type === 'tag') {
-      const attributeName = placeholderStr(placeholder.indexes[0]);
+      const attributeName = placeholderStr$1(placeholder.indexes[0]);
       const foundNode = node.querySelector(`[${attributeName}]`);
       foundNode.removeAttribute(attributeName);
       paths.set(placeholder, getNodePath({node: foundNode}));
@@ -1066,6 +1134,7 @@ const createInstance = ({ id, template, placeholders }, ...values) => {
 const createBuild = ({id, html: html$$1, placeholders: _placeholders}) => {
   const template = document.createElement('template');
   template.innerHTML = html$$1;
+  if (!template.content.childNodes.length) template.content.appendChild(new Comment());
   const placeholders = getPlaceholderWithPaths(template.content, _placeholders);
   return values => {
     const _createInstance = createInstance.bind(undefined, { id, template, placeholders }, ...values);
@@ -1079,9 +1148,10 @@ const createBuild = ({id, html: html$$1, placeholders: _placeholders}) => {
 const cache = new Map();
 
 const htmlTemplate = transform => (strings, ...values) => {
-  const id = 'html' + strings.join(placeholderStr(''));
+  if (typeof strings === 'string') strings = [strings];
+  const id = 'html' + strings.join(placeholderStr$1(''));
   if (cache.has(id)) return cache.get(id)(values)
-  const { html: html$$1, placeholders } = parsePlaceholders({htmlArray: split$1(transform(mergeSplitWithPlaceholders$1(strings))).filter((str, i) => !(i % 2)), values});
+  const { html: html$$1, placeholders } = parsePlaceholders({htmlArray: split$2(transform(mergeSplitWithPlaceholders$1(strings))).filter((str, i) => !(i % 2)), values});
   const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
     ...placeholder.type === 'text'
     ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
@@ -1174,8 +1244,8 @@ const update = {
       let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0;
       if (isEvent) { // Event handling
         const listenerName = name.substring(isEvent === 1 ? 3 : 1);
-        const listener = node.addEventListener(listenerName, value);
-        return { node, data: { name, listener, value } }
+        node.addEventListener(listenerName, value);
+        return { node, data: { name: listenerName, listener: true, value } }
       } else {
         node[name] = value;
       }
@@ -1751,110 +1821,463 @@ const Router = options => {
   return router
 };
 
-const { placeholder: placeholderStr$1, split: split$2, getSplitValueIndexes: getSplitIds, mergeSplitWithValues: execSplit } = css;
+const random = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16);
+const regex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`);
+const globalRegex = new RegExp(`oz-template-placeholder-(\\d*)-${random}`, 'g');
+const placeholder$2 = id => `oz-template-placeholder-${id}-${random}`;
+const split$3 = str => str.split(globalRegex);
+const getSplitValueIndexes$1 = split => split.filter((str, i) => i % 2);
+const mergeSplitWithValues$2 = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('');
+const mergeSplitWithPlaceholders$2 = strings => strings[0] + [...strings].splice(1).map((str, i) => placeholder$2(i) + str).join('');
+const indexPlaceholders$1 = placeholders => placeholders.reduce((arr, placeholder) => [...arr, ...(placeholder.indexes || [placeholder.index]).map(id => placeholder)], []);
+const ref$1 = name => ({ htmlReference: true, name });
 
-async function setPlaceholdersPaths (sheet, placeholders, values) {
-  const rules = sheet.cssRules;
-  const arrRules = [...rules];
-  for (const rulesI in arrRules) {
-    const rule = arrRules[rulesI];
-    if (!rule.cssText.includes('var(--oz-template-placeholder-')) continue
-    for (const style of rule.style) {
-      const val = rule.style[style];
-      if (val.includes('var(--oz-template-placeholder-')) {
-        const valSplit = split$2(val);
-        placeholders.push({
-          type: 'value',
-          ids: getSplitIds(valSplit),
-          path: ['rules', rulesI, 'style', style],
-          split: valSplit
-        });
-      }
-    }
-  }
+var comment = ({ values, node, placeholder: { split } }) => {
+  node.nodeValue = mergeSplitWithValues$2(split, values);
+  return { node }
 }
 
-const getStyle = (path, sheet) => path.reduce((item, i) => item[i], sheet);
-
-const cssTemplate = (parser, options) => {
-  const cache = new Map();
-  return (_strings, ...values) => {
-    const strings = [..._strings];
-    const id = strings.join(placeholderStr$1(''));
-    const cached = cache.get(id);
-    if (cached) return cached(...values)
-    const { css: css$$1 } = parser(strings, values);
-    const placeholders = [];
-    const style = document.createElement('style');
-    style.type = 'text/css';
-    style.innerHTML = css$$1;
-    document.body.appendChild(style);
-    setPlaceholdersPaths(style.sheet, placeholders, values); // setPlaceholdersPaths is async to make firefox gucci since they deal asynchronously with css parsing
-    document.body.removeChild(style);
-    const createCachedInstance = (...values) => {
-      const createInstance = _ => {
-        const node = style.cloneNode(true);
-        const instance = {
-          values: [],
-          update (...values) {
-            if (values.length) instance.values = values;
-            else values = instance.values;
-            const { sheet } = node;
-            if (!sheet) return
-            for (const placeholder of placeholders) {
-              const path = [...placeholder.path];
-              const name = path.splice(-1, 1);
-              let styleDeclaration = getStyle(path, sheet);
-              switch (placeholder.type) {
-                case 'value':
-                  setTimeout(_ => (styleDeclaration[name] = execSplit(placeholder.split, values).slice(6, -1)), 0);
-                  break
-              }
-            }
-          },
-          content: node
-        };
-        instance.update(...values);
-        return instance
-      };
-      createInstance.id = id;
-      createInstance.values = values;
-      return createInstance
-    };
-    cache.set(id, createCachedInstance);
-    return createCachedInstance(...values)
+const text = ({
+  value,
+  values,
+  getChildNodes,
+  setChildNodes,
+  nodes = [],
+  data: { instance: oldInstance, unlisten: oldUnlisten, textArray: oldTextArray = [] } = {},
+  placeholder: { index } = {}
+}) => {
+  if (oldUnlisten) oldUnlisten();
+  if (values && !value) value = values[index];
+  if (typeof value === 'string' || typeof value === 'number') {
+    if (nodes[0] instanceof Text) {
+      if (nodes[0].nodeValue !== value) nodes[0].nodeValue = value;
+      return { nodes: [nodes[0]] }
+    } else {
+      return { nodes: [new Text(value)] }
+    }
+  } else if (value instanceof Node) {
+    if (nodes[0] !== value) return { nodes: [value] }
+  } else if (value && value.build) {
+    if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
+      oldInstance.update(...value.values);
+      return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
+    } else {
+      const instance = value();
+      const unlisten = instance.listen((newChildNodes, oldChildNodes) => {
+        setChildNodes(newChildNodes);
+        // const currentChildNodes = getChildNodes()
+        // setChildNodes(Object.assign([...currentChildNodes], {[currentChildNodes.indexOf(oldChildNodes)]: newChildNodes}))
+      });
+      return { nodes: instance._childNodes, data: { instance, unlisten } }
+    }
+  } else if (value && value.instance) {
+    const unlisten = value.listen((newChildNodes, oldChildNodes) => {
+      setChildNodes(newChildNodes);
+    });
+    return { nodes: value._childNodes, data: { instance: value, unlisten } }
+  } else if (Array.isArray(value)) {
+    if (value.length === 0) value = [undefined];
+    // todo: add more of the parameters to cover all of the simple text features
+    const textArray = value.map((value, i) => {
+      const oldText = oldTextArray[i];
+      const _text = text({
+        value,
+        nodes: oldText && oldText.nodes,
+        data: oldText && oldText.data
+      });
+      return _text
+    });
+    return { nodes: textArray.map(({nodes}) => nodes), data: { textArray } }
+  } else {
+    return { nodes: [ nodes[0] instanceof Comment ? nodes[0] : new Comment('') ] }
   }
 };
 
-const { placeholder: placeholder$1 } = css;
-
-const css$1 = cssTemplate((source, values) => {
-  let src = source[0];
-  for (const i in values) {
-    if (i === 0) continue
-    src += `var(--${placeholder$1(i)})${source[parseInt(i) + 1]}`;
+var tag = ({ values, node, placeholder: { split } }) => {
+  const newTag = mergeSplitWithValues$2(split, values);
+  return {
+    node: node.tagName.toLowerCase() === newTag.toLowerCase()
+      ? node
+      : document.createElement(newTag)
   }
-  return {css: src}
-});
-// todo: add features with a css parser, https://github.com/reworkcss/css/blob/master/lib/parse/index.js
+}
 
-const { regex: placeholderRegex$1 } = html;
+var attribute$1 = ({ refs, values, placeholder, node, data: { name: oldName, listener: oldListener, value: oldValue } = {}, placeholder: { type, indexes, attributeType, nameSplit, valueSplit } }) => {
+  if (oldListener) node.removeEventListener(oldName, oldValue);
+  const name = mergeSplitWithValues$2(nameSplit, values);
+  const value = attributeType === '' ? values[valueSplit[1]] : mergeSplitWithValues$2(valueSplit, values); // mergeSplitWithValues(valueSplit, values)
+  if (attributeType === '"') { // double-quote
+    node.setAttribute(name, value);
+  } else if (attributeType === '\'') {  // single-quote
+    node.setAttribute(name, value);
+  } else if (attributeType === '') {  // no-quote
+    let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0;
+    if (isEvent) { // Event handling
+      const listenerName = name.substring(isEvent === 1 ? 3 : 1);
+      node.addEventListener(listenerName, value);
+      return { node, data: { name: listenerName, listener: true, value } }
+    } else if (nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference) {
+      refs.set(values[nameSplit[1]].name, node);
+    } else if (value && typeof value === 'object' && value.htmlReference) {
+      node[name] = refs.get(value.name);
+    } else {
+      node[name] = value;
+    }
+  }
+  return {node, data: { name }}
+}
+
+const update$1 = {
+  comment,
+  text,
+  tag,
+  attribute: attribute$1
+};
+
+const getNode$1 = (node, path) => path.reduce((currNode, i) => currNode.childNodes.item(i), node);
+
+const flattenArray$2 = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray$2(item)] : [...arr, item], []);
+
+const getValueIndexDifferences$1 = (arr, arr2) => arr2.length > arr.length
+  ? getValueIndexDifferences$1(arr2, arr)
+  : arr.reduce((arr, item, i) =>
+    [
+      ...arr,
+      ...item !== arr2[i] ? [i] : []
+    ], []);
+
+var createInstance$1 = ({ id, template, placeholders }, ...values) => {
+  const doc = document.importNode(template.content, true);
+  let bypassDif = true;
+  let childNodes = [...doc.childNodes];
+  let listeners = [];
+  let placeholdersNodes = new Map(placeholders.map(placeholder => (
+    [
+      placeholder,
+      placeholder.type === 'text' ? [getNode$1(doc, placeholder.path)] : getNode$1(doc, placeholder.path)
+    ]
+  )));
+  let placeholdersData = new Map(placeholders.map(placeholder => [placeholder, {}]));
+  let placeholderByIndex = indexPlaceholders$1(placeholders);
+
+  const updatePlaceholder = ({ values, placeholder, refs }) => {
+    const currentData = placeholdersData.get(placeholder);
+    if (currentData && currentData.directive) currentData.directive(); // cleanup directive function
+    const index = placeholder.index || placeholder.indexes[0];
+    const directive = values[index];
+    const data = placeholdersData.get(placeholder);
+    const node = placeholdersNodes.get(placeholder);
+
+    const replaceNode = (newNode, node) => {
+      placeholdersNodes = new Map([...placeholdersNodes, [placeholder, newNode]]
+        .map(([_placeholder, _node]) => node === _node
+        ? [_placeholder, newNode]
+        : [_placeholder, _node])
+      );
+      childNodes = Object.assign([...childNodes], {[childNodes.indexOf(node)]: newNode});
+      const { parentNode } = node;
+      if (parentNode) {
+        parentNode.insertBefore(newNode, node);
+        parentNode.removeChild(node);
+      }
+    };
+
+    const replaceNodes = (newArray, oldArray) => {
+      placeholdersNodes = new Map([...placeholdersNodes, [placeholder, newArray]]);
+      childNodes = Object.assign([...childNodes], {[childNodes.indexOf(oldArray)]: newArray});
+      newArray = flattenArray$2(newArray);
+      oldArray = flattenArray$2(oldArray);
+      const nodesToRemove = oldArray.filter(node => !newArray.includes(node));
+      for (const i in newArray) {
+        const newNode = newArray[i];
+        const oldNode = oldArray[i];
+        if (newNode !== oldNode) {
+          if (oldNode && oldNode.parentNode) {
+            oldNode.parentNode.insertBefore(newNode, oldNode);
+            oldNode.parentNode.removeChild(oldNode);
+          } else {
+            const previousNewNode = newArray[i - 1];
+            if (previousNewNode && previousNewNode.parentNode) {
+              previousNewNode.parentNode.insertBefore(newNode, previousNewNode.nextSibling);
+              if (oldNode && oldNode.parentNode) oldNode.parentNode.removeChild(oldNode);
+            }
+          }
+        }
+      }
+      for (const node of nodesToRemove) {
+        if (node && node.parentNode) node.parentNode.removeChild(node);
+      }
+    };
+
+    const setElement = newElement => {
+      const element = placeholdersNodes.get(placeholder);
+      const elementPlaceholders = placeholder.attributes.map(indexes => placeholderByIndex[indexes[0]]);
+      for (const {name, value} of element.attributes) newElement.setAttribute(name, value);
+      for (const childNode of element.childNodes) newElement.appendChild(childNode);
+      replaceNode(newElement, element);
+      for (const placeholder of elementPlaceholders) updatePlaceholder({values, placeholder, refs});
+    };
+    if (placeholder.type === 'attribute' && placeholder.indexes.length === 1 && directive && directive.directive) { // placeholder value is a directive
+      placeholdersData = new Map([...placeholdersData, [
+        placeholder,
+        { directive: directive({ getElement: placeholdersNodes.get.bind(placeholdersNodes, placeholder), setElement }) }
+      ]]);
+    } else {
+      const updateResult = update$1[placeholder.type]({
+        refs,
+        placeholder,
+        values,
+        data,
+        [placeholder.type === 'text' ? 'nodes' : 'node']: node,
+        placeholderByIndex,
+        getChildNodes () { return instance._childNodes },
+        setChildNodes: newChildNodes => {
+          const _childNodes = childNodes;
+          childNodes = newChildNodes;
+          for (const listener of listeners) listener(childNodes, _childNodes);
+        }
+      });
+      if (placeholder.type === 'text') {
+        if (node !== updateResult.nodes) replaceNodes(updateResult.nodes, node);
+      } else if (placeholder.type === 'tag' || placeholder.type === 'attribute') {
+        if (node !== updateResult.node) setElement(updateResult.node);
+      } else {
+        if (node !== updateResult.node) replaceNode(updateResult.node, node);
+      }
+      placeholdersData = new Map([...placeholdersData, [placeholder, updateResult.data]]);
+    }
+    for (const listener of listeners) listener(childNodes, node);
+  };
+
+  const instance = {
+    id,
+    values,
+    refs: new Map(),
+    instance: true,
+    __reactivity__: false,
+    get _childNodes () { return childNodes },
+    get childNodes () { return flattenArray$2(childNodes) },
+    get content () {
+      for (const node of instance.childNodes) doc.appendChild(node);
+      return doc
+    },
+    update (...values) {
+      const placeholdersToUpdate =
+      bypassDif // if bypass, update all the placeholders (first placeholder setup)
+      ? placeholders // all placeholders
+      : getValueIndexDifferences$1(values, instance.values) // placeholders which split values has changed
+        .map(index => placeholderByIndex[index]) // placeholders
+        .filter(placeholder => placeholder && placeholdersNodes.get(placeholder));
+      instance.values = values;
+      const refPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference);
+      const normalPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => !(nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference));
+      for (const placeholder of [...refPlaceholders, ...normalPlaceholders]) updatePlaceholder({placeholder, values, refs: instance.refs});
+    },
+    listen (func) {
+      listeners = [...listeners, func];
+      return _ => (listeners = Object.assign([...listeners], {[listeners.indexOf(func)]: undefined}).filter(item => item))
+    }
+  };
+  const textPlaceholdersByFirstNode = new Map(placeholders.filter(({type}) => type === 'text').map(placeholder => [placeholdersNodes.get(placeholder)[0], placeholder]));
+  childNodes = childNodes.reduce((arr, node) =>
+    textPlaceholdersByFirstNode.has(node)
+    ? [...arr, placeholdersNodes.get(textPlaceholdersByFirstNode.get(node))]
+    : [...arr, node]
+  , []);
+  instance.update(...values);
+  bypassDif = false;
+  // console.log('created', id)
+  return instance
+}
+
+const attribute$2 = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/;
+const ncname$1 = '[a-zA-Z_][\\w\\-\\.]*';
+const qnameCapture$1 = `((?:${ncname$1}\\:)?${ncname$1})`;
+const startTagOpen$1 = new RegExp(`^<${qnameCapture$1}`);
+const startTagClose$1 = /^\s*(\/?)>/;
+const endTag$1 = new RegExp(`^<\\/(${qnameCapture$1}[^>]*)>`);
+
+const parseAttributes$1 = ({leftHTML = '', rightHTML, attributes = []}) => {
+  const tagCloseMatch = rightHTML.match(startTagClose$1);
+  if (tagCloseMatch) return { attributes: attributes, leftHTML: leftHTML, rightHTML }
+  const match = rightHTML.match(attribute$2);
+  if (!match) throw new SyntaxError(`Oz html template attribute parsing: tag isn't closed.`)
+  const attrNameSplit = split$3(match[1]);
+  const attributeValue = match[3] || match[4] || match[5];
+  const attrValueSplit = attributeValue ? split$3(attributeValue) : [''];
+  const indexes = [...getSplitValueIndexes$1(attrNameSplit), ...getSplitValueIndexes$1(attrValueSplit)];
+  return parseAttributes$1({
+    leftHTML: `${leftHTML} ${indexes.length ? placeholder$2(indexes[0]) : match[0]}`,
+    rightHTML: rightHTML.substring(match[0].length),
+    attributes: indexes.length ? [...attributes, {
+      type: match[3] ? '"' : match[4] ? '\'' : '',
+      nameSplit: attrNameSplit,
+      valueSplit: attrValueSplit,
+      indexes
+    }] : attributes
+  })
+};
+
+const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = '', rightHTML }) => {
+  if (rightHTML === undefined) return parsePlaceholders$1({ values, rightHTML: mergeSplitWithPlaceholders$2(htmlArray) })
+  if (!rightHTML.length) return { placeholders, html: leftHTML }
+  const _textEnd = rightHTML.indexOf('<');
+  const isComment = rightHTML.startsWith('<!--');
+  if (_textEnd || isComment) {
+    const textEnd = _textEnd === -1 ? rightHTML.length : _textEnd;
+    const commentEnd = isComment ? rightHTML.indexOf('-->') : undefined;
+    if (isComment && commentEnd === -1) throw new Error(`Comment not closed, can't continue the template parsing "${rightHTML.substring(0, textEnd)}"`)
+    const textContent = rightHTML.substring(isComment ? 4 : 0, isComment ? commentEnd : textEnd);
+    const textSplit = split$3(textContent);
+    const hasPlaceholder = textSplit.length > 1;
+    const indexes = getSplitValueIndexes$1(textSplit);
+    return parsePlaceholders$1({
+      values,
+      placeholders: hasPlaceholder ? [...placeholders, {
+        type: isComment ? 'comment' : 'text',
+        indexes: getSplitValueIndexes$1(textSplit),
+        split: textSplit
+      }] : placeholders,
+      leftHTML: leftHTML + (isComment ? `<!--${hasPlaceholder ? placeholder$2(indexes[0]) : textContent}-->` : textContent),
+      rightHTML: rightHTML.substring(isComment ? commentEnd + 3 : textEnd)
+    })
+  }
+  const startTagMatch = rightHTML.match(startTagOpen$1);
+  if (startTagMatch) {
+    const tagSplit = split$3(startTagMatch[1]);
+    const hasPlaceholder = tagSplit.length > 1;
+    const indexes = getSplitValueIndexes$1(tagSplit);
+    const {
+      attributes,
+      leftHTML: _leftHTML,
+      rightHTML: _rightHTML
+    } = parseAttributes$1({rightHTML: rightHTML.substring(startTagMatch[0].length)});
+    const attributePlaceholders = attributes.map(({type, ...rest}) => ({
+      type: 'attribute',
+      attributeType: type,
+      tag: indexes,
+      attributes: attributes.map(({indexes}) => indexes).filter(indexes => rest.indexes !== indexes),
+      ...rest
+    }));
+    return parsePlaceholders$1({
+      values,
+      placeholders: [...placeholders, ...hasPlaceholder ? [{
+        type: 'tag',
+        indexes,
+        split: tagSplit,
+        attributes: attributes.map(({indexes}) => indexes)
+      }] : [],
+        ...attributePlaceholders.length ? attributePlaceholders : []],
+      leftHTML: `${leftHTML}<${mergeSplitWithValues$2(tagSplit, values)}${hasPlaceholder ? ` ${placeholder$2(indexes[0])} ` : ''}${_leftHTML}`,
+      rightHTML: _rightHTML
+    })
+  }
+  const endTagMatch = rightHTML.match(endTag$1);
+  if (endTagMatch) {
+    const tagSplit = split$3(endTagMatch[1]);
+    return parsePlaceholders$1({
+      values,
+      placeholders,
+      leftHTML: `${leftHTML}</${mergeSplitWithValues$2(tagSplit, values)}>`,
+      rightHTML: rightHTML.substring(endTagMatch[0].length)
+    })
+  }
+};
+
+const getSiblingIndex$1 = ({previousSibling} = {}, i = 0) => previousSibling ? getSiblingIndex$1(previousSibling, i + 1) : i;
+
+const getNodePath$1 = ({node, node: {parentElement: parent} = {}, path = []}) => parent
+  ? getNodePath$1({node: parent, path: [...path, [...parent.childNodes].indexOf(node)]})
+  : [...path, getSiblingIndex$1(node)].reverse();
+
+const getPlaceholderWithPaths$1 = (node, _placeholders) => {
+  const placeholders = _placeholders.reduce((arr, placeholder$$1) => [...arr, ...placeholder$$1.type === 'text'
+    ? [...placeholder$$1.indexes.map(index => ({type: 'text', index}))]
+    : [placeholder$$1]]
+  , []);
+  const placeholderByIndex = indexPlaceholders$1(placeholders);
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, undefined, false);
+  const nodes = new Map();
+  const paths = new Map();
+  const nodesToRemove = [];
+  while (walker.nextNode()) {
+    const currentNode = walker.currentNode;
+    const match = currentNode.nodeValue.match(regex);
+    if (match) {
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        const placeholderNode = currentNode.splitText(match.index);
+        placeholderNode.nodeValue = placeholderNode.nodeValue.substring(match[0].length);
+        if (placeholderNode.nodeValue.length) placeholderNode.splitText(0);
+        if (!currentNode.nodeValue.length) nodesToRemove.push(currentNode); // currentNode.parentNode.removeChild(currentNode)
+        nodes.set(placeholderByIndex[match[1]], placeholderNode);
+      } else if (currentNode.nodeType === Node.COMMENT_NODE) {
+        nodes.set(placeholderByIndex[match[1]], currentNode);
+      }
+    }
+  }
+  for (const node of nodesToRemove) node.parentNode.removeChild(node);
+  for (const placeholder$$1 of placeholders) {
+    const type = placeholder$$1.type;
+    paths.set(placeholder$$1, getNodePath$1({node: nodes.get(placeholder$$1)}));
+    if (type === 'attribute' || type === 'tag') {
+      const attributeName = placeholder$2(placeholder$$1.indexes[0]);
+      const foundNode = node.querySelector(`[${attributeName}]`);
+      foundNode.removeAttribute(attributeName);
+      paths.set(placeholder$$1, getNodePath$1({node: foundNode}));
+    }
+  }
+  return [...paths].map(([placeholder$$1, path]) => ({...placeholder$$1, path}))
+};
+
+const createBuild$1 = ({id, html, placeholders: _placeholders}) => {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  if (!template.content.childNodes.length) template.content.appendChild(new Comment());
+  const placeholders = getPlaceholderWithPaths$1(template.content, _placeholders);
+  return values => {
+    const _createInstance = createInstance$1.bind(undefined, { id, template, placeholders }, ...values);
+    _createInstance.build = true;
+    _createInstance.id = id;
+    _createInstance.values = values;
+    return _createInstance
+  }
+};
+
+const cache$1 = new Map();
+
+const tag$1 = transform => (strings, ...values) => {
+  if (typeof strings === 'string') strings = [strings];
+  const id = 'html' + strings.join(placeholder$2(''));
+  if (cache$1.has(id)) return cache$1.get(id)(values)
+  const { html, placeholders } = parsePlaceholders$1({htmlArray: split$3(transform ? transform(mergeSplitWithPlaceholders$2(strings)) : mergeSplitWithPlaceholders$2(strings)).filter((str, i) => !(i % 2)), values});
+  const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder$$1) => [...arr,
+    ...placeholder$$1.type === 'text'
+    ? placeholder$$1.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
+    : [placeholder$$1]
+  ], []);
+  const build = createBuild$1({ id, html, placeholders: placeholdersWithFixedTextPlaceholders });
+  cache$1.set(id, build);
+  return build(values)
+};
+
+const html$2 = tag$1();
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 
 // todo: rework this file + add way to escape '.' in tag name
 
 const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\((.*)\))?)(?: (.*))?/;
+// const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\(([\s\S]*?)\))?)(?: (.*))?/gm
 
 const identifiersRegex = /([#.])([a-z0-9-]*)/g;
 const classRegex = /class="(.*)"/;
 
-const makeHTML = ({tag, attributes, childs, textContent, id, classList}) => {
+const makeHTML = ({tag: tag$$1, attributes, childs, textContent, id, classList}) => {
   const classStr = classList.join(' ');
   let attrStr = attributes ? ' ' + attributes : '';
   if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`);
   else if (classStr) attrStr += ` class="${classStr}"`;
-  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map(line => makeHTML(line)).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`
+  if (tag$$1) return `<${tag$$1}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map(line => makeHTML(line)).join('')}${voidTags.includes(tag$$1) ? '' : `</${tag$$1}>`}`
   else return '\n' + textContent
 };
 
@@ -1874,8 +2297,8 @@ const hierarchise = arr => {
 const pozToHTML = str => {
   const srcArr = str.split('\n').filter(line => line.trim().length).map(line => {
     const lineMatch = line.match(lineRegex);
-    const tag = lineMatch[2].match(/([a-z0-9-]*)/)[1];
-    const identifiers = lineMatch[2].slice(tag.length);
+    const tag$$1 = lineMatch[2].match(/([a-z0-9-]*)/)[1];
+    const identifiers = lineMatch[2].slice(tag$$1.length);
     const matches = [];
     let match, id;
     while ((match = identifiersRegex.exec(identifiers))) matches.push(match);
@@ -1884,11 +2307,11 @@ const pozToHTML = str => {
     for (const item of matches) item[1] === '.' ? classList.push(item[2]) : undefined; // eslint-disable-line
     const isText = line.trimLeft()[0] === '|';
     let textContent = isText ? line.trimLeft().slice(2) : lineMatch[4];
-    const isTemplate = tag && !tag.replace(placeholderRegex$1, '').length;
-    if (isTemplate) textContent = tag;
+    const isTemplate = tag$$1 && !tag$$1.replace(regex, '').length;
+    if (isTemplate) textContent = tag$$1;
     return {
       indentation: lineMatch[1].length,
-      tag: isText || isTemplate ? undefined : tag || 'div',
+      tag: isText || isTemplate ? undefined : tag$$1 || 'div',
       attributes: lineMatch[3],
       id,
       classList,
@@ -1897,11 +2320,13 @@ const pozToHTML = str => {
     }
   });
   const hierarchisedArr = hierarchise(srcArr);
-  const html$$1 = hierarchisedArr.map(line => makeHTML(line)).join('');
-  return html$$1
+  const html = hierarchisedArr.map(line => makeHTML(line)).join('');
+  return html
 };
 
-const poz = htmlTemplate(pozToHTML);
+const poz = tag$1(pozToHTML);
+
+// export { html, ref } from './html.js'
 
 const bind = (obj, prop, event) => {
   const func = ({getElement}) => {
@@ -1938,7 +2363,9 @@ exports.mixin = mixin;
 exports.pushContext = pushContext;
 exports.RouterView = RouterView;
 exports.Router = Router;
-exports.html = html$1;
+exports.html = html$2;
+exports.tag = tag$1;
+exports.ref = ref$1;
 exports.css = css$1;
 exports.poz = poz;
 exports.bind = bind;
