@@ -45,7 +45,7 @@ export default ({ id, template, placeholders }, ...values) => {
   let placeholdersData = new Map(placeholders.map(placeholder => [placeholder, {}]))
   let placeholderByIndex = indexPlaceholders(placeholders)
 
-  const updatePlaceholder = ({ values, placeholder }) => {
+  const updatePlaceholder = ({ values, placeholder, refs }) => {
     const currentData = placeholdersData.get(placeholder)
     if (currentData && currentData.directive) currentData.directive() // cleanup directive function
     const index = placeholder.index || placeholder.indexes[0]
@@ -100,7 +100,7 @@ export default ({ id, template, placeholders }, ...values) => {
       for (const {name, value} of element.attributes) newElement.setAttribute(name, value)
       for (const childNode of element.childNodes) newElement.appendChild(childNode)
       replaceNode(newElement, element)
-      for (const placeholder of elementPlaceholders) updatePlaceholder({values, placeholder})
+      for (const placeholder of elementPlaceholders) updatePlaceholder({values, placeholder, refs})
     }
     if (placeholder.type === 'attribute' && placeholder.indexes.length === 1 && directive && directive.directive) { // placeholder value is a directive
       placeholdersData = new Map([...placeholdersData, [
@@ -109,6 +109,7 @@ export default ({ id, template, placeholders }, ...values) => {
       ]])
     } else {
       const updateResult = update[placeholder.type]({
+        refs,
         placeholder,
         values,
         data,
@@ -136,6 +137,7 @@ export default ({ id, template, placeholders }, ...values) => {
   const instance = {
     id,
     values,
+    refs: new Map(),
     instance: true,
     __reactivity__: false,
     get _childNodes () { return childNodes },
@@ -152,7 +154,9 @@ export default ({ id, template, placeholders }, ...values) => {
         .map(index => placeholderByIndex[index]) // placeholders
         .filter(placeholder => placeholder && placeholdersNodes.get(placeholder))
       instance.values = values
-      for (const placeholder of placeholdersToUpdate) updatePlaceholder({placeholder, values})
+      const refPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference)
+      const normalPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => !(nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference))
+      for (const placeholder of [...refPlaceholders, ...normalPlaceholders]) updatePlaceholder({placeholder, values, refs: instance.refs})
     },
     listen (func) {
       listeners = [...listeners, func]
@@ -167,5 +171,6 @@ export default ({ id, template, placeholders }, ...values) => {
   , [])
   instance.update(...values)
   bypassDif = false
+  // console.log('created', id)
   return instance
 }
