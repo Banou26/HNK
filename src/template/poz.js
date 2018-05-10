@@ -1,14 +1,12 @@
-import { regex as placeholderRegex } from './html/utils.js'
 import { tag as htmlTemplate } from './html/index.js'
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 
-// todo: rework this file + add way to escape '.' in tag name
+const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/
+const gRegex = new RegExp(regex, 'gm')
 
-const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\((.*)\))?)(?: (.*))?/
-// const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\(([\s\S]*?)\))?)(?: (.*))?/gm
-
-const identifiersRegex = /([#.])([a-z0-9-]*)/g
+const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/
+const gIdentifierRegex = new RegExp(identifierRegex, 'g')
 const classRegex = /class="(.*)"/
 
 const makeHTML = ({tag, attributes, childs, textContent, id, classList}) => {
@@ -33,34 +31,31 @@ const hierarchise = arr => {
   return hierarchisedArr
 }
 
-const pozToHTML = str => {
-  const srcArr = str.split('\n').filter(line => line.trim().length).map(line => {
-    const lineMatch = line.match(lineRegex)
-    const tag = lineMatch[2].match(/([a-z0-9-]*)/)[1]
-    const identifiers = lineMatch[2].slice(tag.length)
-    const matches = []
-    let match, id
-    while ((match = identifiersRegex.exec(identifiers))) matches.push(match)
-    const classList = []
-    for (const item of matches) item[1] === '#' ? id = item[2] : undefined // eslint-disable-line
-    for (const item of matches) item[1] === '.' ? classList.push(item[2]) : undefined // eslint-disable-line
-    const isText = line.trimLeft()[0] === '|'
-    let textContent = isText ? line.trimLeft().slice(2) : lineMatch[4]
-    const isTemplate = tag && !tag.replace(placeholderRegex, '').length
-    if (isTemplate) textContent = tag
-    return {
-      indentation: lineMatch[1].length,
-      tag: isText || isTemplate ? undefined : tag || 'div',
-      attributes: lineMatch[3],
-      id,
-      classList,
-      textContent,
-      childs: []
-    }
-  })
-  const hierarchisedArr = hierarchise(srcArr)
-  const html = hierarchisedArr.map(line => makeHTML(line)).join('')
-  return html
-}
+const pozToHTML = str =>
+  hierarchise(
+    str
+    .match(gRegex)
+    .map(str => str.match(regex))
+    .filter(match => match[0].trim().length)
+    .map(match => {
+      const tag = match[3].match(/^([a-z0-9-]*)/)[1]
+      const identifiers = match[3].slice(tag.length).match(gIdentifierRegex) || []
+      const id = identifiers.find(identifier => identifier.match(identifierRegex)[2])
+      const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1))
+      return {
+        indentation: match[1].split('\n').pop().length,
+        tag: match[2]
+          ? undefined
+          : tag || 'div',
+        attributes: match[4],
+        id,
+        classList,
+        textContent: match[5],
+        childs: []
+      }
+    })
+  )
+  .map(line => makeHTML(line))
+  .join('')
 
 export const poz = htmlTemplate(pozToHTML)
