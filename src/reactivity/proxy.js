@@ -23,7 +23,7 @@ export default object => new Proxy(object, {
       }
     }
     registerDependency({ target, property })
-    if ((typeof value === 'object' || typeof value === 'function') && value[reactivitySymbol]) registerDependency({ target: value })
+    if (value && (typeof value === 'object' || typeof value === 'function') && value[reactivitySymbol]) registerDependency({ target: value })
     return value
   },
   set (target, property, _value, receiver) {
