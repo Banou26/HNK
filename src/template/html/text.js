@@ -18,7 +18,7 @@ const text = ({
     }
   } else if (value instanceof Node) {
     if (nodes[0] !== value) return { nodes: [value] }
-  } else if (value && value.build) {
+  } else if (value && value.build && !value.$promise) {
     if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
       oldInstance.update(...value.values)
       return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
@@ -31,7 +31,7 @@ const text = ({
       })
       return { nodes: instance._childNodes, data: { instance, unlisten } }
     }
-  } else if (value && value.instance) {
+  } else if (value && value.instance && !value.$promise) {
     const unlisten = value.listen((newChildNodes, oldChildNodes) => {
       setChildNodes(newChildNodes)
     })
@@ -49,6 +49,8 @@ const text = ({
       return _text
     })
     return { nodes: textArray.map(({nodes}) => nodes), data: { textArray } }
+  } else if (value && value.$promise) {
+    return { nodes: [ new Text('') ] }
   } else {
     return { nodes: [ nodes[0] instanceof Comment ? nodes[0] : new Comment('') ] }
   }
