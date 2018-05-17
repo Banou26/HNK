@@ -1,5 +1,7 @@
 import { reactify, watch } from '../reactivity/index.js'
 
+export let elementContext = Symbol.for('OzElementContext')
+
 const mixins = []
 export const mixin = obj => mixins.push(obj)
 let currentContexts = []
@@ -39,7 +41,7 @@ export const registerElement = options => {
     constructor () {
       super()
       const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this
-      const context = this.__context__ = reactify({
+      const context = this[elementContext] = reactify({
         ...rest,
         host,
         props: {},
@@ -105,7 +107,7 @@ export const registerElement = options => {
     }
 
     connectedCallback () {
-      const { __context__: context, __context__: { host, style, template } } = this
+      const { [elementContext]: context, [elementContext]: { host, style, template } } = this
       mixins.forEach(callMixin.bind(undefined, context, options))
       if (template) pushContext(context, _ => host.appendChild(template.content))
       if (style) {
@@ -117,7 +119,7 @@ export const registerElement = options => {
     }
 
     disconnectedCallback () {
-      const { __context__: context, __context__: { style } } = this
+      const { [elementContext]: context, [elementContext]: { style } } = this
       if (style && !shadowDom) style.content.parentElement.removeChild(style.content) // todo: check why the element is emptied but not removed
       if (disconnected) disconnected(context)
     }
