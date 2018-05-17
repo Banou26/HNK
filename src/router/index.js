@@ -1,3 +1,4 @@
+import { elementContext } from '../elements/index.js'
 import { mixin, pushContext } from '../elements/index.js'
 import { reactify } from '../reactivity/index.js'
 import pathToRegexp, { compile } from '../libs/path-to-regexp.js'
@@ -102,7 +103,7 @@ export const Router = options => {
 
     const callComponentsGuards = async (components, guardFunctionName) => {
       abortResults(await Promise.all(components.map(component => {
-        const { __context__: context } = component
+        const { [elementContext]: context } = component
         if (!component[guardFunctionName]) return
         return component[guardFunctionName](context || newRoute, context ? newRoute : currentRoute, context ? currentRoute : undefined)
       }).filter(elem => elem)), guardFunctionName)
