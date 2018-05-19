@@ -3,5 +3,8 @@ import { css } from '../template/css.js'
 
 export default registerElement({
   name: 'router-link',
-  style: _ => css`router-link { cursor: pointer; }`
+  extends: HTMLAnchorElement,
+  style: _ => css`router-link, a[is="router-link"] {
+    cursor: pointer;
+  }`
 })
