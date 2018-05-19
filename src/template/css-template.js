@@ -14,7 +14,7 @@ async function setPlaceholdersPaths (sheet, placeholders, values) {
         placeholders.push({
           type: 'value',
           ids: getSplitIds(valSplit),
-          path: ['rules', rulesI, 'style', style],
+          path: ['cssRules', rulesI, 'style', style],
           split: valSplit
         })
       }
