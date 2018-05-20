@@ -24,7 +24,7 @@ export const pushContext = (context, func) => {
 export const registerElement = options => {
   const {
     name,
-    extend = HTMLElement,
+    extends: extend,
     shadowDom,
     state,
     props,
@@ -37,7 +37,8 @@ export const registerElement = options => {
     disconnected,
     ...rest
   } = options
-  class OzElement extends extend {
+  const extendsClass = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement
+  class OzElement extends extendsClass {
     constructor () {
       super()
       const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this
@@ -124,6 +125,6 @@ export const registerElement = options => {
       if (disconnected) disconnected(context)
     }
   }
-  customElements.define(name, OzElement)
+  customElements.define(name, OzElement, { ...extend ? { extends: extend } : undefined })
   return OzElement
 }
