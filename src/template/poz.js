@@ -1,4 +1,5 @@
 import { tag as htmlTemplate } from './html/index.js'
+import { regex as placeholderRegex } from './html/utils.js'
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 
@@ -38,8 +39,11 @@ const pozToHTML = str =>
     .map(str => str.match(regex))
     .filter(match => match[0].trim().length)
     .map(match => {
-      const tag = match[3].match(/^([a-z0-9-]*)/)[1]
-      const identifiers = match[3].slice(tag.length).match(gIdentifierRegex) || []
+      if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
+        return { indentation: match[1].split('\n').pop().length, textContent: match[3], classList: [] }
+      }
+      const tag = match[3] ? match[3].match(/^([a-z0-9-]*)/)[1] : undefined
+      const identifiers = match[3] ? match[3].slice(tag.length).match(gIdentifierRegex) || [] : []
       const id = identifiers.find(identifier => identifier.match(identifierRegex)[2])
       const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1))
       return {
