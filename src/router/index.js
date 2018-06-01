@@ -37,6 +37,7 @@ const createRouteComponents = route => new Map([...getRouteComponents(route)].ma
 const flattenRoute = (route, arr = [route]) => route.parent ? flattenRoute(route.parent, [route.parent, ...arr]) : arr
 
 export const Router = options => {
+  performance.mark('OzRouter initialization')
   const base = '/' + (options.base || '').replace(/^\//g, '')
   const originBase = window.location.origin + base
   const flattenedRoutes = options.routes ? flattenRoutes(options.routes) : undefined
@@ -162,5 +163,7 @@ export const Router = options => {
   })
   window.addEventListener('popstate', ev => router.replace(location.pathname))
   router.replace(location.pathname)
+  performance.mark('OzRouter initialized')
+  performance.measure('OzRouter initialization', 'OzRouter initialization', 'OzRouter initialized')
   return router
 }
