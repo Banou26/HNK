@@ -42,11 +42,14 @@ export const notify = ({ target, property, value }) => {
     const watchers = propertyReactivity(target, property).watchers
     propertyReactivity(target, property).watchers = []
     callWatchers(watchers)
-  } else {
+  }/* else {
     const watchers = reactivity.watchers
     reactivity.watchers = []
     callWatchers(watchers)
-  }
+  }*/
+  const watchers = reactivity.watchers
+  reactivity.watchers = []
+  callWatchers(watchers)
 }
 
 export const registerWatcher = (getter, watcher, {object, property} = {}) => {

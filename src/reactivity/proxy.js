@@ -15,7 +15,6 @@ export default object => new Proxy(object, {
       } else {
         const watcher = _ => {
           notify({ target, property })
-          notify({ target })
         }
         watcher.propertyReactivity = propertyReactivity
         watcher.cache = true
@@ -41,7 +40,7 @@ export default object => new Proxy(object, {
       return Reflect.set(target, property, value, receiver)
     } finally {
       notify({ target, property, value })
-      notify({ target, value })
+      // notify({ target, value })
     }
   },
   deleteProperty (target, property) {
@@ -50,7 +49,7 @@ export default object => new Proxy(object, {
       return Reflect.deleteProperty(target, property)
     } finally {
       notify({ target, property })
-      notify({ target })
+      // notify({ target })
       const reactivityProperties = target[reactivitySymbol].properties
       if (!reactivityProperties.get(property).watchers.length) reactivityProperties.delete(property)
     }

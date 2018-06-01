@@ -28,23 +28,20 @@ for (const { type, ReactiveType, reactivePrototype } of builtIn) {
     const { notify: _notify } = reactivePrototype.get(prop) || {}
     if (!ReactiveType.prototype.hasOwnProperty(prop)) {
       const desc = mapDescriptors[prop]
-      /*
-      * Todo: Check if the registerDependency isn't redundant with the proxy registerDependency,
-      * I'm not sure since the function can be called after getting its reference
-      */
-      if ('value' in desc && typeof desc.value === 'function') {
-        ReactiveType.prototype[prop] = function (...args) {
-          try {
-            return type.prototype[prop].apply(this[reactivitySymbol].object, args)
-          } finally {
-            registerDependency({ target: this })
-            if (_notify) notify({ target: this })
-          }
-        }
-      } else if ('get' in desc) {
-        Object.defineProperty(ReactiveType.prototype, prop, {
+      Object.defineProperty(ReactiveType.prototype, prop, {
           ...desc,
-          ...desc.get && {
+          ...'value' in desc && typeof desc.value === 'function' && {
+            value: function (...args) {
+              return type.prototype[prop].apply(this[reactivitySymbol].object, args)
+              // try {
+              //   return type.prototype[prop].apply(this[reactivitySymbol].object, args)
+              // } finally {
+              //   registerDependency({ target: this })
+              //   if (_notify) notify({ target: this })
+              // }
+            }
+          }/*,
+          ...'get' in desc && desc.get && {
             get () {
               try {
                 return Reflect.get(type.prototype, prop, this[reactivitySymbol].object)
@@ -52,9 +49,8 @@ for (const { type, ReactiveType, reactivePrototype } of builtIn) {
                 registerDependency({ target: this, property: prop })
               }
             }
-          }
+          }*/
         })
-      }
     }
   }
 }
