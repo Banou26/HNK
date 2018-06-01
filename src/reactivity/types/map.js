@@ -30,8 +30,31 @@ export const ReactiveType = class ReactiveMap extends Map {
     try {
       return super.set.apply(this[reactivitySymbol].object, [key, value])
     } finally {
-      registerDependency({ target: this })
+      registerDependency({ target: this, key })
       notify({ target: this, value })
+    }
+  }
+  delete (key, val) {
+    const value = r(val)
+    try {
+      return super.delete.apply(this[reactivitySymbol].object, [key, value])
+    } finally {
+      registerDependency({ target: this, key })
+      notify({ target: this, value })
+    }
+  }
+  get (key) {
+    try {
+      return super.get.apply(this[reactivitySymbol].object, [key])
+    } finally {
+      registerDependency({ target: this, key })
+    }
+  }
+  has (key) {
+    try {
+      return super.has.apply(this[reactivitySymbol].object, [key])
+    } finally {
+      registerDependency({ target: this, key })
     }
   }
 }
