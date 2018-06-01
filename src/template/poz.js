@@ -26,7 +26,7 @@ const pushLine = ({childs: currentChilds}, line) => {
 const hierarchise = arr => {
   const hierarchisedArr = []
   for (let line of arr) {
-    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line)
+    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line)
     else hierarchisedArr.push(line)
   }
   return hierarchisedArr
