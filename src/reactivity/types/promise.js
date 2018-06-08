@@ -4,8 +4,8 @@ export const type = Promise
 
 const promisify = promise => {
   const func = _ => {}
-  func.$promise = promise
-  func.$resolved = false
+  Object.defineProperty(func, '$promise', {value: promise})
+  Object.defineProperty(func, '$resolved', {value: false})
   const proxy = new Proxy(func, {
     get (target, prop, receiver) {
       if (prop in func) return func[prop]
@@ -25,9 +25,9 @@ const promisify = promise => {
     if (value && typeof value === 'object') {
       const reactiveValue = r(value)
       const { object } = reactiveValue[reactivitySymbol]
-      object.$promise = promise
-      object.$resolved = true
-      object.$resolvedValue = value
+      Object.defineProperty(object, '$promise', {value: promise})
+      Object.defineProperty(object, '$resolved', {value: true})
+      Object.defineProperty(object, '$resolvedValue', {value})
     }
     notify({target: proxy})
   })
