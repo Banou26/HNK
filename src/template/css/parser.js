@@ -1,8 +1,11 @@
-const comment = /\/\*[^*]*\*+([^/*][^*]*\*+)*\//gim
-const port = /@import[^;]*;/gim
-const custom = /(?:^[^;\-\s}]+)?--([^;{}]*?):([^{};]*?)(?:[;\n]|$)/gim
-const mixinProp = /(?:^[^;\-\s}]+)?--([^;{}]*?):[^{};]*?{([^}]*?)}(?:[;\n]|$)?/gim
-const mixinApply = /@apply\s*(\(?[^);]*\)?)\s*(?:[;\n]|$)?/gim
-const varApply = /([^;:]*?):([^;]*?var\([^;]*\))(?:[;\n]|$)?/gim
-const keyframesRules = //gim
-const multipleSpaces: /\s+/g
+const rliteral = char => `(?:\\${char}(?:\\\\.|[^\\\\${char}\\\\])*\\${char})`
+const rstring = `(?:${rliteral(`"`)}|${rliteral(`'`)})`
+const rimport = `(?:@import (?:url\\((?:${rstring}|[^)]*)\\)|${rstring})(?: [^;]*);)`
+const rcomment = /\/\*.*?\*\//
+console.log(new RegExp(rimport))
+
+const firstPlaceholder = String.fromCodePoint(0xfffff)
+
+const parsePlaceholders = str => {
+
+}

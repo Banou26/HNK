@@ -15,7 +15,7 @@ class StyleNode {
   }
 }
 
-const parse = text => {
+export default text => {
   text = clean(text)
   return parseCss(lex(text), text)
 }
@@ -155,29 +155,3 @@ const VAR_START = '--'
 const MEDIA_START = '@media'
 const AT_START = '@'
 
-parse(`.polling_message --bruh {
-  color: white;
-  float: left;
-  margin-right: 2%;            
-}
-
-.view_port {
-  background-color: black;
-  height: 25px;
-  width: 100%;
-  overflow: hidden;
-}
-
-.cylon_eye {
-  background-color: red;
-  background-image: linear-gradient(to right,
-      rgba(0, 0, 0, .9) 25%,
-      rgba(0, 0, 0, .1) 50%,
-      rgba(0, 0, 0, .9) 75%);
-  color: white;
-  height: 100%;
-  width: 20%;
-
-          animation: 4s linear 0s infinite alternate move_eye;
-}
-@keyframes move_eye { bruh dude { margin-left: -20%; } to { margin-left: 100%; }  }`)
