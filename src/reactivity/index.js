@@ -16,7 +16,7 @@ export const reactivityProperties = ['$watch', reactivitySymbol]
 export const setObjectReactivity = ({target, unreactive, original, object}) => {
   if (unreactive) return (target[reactivitySymbol] = false)
   if (original) reactiveRoot.objects.set(original, target)
-  target[reactivitySymbol] = { watchers: [], properties: new Map(), object }
+  Object.defineProperty(target, reactivitySymbol, { value: { watchers: [], properties: new Map(), object } })
   Object.defineProperty(target, '$watch', { value: _watch(target) })
 }
 
