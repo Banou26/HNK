@@ -26,9 +26,14 @@ export default object => new Proxy(object, {
     return value
   },
   set (target, property, _value, receiver) {
+    registerDependency({ target: receiver })
     if (_value === target[property]) return true
-    if (reactivityProperties.includes(property)) return Reflect.set(target, property, _value, receiver)
+    if (reactivityProperties.includes(property)) {
+      registerDependency({ target: _value })
+      return Reflect.set(target, property, _value, receiver)
+    }
     let value = r(_value)
+    registerDependency({ target: value })
     if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue
     else if (typeof value === 'function' && value.$promise) {
       value.$promise.then(val =>
@@ -40,16 +45,15 @@ export default object => new Proxy(object, {
       return Reflect.set(target, property, value, receiver)
     } finally {
       notify({ target, property, value })
-      // notify({ target, value })
     }
   },
   deleteProperty (target, property) {
+    registerDependency({ target: target })
     if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property)
     try {
       return Reflect.deleteProperty(target, property)
     } finally {
       notify({ target, property })
-      // notify({ target })
       const reactivityProperties = target[reactivitySymbol].properties
       if (!reactivityProperties.get(property).watchers.length) reactivityProperties.delete(property)
     }
