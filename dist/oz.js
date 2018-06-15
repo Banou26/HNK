@@ -2,6 +2,10 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var mensch = _interopDefault(require('mensch'));
+
 const UUID = a => a ? (a ^ Math.random() * 16 >> a / 4).toString(16) : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, UUID);
 
 const isObject = item => item && typeof item === 'object' && !Array.isArray(item);
@@ -139,7 +143,6 @@ var proxify = object => new Proxy(object, {
       } else {
         const watcher = _ => {
           notify({ target, property });
-          notify({ target });
         };
         watcher.propertyReactivity = propertyReactivity$$1;
         watcher.cache = true;
@@ -147,13 +150,18 @@ var proxify = object => new Proxy(object, {
       }
     }
     registerDependency({ target, property });
-    if ((typeof value === 'object' || typeof value === 'function') && value[exports.reactivitySymbol]) registerDependency({ target: value });
+    if (value && (typeof value === 'object' || typeof value === 'function') && value[exports.reactivitySymbol]) registerDependency({ target: value });
     return value
   },
   set (target, property, _value, receiver) {
+    registerDependency({ target: receiver });
     if (_value === target[property]) return true
-    if (reactivityProperties.includes(property)) return Reflect.set(target, property, _value, receiver)
+    if (reactivityProperties.includes(property)) {
+      registerDependency({ target: _value });
+      return Reflect.set(target, property, _value, receiver)
+    }
     let value = reactify(_value);
+    registerDependency({ target: value });
     if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue;
     else if (typeof value === 'function' && value.$promise) {
       value.$promise.then(val =>
@@ -165,16 +173,15 @@ var proxify = object => new Proxy(object, {
       return Reflect.set(target, property, value, receiver)
     } finally {
       notify({ target, property, value });
-      notify({ target, value });
     }
   },
   deleteProperty (target, property) {
+    registerDependency({ target: target });
     if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property)
     try {
       return Reflect.deleteProperty(target, property)
     } finally {
       notify({ target, property });
-      notify({ target });
       const reactivityProperties$$1 = target[exports.reactivitySymbol].properties;
       if (!reactivityProperties$$1.get(property).watchers.length) reactivityProperties$$1.delete(property);
     }
@@ -223,8 +230,31 @@ const ReactiveType = class ReactiveMap extends Map {
     try {
       return super.set.apply(this[exports.reactivitySymbol].object, [key, value])
     } finally {
-      registerDependency({ target: this });
+      registerDependency({ target: this, key });
       notify({ target: this, value });
+    }
+  }
+  delete (key, val) {
+    const value = reactify(val);
+    try {
+      return super.delete.apply(this[exports.reactivitySymbol].object, [key, value])
+    } finally {
+      registerDependency({ target: this, key });
+      notify({ target: this, value });
+    }
+  }
+  get (key) {
+    try {
+      return super.get.apply(this[exports.reactivitySymbol].object, [key])
+    } finally {
+      registerDependency({ target: this, key });
+    }
+  }
+  has (key) {
+    try {
+      return super.has.apply(this[exports.reactivitySymbol].object, [key])
+    } finally {
+      registerDependency({ target: this, key });
     }
   }
 };
@@ -308,8 +338,8 @@ const type$4 = Promise;
 
 const promisify = promise => {
   const func = _ => {};
-  func.$promise = promise;
-  func.$resolved = false;
+  Object.defineProperty(func, '$promise', {value: promise});
+  Object.defineProperty(func, '$resolved', {value: false});
   const proxy = new Proxy(func, {
     get (target, prop, receiver) {
       if (prop in func) return func[prop]
@@ -329,9 +359,9 @@ const promisify = promise => {
     if (value && typeof value === 'object') {
       const reactiveValue = reactify(value);
       const { object } = reactiveValue[exports.reactivitySymbol];
-      object.$promise = promise;
-      object.$resolved = true;
-      object.$resolvedValue = value;
+      Object.defineProperty(object, '$promise', {value: promise});
+      Object.defineProperty(object, '$resolved', {value: true});
+      Object.defineProperty(object, '$resolvedValue', {value});
     }
     notify({target: proxy});
   });
@@ -397,33 +427,29 @@ for (const { type: type$$1, ReactiveType: ReactiveType$$1, reactivePrototype: re
     const { notify: _notify } = reactivePrototype$$1.get(prop) || {};
     if (!ReactiveType$$1.prototype.hasOwnProperty(prop)) {
       const desc = mapDescriptors[prop];
-      /*
-      * Todo: Check if the registerDependency isn't redundant with the proxy registerDependency,
-      * I'm not sure since the function can be called after getting its reference
-      */
-      if ('value' in desc && typeof desc.value === 'function') {
-        ReactiveType$$1.prototype[prop] = function (...args) {
-          try {
-            return type$$1.prototype[prop].apply(this[exports.reactivitySymbol].object, args)
-          } finally {
-            registerDependency({ target: this });
-            if (_notify) notify({ target: this });
-          }
-        };
-      } else if ('get' in desc) {
-        Object.defineProperty(ReactiveType$$1.prototype, prop, {
+      Object.defineProperty(ReactiveType$$1.prototype, prop, {
           ...desc,
-          ...desc.get && {
+          ...'value' in desc && typeof desc.value === 'function' && {
+            value: function (...args) {
+              return type$$1.prototype[prop].apply(this[exports.reactivitySymbol].object, args)
+              // try {
+              //   return type.prototype[prop].apply(this[reactivitySymbol].object, args)
+              // } finally {
+              //   registerDependency({ target: this })
+              //   if (_notify) notify({ target: this })
+              // }
+            }
+          }/*,
+          ...'get' in desc && desc.get && {
             get () {
               try {
-                return Reflect.get(type$$1.prototype, prop, this[exports.reactivitySymbol].object)
+                return Reflect.get(type.prototype, prop, this[reactivitySymbol].object)
               } finally {
-                registerDependency({ target: this, property: prop });
+                registerDependency({ target: this, property: prop })
               }
             }
-          }
+          }*/
         });
-      }
     }
   }
 }
@@ -444,7 +470,7 @@ const reactivityProperties = ['$watch', exports.reactivitySymbol];
 const setObjectReactivity = ({target, unreactive, original, object}) => {
   if (unreactive) return (target[exports.reactivitySymbol] = false)
   if (original) exports.reactiveRoot.objects.set(original, target);
-  target[exports.reactivitySymbol] = { watchers: [], properties: new Map(), object };
+  Object.defineProperty(target, exports.reactivitySymbol, { value: { watchers: [], properties: new Map(), object } });
   Object.defineProperty(target, '$watch', { value: _watch(target) });
 };
 
@@ -470,11 +496,14 @@ const notify = ({ target, property, value }) => {
     const watchers = propertyReactivity(target, property).watchers;
     propertyReactivity(target, property).watchers = [];
     callWatchers(watchers);
-  } else {
-    const watchers = reactivity.watchers;
-    reactivity.watchers = [];
-    callWatchers(watchers);
-  }
+  }/* else {
+    const watchers = reactivity.watchers
+    reactivity.watchers = []
+    callWatchers(watchers)
+  }*/
+  const watchers = reactivity.watchers;
+  reactivity.watchers = [];
+  callWatchers(watchers);
 };
 
 const registerWatcher = (getter, watcher, {object, property} = {}) => {
@@ -550,6 +579,8 @@ const _watch = target => (getter, handler) => {
 
 const watch = _watch();
 
+let elementContext = Symbol.for('OzElementContext');
+
 const mixins = [];
 const mixin = obj => mixins.push(obj);
 let currentContexts = [];
@@ -572,7 +603,7 @@ const pushContext = (context, func) => {
 const registerElement = options => {
   const {
     name,
-    extend = HTMLElement,
+    extends: extend,
     shadowDom,
     state,
     props,
@@ -585,11 +616,12 @@ const registerElement = options => {
     disconnected,
     ...rest
   } = options;
-  class OzElement extends extend {
+  const extendsClass = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement;
+  class OzElement extends extendsClass {
     constructor () {
       super();
       const host = shadowDom && this.attachShadow ? this.attachShadow({ mode: shadowDom }) : this;
-      const context = this.__context__ = reactify({
+      const context = this[elementContext] = reactify({
         ...rest,
         host,
         props: {},
@@ -655,24 +687,28 @@ const registerElement = options => {
     }
 
     connectedCallback () {
-      const { __context__: context, __context__: { host, style, template } } = this;
+      const { [elementContext]: context, [elementContext]: { host, style, template } } = this;
       mixins.forEach(callMixin.bind(undefined, context, options));
       if (template) pushContext(context, _ => host.appendChild(template.content));
       if (style) {
         if (shadowDom) host.appendChild(style.content);
-        else this.ownerDocument.head.appendChild(style.content);
+        else {
+          const root = host.getRootNode();
+          if (root === document) host.getRootNode({composed: true}).head.appendChild(style.content);
+          else root.appendChild(style.content);
+        }
         style.update();
       }
       if (connected) connected(context);
     }
 
     disconnectedCallback () {
-      const { __context__: context, __context__: { style } } = this;
+      const { [elementContext]: context, [elementContext]: { style } } = this;
       if (style && !shadowDom) style.content.parentElement.removeChild(style.content); // todo: check why the element is emptied but not removed
       if (disconnected) disconnected(context);
     }
   }
-  customElements.define(name, OzElement);
+  customElements.define(name, OzElement, { ...extend ? { extends: extend } : undefined });
   return OzElement
 };
 
@@ -741,7 +777,7 @@ async function setPlaceholdersPaths (sheet, placeholders, values) {
         placeholders.push({
           type: 'value',
           ids: getSplitIds(valSplit),
-          path: ['rules', rulesI, 'style', style],
+          path: ['cssRules', rulesI, 'style', style],
           split: valSplit
         });
       }
@@ -828,7 +864,8 @@ const css$1 = cssTemplate((source, values) => {
 
 registerElement({
   name: 'router-link',
-  style: _ => css$1`router-link { cursor: pointer; }`
+  extends: 'a',
+  style: _ => css$1`router-link, a[is="router-link"] { cursor: pointer; }`
 })
 
 const {
@@ -867,8 +904,8 @@ const parseAttributes = ({leftHTML = '', rightHTML, attributes = []}) => {
   })
 };
 
-const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = '', rightHTML }) => {
-  if (rightHTML === undefined) return parsePlaceholders({ values, rightHTML: mergeSplitWithPlaceholders(htmlArray) })
+const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = '', rightHTML }) => {
+  if (rightHTML === undefined) return parsePlaceholders$1({ values, rightHTML: mergeSplitWithPlaceholders(htmlArray) })
   if (!rightHTML.length) return { placeholders, html: leftHTML }
   const _textEnd = rightHTML.indexOf('<');
   const isComment = rightHTML.startsWith('<!--');
@@ -880,7 +917,7 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
     const textSplit = split$1(textContent);
     const hasPlaceholder = textSplit.length > 1;
     const indexes = getSplitValueIndexes(textSplit);
-    return parsePlaceholders({
+    return parsePlaceholders$1({
       values,
       placeholders: hasPlaceholder ? [...placeholders, {
         type: isComment ? 'comment' : 'text',
@@ -908,7 +945,7 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
       attributes: attributes.map(({indexes}) => indexes).filter(indexes => rest.indexes !== indexes),
       ...rest
     }));
-    return parsePlaceholders({
+    return parsePlaceholders$1({
       values,
       placeholders: [...placeholders, ...hasPlaceholder ? [{
         type: 'tag',
@@ -924,7 +961,7 @@ const parsePlaceholders = ({ htmlArray, values, placeholders = [], leftHTML = ''
   const endTagMatch = rightHTML.match(endTag);
   if (endTagMatch) {
     const tagSplit = split$1(endTagMatch[1]);
-    return parsePlaceholders({
+    return parsePlaceholders$1({
       values,
       placeholders,
       leftHTML: `${leftHTML}</${mergeSplitWithValues(tagSplit, values)}>`,
@@ -953,7 +990,7 @@ const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
 
 const flattenArray$1 = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...arr, ...flattenArray$1(item)] : [...arr, item], []);
 
-const getPlaceholderWithPaths = (node, _placeholders) => {
+const getPlaceholderWithPaths$1 = (node, _placeholders) => {
   const placeholders = _placeholders.reduce((arr, placeholder) => [...arr, ...placeholder.type === 'text'
     ? [...placeholder.indexes.map(index => ({type: 'text', index}))]
     : [placeholder]]
@@ -992,7 +1029,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
   return [...paths].map(([placeholder, path]) => ({...placeholder, path}))
 };
 
-const createInstance = ({ id, template, placeholders }, ...values) => {
+const createInstance$1 = ({ id, template, placeholders }, ...values) => {
   const doc = document.importNode(template.content, true);
   let bypassDif = true;
   let childNodes = [...doc.childNodes];
@@ -1135,9 +1172,9 @@ const createBuild = ({id, html: html$$1, placeholders: _placeholders}) => {
   const template = document.createElement('template');
   template.innerHTML = html$$1;
   if (!template.content.childNodes.length) template.content.appendChild(new Comment());
-  const placeholders = getPlaceholderWithPaths(template.content, _placeholders);
+  const placeholders = getPlaceholderWithPaths$1(template.content, _placeholders);
   return values => {
-    const _createInstance = createInstance.bind(undefined, { id, template, placeholders }, ...values);
+    const _createInstance = createInstance$1.bind(undefined, { id, template, placeholders }, ...values);
     _createInstance.build = true;
     _createInstance.id = id;
     _createInstance.values = values;
@@ -1151,7 +1188,7 @@ const htmlTemplate = transform => (strings, ...values) => {
   if (typeof strings === 'string') strings = [strings];
   const id = 'html' + strings.join(placeholderStr$1(''));
   if (cache.has(id)) return cache.get(id)(values)
-  const { html: html$$1, placeholders } = parsePlaceholders({htmlArray: split$2(transform(mergeSplitWithPlaceholders$1(strings))).filter((str, i) => !(i % 2)), values});
+  const { html: html$$1, placeholders } = parsePlaceholders$1({htmlArray: split$2(transform(mergeSplitWithPlaceholders$1(strings))).filter((str, i) => !(i % 2)), values});
   const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
     ...placeholder.type === 'text'
     ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
@@ -1693,6 +1730,7 @@ const createRouteComponents = route => new Map([...getRouteComponents(route)].ma
 const flattenRoute = (route, arr = [route]) => route.parent ? flattenRoute(route.parent, [route.parent, ...arr]) : arr;
 
 const Router = options => {
+  performance.mark('OzRouter initialization');
   const base = '/' + (options.base || '').replace(/^\//g, '');
   const originBase = window.location.origin + base;
   const flattenedRoutes = options.routes ? flattenRoutes(options.routes) : undefined;
@@ -1759,7 +1797,7 @@ const Router = options => {
 
     const callComponentsGuards = async (components, guardFunctionName) => {
       abortResults(await Promise.all(components.map(component => {
-        const { __context__: context } = component;
+        const { [elementContext]: context } = component;
         if (!component[guardFunctionName]) return
         return component[guardFunctionName](context || newRoute, context ? newRoute : currentRoute, context ? currentRoute : undefined)
       }).filter(elem => elem)), guardFunctionName);
@@ -1818,6 +1856,8 @@ const Router = options => {
   });
   window.addEventListener('popstate', ev => router.replace(location.pathname));
   router.replace(location.pathname);
+  performance.mark('OzRouter initialized');
+  performance.measure('OzRouter initialization', 'OzRouter initialization', 'OzRouter initialized');
   return router
 };
 
@@ -1857,7 +1897,7 @@ const text = ({
     }
   } else if (value instanceof Node) {
     if (nodes[0] !== value) return { nodes: [value] }
-  } else if (value && value.build) {
+  } else if (value && value.build && !value.$promise) {
     if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
       oldInstance.update(...value.values);
       return { nodes: oldInstance._childNodes, data: { instance: oldInstance } }
@@ -1870,7 +1910,7 @@ const text = ({
       });
       return { nodes: instance._childNodes, data: { instance, unlisten } }
     }
-  } else if (value && value.instance) {
+  } else if (value && value.instance && !value.$promise) {
     const unlisten = value.listen((newChildNodes, oldChildNodes) => {
       setChildNodes(newChildNodes);
     });
@@ -1888,6 +1928,8 @@ const text = ({
       return _text
     });
     return { nodes: textArray.map(({nodes}) => nodes), data: { textArray } }
+  } else if (value && value.$promise) {
+    return { nodes: [ new Text('') ] }
   } else {
     return { nodes: [ nodes[0] instanceof Comment ? nodes[0] : new Comment('') ] }
   }
@@ -1946,7 +1988,7 @@ const getValueIndexDifferences$1 = (arr, arr2) => arr2.length > arr.length
       ...item !== arr2[i] ? [i] : []
     ], []);
 
-var createInstance$1 = ({ id, template, placeholders }, ...values) => {
+var createInstance$2 = ({ id, template, placeholders }, ...values) => {
   const doc = document.importNode(template.content, true);
   let bypassDif = true;
   let childNodes = [...doc.childNodes];
@@ -2118,8 +2160,8 @@ const parseAttributes$1 = ({leftHTML = '', rightHTML, attributes = []}) => {
   })
 };
 
-const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = '', rightHTML }) => {
-  if (rightHTML === undefined) return parsePlaceholders$1({ values, rightHTML: mergeSplitWithPlaceholders$2(htmlArray) })
+const parsePlaceholders$2 = ({ htmlArray, values, placeholders = [], leftHTML = '', rightHTML }) => {
+  if (rightHTML === undefined) return parsePlaceholders$2({ values, rightHTML: mergeSplitWithPlaceholders$2(htmlArray) })
   if (!rightHTML.length) return { placeholders, html: leftHTML }
   const _textEnd = rightHTML.indexOf('<');
   const isComment = rightHTML.startsWith('<!--');
@@ -2131,7 +2173,7 @@ const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = 
     const textSplit = split$3(textContent);
     const hasPlaceholder = textSplit.length > 1;
     const indexes = getSplitValueIndexes$1(textSplit);
-    return parsePlaceholders$1({
+    return parsePlaceholders$2({
       values,
       placeholders: hasPlaceholder ? [...placeholders, {
         type: isComment ? 'comment' : 'text',
@@ -2159,7 +2201,7 @@ const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = 
       attributes: attributes.map(({indexes}) => indexes).filter(indexes => rest.indexes !== indexes),
       ...rest
     }));
-    return parsePlaceholders$1({
+    return parsePlaceholders$2({
       values,
       placeholders: [...placeholders, ...hasPlaceholder ? [{
         type: 'tag',
@@ -2175,7 +2217,7 @@ const parsePlaceholders$1 = ({ htmlArray, values, placeholders = [], leftHTML = 
   const endTagMatch = rightHTML.match(endTag$1);
   if (endTagMatch) {
     const tagSplit = split$3(endTagMatch[1]);
-    return parsePlaceholders$1({
+    return parsePlaceholders$2({
       values,
       placeholders,
       leftHTML: `${leftHTML}</${mergeSplitWithValues$2(tagSplit, values)}>`,
@@ -2190,7 +2232,7 @@ const getNodePath$1 = ({node, node: {parentElement: parent} = {}, path = []}) =>
   ? getNodePath$1({node: parent, path: [...path, [...parent.childNodes].indexOf(node)]})
   : [...path, getSiblingIndex$1(node)].reverse();
 
-const getPlaceholderWithPaths$1 = (node, _placeholders) => {
+const getPlaceholderWithPaths$2 = (node, _placeholders) => {
   const placeholders = _placeholders.reduce((arr, placeholder$$1) => [...arr, ...placeholder$$1.type === 'text'
     ? [...placeholder$$1.indexes.map(index => ({type: 'text', index}))]
     : [placeholder$$1]]
@@ -2233,9 +2275,9 @@ const createBuild$1 = ({id, html, placeholders: _placeholders}) => {
   const template = document.createElement('template');
   template.innerHTML = html;
   if (!template.content.childNodes.length) template.content.appendChild(new Comment());
-  const placeholders = getPlaceholderWithPaths$1(template.content, _placeholders);
+  const placeholders = getPlaceholderWithPaths$2(template.content, _placeholders);
   return values => {
-    const _createInstance = createInstance$1.bind(undefined, { id, template, placeholders }, ...values);
+    const _createInstance = createInstance$2.bind(undefined, { id, template, placeholders }, ...values);
     _createInstance.build = true;
     _createInstance.id = id;
     _createInstance.values = values;
@@ -2249,7 +2291,7 @@ const tag$1 = transform => (strings, ...values) => {
   if (typeof strings === 'string') strings = [strings];
   const id = 'html' + strings.join(placeholder$2(''));
   if (cache$1.has(id)) return cache$1.get(id)(values)
-  const { html, placeholders } = parsePlaceholders$1({htmlArray: split$3(transform ? transform(mergeSplitWithPlaceholders$2(strings)) : mergeSplitWithPlaceholders$2(strings)).filter((str, i) => !(i % 2)), values});
+  const { html, placeholders } = parsePlaceholders$2({htmlArray: split$3(transform ? transform(mergeSplitWithPlaceholders$2(strings)) : mergeSplitWithPlaceholders$2(strings)).filter((str, i) => !(i % 2)), values});
   const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder$$1) => [...arr,
     ...placeholder$$1.type === 'text'
     ? placeholder$$1.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
@@ -2261,16 +2303,139 @@ const tag$1 = transform => (strings, ...values) => {
 };
 
 const html$2 = tag$1();
+html$2.ref = ref$1;
+
+const random$1 = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16);
+
+const placeholderRegex$1 = /[\u{E000}-\u{F8FF}]/umg;
+const placeholder$4 = (n = 0) => String.fromCodePoint(0xE000 + n);
+const charToN = str => -(0xE000 - str.codePointAt());
+
+const parseRule = (rule, placeholders) => {
+  rule.selectors.forEach(selector =>
+    (selector.match(placeholderRegex$1) || [])
+      .forEach(match => (placeholders[charToN(match)] = {
+        type: 'style selector',
+        rule
+      })));
+
+  rule.declarations.forEach(declaration => {
+    const { name, value } = declaration;
+    const nameMatch = name.match(placeholderRegex$1);
+    if (nameMatch) {
+      if (!declaration.name.startsWith('--')) declaration.name = '--' + declaration.name;
+      nameMatch.forEach(match => (placeholders[charToN(match)] = {
+        type: 'declaration name',
+        declaration
+      }));
+    }
+    const valueMatch = value.match(placeholderRegex$1);
+    if (valueMatch) {
+      declaration.value = value.replace(placeholderRegex$1, ' var(--$&) ');
+      valueMatch.forEach(match => (placeholders[charToN(match)] = {
+        type: 'declaration value',
+        declaration
+      }));
+    }
+  });
+};
+
+const parseMedia = (media, _placeholders) => {
+  if (media.rules) media.rules.forEach(parseRule);
+  const name = media.name;
+  const placeholders = media.name.match(placeholderRegex$1);
+  placeholders.forEach(match => (_placeholders[charToN(match)] = {
+    type: 'media condition',
+    media,
+    name
+  }));
+  media.name = placeholders.reduce((str, placeholder) => `${str} and (aspect-ratio: ${charToN(placeholder) + 1}/9999)`, '');
+};
+// CSSMediaRule.media.appendMedium / CSSMediaRule.media.mediaText
+// https://developer.mozilla.org/en-US/docs/Web/API/StyleSheet/media
+// (aspect-ratio: 10/1230) and (aspect-ratio: 11/1230)
+
+const parseKeyframe = (keyframe, placeholders) =>
+  keyframe.rules &&
+  (keyframe.rules.forEach(parseRule) || true) &&
+  (keyframe.name.match(placeholderRegex$1) || [])
+    .forEach(match => (placeholders[charToN(match)] = {
+      type: 'keyframe name',
+      keyframe
+    }));
+
+const parseStyleSheet = (styleSheet, placeholders) => styleSheet.rules.map(rule =>
+  rule.type === 'rule'
+    ? parseRule(rule, placeholders)
+    : rule.type === 'media'
+      ? parseMedia(rule, placeholders)
+      : rule.type === 'keyframes'
+        ? parseKeyframe(rule, placeholders)
+        : undefined);
+
+const parse$1 = (_str, placeholders = []) => {
+  const str = _str.reduce((fullStr, currentStr, i) => fullStr + currentStr + placeholder$4(i), '');
+  console.log(str);
+  const ast = mensch.parse(str);
+  console.log(ast);
+  parseStyleSheet(ast.stylesheet, placeholders);
+  return placeholders
+};
+
+console.log(((strings, ...values) => parse$1(strings))`
+bruh:before ${'lol'} {
+  content: " yayaya { lul }";
+}
+
+.polling_message --bruh {
+  color: ${'white'};
+  float${'lmao'}: left;
+  margin-right: 2%;
+}
+
+.view_port {
+  background-color: black;
+  height: 25px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.cylon_eye {
+  background-color: red;
+  background-image: linear-gradient(to right,
+      rgba(0, 0, 0, .9) 25%,
+      rgba(0, 0, 0, .1) 50%,
+      rgba(0, 0, 0, .9) 75%);
+  color: white;
+  height: 100%;
+  width: 20%;
+  animation: 4s linear 0s infinite alternate move_eye;
+}
+@keyframes move_eye ${'bruh'} { bruh dude { margin-left: -20%; } to { margin-left: 100%; }  }
+
+@media screen and (min-width: ${30}em) and (orientation: landscape){
+
+  .cylon_eye {
+    background-color: red;
+    background-image: linear-gradient(to right,
+        rgba(0, 0, 0, .9) 25%,
+        rgba(0, 0, 0, .1) 50%,
+        rgba(0, 0, 0, .9) 75%);
+    color: white;
+    height: 100%;
+    width: 20%;
+    animation: 4s linear 0s infinite alternate move_eye;
+  }
+
+}
+`);
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 
-// todo: rework this file + add way to escape '.' in tag name
+const regex$2 = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/;
+const gRegex = new RegExp(regex$2, 'gm');
 
-// const lineRegex = /^(\s*)(?:([.#\w-]*)(?:\((.*)\))?)(?: (.*))?/
-const regex$1 = /^(\s*)(?:\||(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/;
-const gRegex = new RegExp(regex$1, 'gm');
-
-const identifierRegex = /(\.)|(#)([a-z0-9-]*)/;
+const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/;
 const gIdentifierRegex = new RegExp(identifierRegex, 'g');
 const classRegex = /class="(.*)"/;
 
@@ -2290,61 +2455,35 @@ const pushLine = ({childs: currentChilds}, line) => {
 const hierarchise = arr => {
   const hierarchisedArr = [];
   for (let line of arr) {
-    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line);
+    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line);
     else hierarchisedArr.push(line);
   }
   return hierarchisedArr
 };
 
-// const pozToHTML = str => {
-//   const srcArr = str.split('\n').filter(line => line.trim().length).map(line => {
-//     const lineMatch = line.match(lineRegex)
-//     const tag = lineMatch[2].match(/([a-z0-9-]*)/)[1]
-//     const identifiers = lineMatch[2].slice(tag.length)
-//     const matches = []
-//     let match, id
-//     while ((match = identifiersRegex.exec(identifiers))) matches.push(match)
-//     const classList = []
-//     for (const item of matches) item[1] === '#' ? id = item[2] : undefined // eslint-disable-line
-//     for (const item of matches) item[1] === '.' ? classList.push(item[2]) : undefined // eslint-disable-line
-//     const isText = line.trimLeft()[0] === '|'
-//     let textContent = isText ? line.trimLeft().slice(2) : lineMatch[4]
-//     const isTemplate = tag && !tag.replace(placeholderRegex, '').length
-//     if (isTemplate) textContent = tag
-//     return {
-//       indentation: lineMatch[1].length,
-//       tag: isText || isTemplate ? undefined : tag || 'div',
-//       attributes: lineMatch[3],
-//       id,
-//       classList,
-//       textContent,
-//       childs: []
-//     }
-//   })
-//   const hierarchisedArr = hierarchise(srcArr)
-//   const html = hierarchisedArr.map(line => makeHTML(line)).join('')
-//   return html
-// }
-
 const pozToHTML = str =>
   hierarchise(
     str
     .match(gRegex)
-    .map(str => str.match(regex$1))
+    .map(str => str.match(regex$2))
+    .filter(match => match[0].trim().length)
     .map(match => {
-      const tag$$1 = match[3].match(/([a-z0-9-]*)/)[1];
-      const identifiers = match[2].slice(tag$$1.length).match(gIdentifierRegex);
+      if (match[3] && !match[3].replace(regex, '').trim().length) {
+        return { indentation: match[1].split('\n').pop().length, textContent: match[3], classList: [] }
+      }
+      const tag$$1 = match[3] ? match[3].match(/^([a-z0-9-]*)/)[1] : undefined;
+      const identifiers = match[3] ? match[3].slice(tag$$1.length).match(gIdentifierRegex) || [] : [];
       const id = identifiers.find(identifier => identifier.match(identifierRegex)[2]);
-      const classes = identifiers.find(identifier => identifier.match(identifierRegex)[1]);
+      const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1));
       return {
-        identation: match[1].length,
+        indentation: match[1].split('\n').pop().length,
         tag: match[2]
           ? undefined
-          : match[3] || 'div',
+          : tag$$1 || 'div',
         attributes: match[4],
         id,
-        classes,
-        text: match[5],
+        classList,
+        textContent: match[5],
         childs: []
       }
     })
@@ -2389,6 +2528,7 @@ exports.react = reactify;
 exports.registerElement = registerElement;
 exports.mixin = mixin;
 exports.pushContext = pushContext;
+exports.elementContext = elementContext;
 exports.RouterView = RouterView;
 exports.Router = Router;
 exports.html = html$2;

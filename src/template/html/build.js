@@ -63,21 +63,6 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
 
 const cache = new Map()
 
-export const htmlTemplate = transform => (strings, ...values) => {
-  if (typeof strings === 'string') strings = [strings]
-  const id = 'html' + strings.join(placeholderStr(''))
-  if (cache.has(id)) return cache.get(id)(values)
-  const { html, placeholders } = parsePlaceholders({htmlArray: split(transform(mergeSplitWithPlaceholders(strings))).filter((str, i) => !(i % 2)), values})
-  const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
-    ...placeholder.type === 'text'
-    ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
-    : [placeholder]
-  ], [])
-  const build = createBuild({ id, html, placeholders: placeholdersWithFixedTextPlaceholders })
-  cache.set(id, build)
-  return build(values)
-}
-
 export const tag = transform => (strings, ...values) => {
   if (typeof strings === 'string') strings = [strings]
   const id = 'html' + strings.join(placeholderStr(''))
