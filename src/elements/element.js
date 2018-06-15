@@ -113,7 +113,11 @@ export const registerElement = options => {
       if (template) pushContext(context, _ => host.appendChild(template.content))
       if (style) {
         if (shadowDom) host.appendChild(style.content)
-        else this.ownerDocument.head.appendChild(style.content)
+        else {
+          const root = host.getRootNode()
+          if (root === document) host.getRootNode({composed: true}).head.appendChild(style.content)
+          else root.appendChild(style.content)
+        }
         style.update()
       }
       if (connected) connected(context)
