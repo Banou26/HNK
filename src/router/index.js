@@ -1,5 +1,4 @@
-import { elementContext } from '../elements/index.js'
-import { mixin, pushContext } from '../elements/index.js'
+import { elementContext, mixin, pushContext } from '../elements/index.js'
 import { reactify } from '../reactivity/index.js'
 import pathToRegexp, { compile } from '../libs/path-to-regexp.js'
 import { cloneObject, flattenArray } from '../utils.js'
@@ -30,7 +29,14 @@ const flattenRoutes = (routes, __path = '', parent) => {
 
 const getRouterViewPositionElement = (route, n) => n ? getRouterViewPositionElement(route.parent, n - 1) : route
 
-const getRouteComponents = route => [...route.component ? [['default', route.component]] : [], ...route.components ? Object.entries(route.components) : []]
+const getRouteComponents = route => [
+  ...route.component
+    ? [['default', route.component]]
+    : [],
+  ...route.components
+    ? Object.entries(route.components)
+    : []
+]
 
 const createRouteComponents = route => new Map([...getRouteComponents(route)].map(([name, Component]) => ([name, document.createElement(Component.name)])))
 
@@ -125,8 +131,8 @@ export const Router = options => {
 
     abortResults(await Promise.all(flattenArray(activatedRoutes.map(route =>
       [...getRouteComponents(route)]
-      .filter(Component => Object.getPrototypeOf(Component).beforeRouteEnter)
-      .map(Component => Object.getPrototypeOf(Component).beforeRouteEnter.apply(undefined, [newRoute, currentRoute]))
+        .filter(Component => Object.getPrototypeOf(Component).beforeRouteEnter)
+        .map(Component => Object.getPrototypeOf(Component).beforeRouteEnter.apply(undefined, [newRoute, currentRoute]))
     ))), 'beforeRouteEnter', true)
 
     const activatedComponents = pushContext(state.__rootElementContext__, _ => new Map(activatedRoutes.map(route => [route, createRouteComponents(route)])))
