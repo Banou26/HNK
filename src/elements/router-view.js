@@ -17,7 +17,9 @@ export const RouterView = customElements.get('router-view') || registerElement({
       const { router: { currentRoutesComponents, currentRoute: { matched } = {} } = {}, props: { name = 'default' } } = ctx
       if (matched) {
         const routeConfig = matched[getRouterViewPosition(ctx.host)]
-        return currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig)/* components */.get(name)/* component */
+        // todo: manage the stuff with selecting router-view name prop ect
+        return [...currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig).values()]/* components */
+        // return currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig)/* components */.get(name)/* component */
       }
     }
   })
