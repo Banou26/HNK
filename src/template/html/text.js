@@ -18,6 +18,7 @@ const text = ({
     }
   } else if (value instanceof Node) {
     if (nodes[0] !== value) return { nodes: [value] }
+    else return { nodes: [value] }
   } else if (value && value.build && !value.$promise) {
     if (oldInstance && oldInstance.instance && oldInstance.id === value.id) {
       oldInstance.update(...value.values)
