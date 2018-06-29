@@ -17,10 +17,10 @@ const flattenArray = arr => arr.reduce((arr, item) => Array.isArray(item) ? [...
 
 const replaceArray = (arr, target, replacement) => arr.reduce((arr, item) => [...arr,
   target === item
-  ? replacement
-  : Array.isArray(item)
-    ? replaceArray(item, target, replacement)
-    : item
+    ? replacement
+    : Array.isArray(item)
+      ? replaceArray(item, target, replacement)
+      : item
 ], [])
 
 const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
@@ -31,7 +31,8 @@ const getValueIndexDifferences = (arr, arr2) => arr2.length > arr.length
       ...item !== arr2[i] ? [i] : []
     ], [])
 
-export default ({ id, template, placeholders }, ...values) => {
+export default ({ id, template, placeholders }, ..._values) => (...values) => {
+  if (!values.length) values = _values
   const doc = document.importNode(template.content, true)
   let bypassDif = true
   let childNodes = [...doc.childNodes]
@@ -55,10 +56,10 @@ export default ({ id, template, placeholders }, ...values) => {
 
     const replaceNode = (newNode, node) => {
       placeholdersNodes = new Map([...placeholdersNodes, [placeholder, newNode]]
-        .map(([_placeholder, _node]) => node === _node
-        ? [_placeholder, newNode]
-        : [_placeholder, _node])
-      )
+        .map(([_placeholder, _node]) =>
+          node === _node
+            ? [_placeholder, newNode]
+            : [_placeholder, _node]))
       childNodes = Object.assign([...childNodes], {[childNodes.indexOf(node)]: newNode})
       const { parentNode } = node
       if (parentNode) {
@@ -149,10 +150,10 @@ export default ({ id, template, placeholders }, ...values) => {
     update (...values) {
       const placeholdersToUpdate =
       bypassDif // if bypass, update all the placeholders (first placeholder setup)
-      ? placeholders // all placeholders
-      : getValueIndexDifferences(values, instance.values) // placeholders which split values has changed
-        .map(index => placeholderByIndex[index]) // placeholders
-        .filter(placeholder => placeholder && placeholdersNodes.get(placeholder))
+        ? placeholders // all placeholders
+        : getValueIndexDifferences(values, instance.values) // placeholders which split values has changed
+          .map(index => placeholderByIndex[index]) // placeholders
+          .filter(placeholder => placeholder && placeholdersNodes.get(placeholder))
       instance.values = values
       const refPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference)
       const normalPlaceholders = placeholdersToUpdate.filter(({nameSplit}) => !(nameSplit && nameSplit.length === 3 && nameSplit[1] && values[nameSplit[1]].htmlReference))
@@ -166,9 +167,9 @@ export default ({ id, template, placeholders }, ...values) => {
   const textPlaceholdersByFirstNode = new Map(placeholders.filter(({type}) => type === 'text').map(placeholder => [placeholdersNodes.get(placeholder)[0], placeholder]))
   childNodes = childNodes.reduce((arr, node) =>
     textPlaceholdersByFirstNode.has(node)
-    ? [...arr, placeholdersNodes.get(textPlaceholdersByFirstNode.get(node))]
-    : [...arr, node]
-  , [])
+      ? [...arr, placeholdersNodes.get(textPlaceholdersByFirstNode.get(node))]
+      : [...arr, node]
+    , [])
   instance.update(...values)
   bypassDif = false
   // console.log('created', id)

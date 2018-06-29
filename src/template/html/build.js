@@ -12,7 +12,7 @@ const getPlaceholderWithPaths = (node, _placeholders) => {
   const placeholders = _placeholders.reduce((arr, placeholder) => [...arr, ...placeholder.type === 'text'
     ? [...placeholder.indexes.map(index => ({type: 'text', index}))]
     : [placeholder]]
-  , [])
+    , [])
   const placeholderByIndex = indexPlaceholders(placeholders)
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT + NodeFilter.SHOW_TEXT, undefined, false)
   const nodes = new Map()
@@ -53,7 +53,7 @@ const createBuild = ({id, html, placeholders: _placeholders}) => {
   if (!template.content.childNodes.length) template.content.appendChild(new Comment())
   const placeholders = getPlaceholderWithPaths(template.content, _placeholders)
   return values => {
-    const _createInstance = createInstance.bind(undefined, { id, template, placeholders }, ...values)
+    const _createInstance = createInstance({ id, template, placeholders }, ...values)
     _createInstance.build = true
     _createInstance.id = id
     _createInstance.values = values
@@ -70,8 +70,8 @@ export const tag = transform => (strings, ...values) => {
   const { html, placeholders } = parsePlaceholders({htmlArray: split(transform ? transform(mergeSplitWithPlaceholders(strings)) : mergeSplitWithPlaceholders(strings)).filter((str, i) => !(i % 2)), values})
   const placeholdersWithFixedTextPlaceholders = placeholders.reduce((arr, placeholder) => [...arr,
     ...placeholder.type === 'text'
-    ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
-    : [placeholder]
+      ? placeholder.indexes.map(index => ({ type: 'text', indexes: [index], split: ['', index, ''] }))
+      : [placeholder]
   ], [])
   const build = createBuild({ id, html, placeholders: placeholdersWithFixedTextPlaceholders })
   cache.set(id, build)

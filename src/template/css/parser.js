@@ -46,7 +46,7 @@ const parseMedia = (media, _placeholders) => {
 }
 // CSSMediaRule.media.appendMedium / CSSMediaRule.media.mediaText
 // https://developer.mozilla.org/en-US/docs/Web/API/StyleSheet/media
-// (aspect-ratio: 10/1230) and (aspect-ratio: 11/1230)
+// (aspect-ratio: 1/9999) and (aspect-ratio: 2/9999)
 
 const parseKeyframe = (keyframe, placeholders) =>
   keyframe.rules &&

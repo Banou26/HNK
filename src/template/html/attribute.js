@@ -6,9 +6,9 @@ export default ({ refs, values, placeholder, node, data: { name: oldName, listen
   const value = attributeType === '' ? values[valueSplit[1]] : mergeSplitWithValues(valueSplit, values) // mergeSplitWithValues(valueSplit, values)
   if (attributeType === '"') { // double-quote
     node.setAttribute(name, value)
-  } else if (attributeType === '\'') {  // single-quote
+  } else if (attributeType === '\'') { // single-quote
     node.setAttribute(name, value)
-  } else if (attributeType === '') {  // no-quote
+  } else if (attributeType === '') { // no-quote
     let isEvent = name.startsWith('on-') ? 1 : name.startsWith('@') ? 2 : 0
     if (isEvent) { // Event handling
       const listenerName = name.substring(isEvent === 1 ? 3 : 1)
