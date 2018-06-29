@@ -3,8 +3,13 @@ import { watch } from '../reactivity/index.js'
 export const bind = (obj, prop, event) => {
   const func = ({getElement}) => {
     const element = getElement()
-    element.value = obj[prop]
-    let unwatch = watch(_ => obj[prop], value => (element.value = value))
+    const type = element.getAttribute('type')
+    const _prop =
+    type === 'checkbox'
+      ? 'checked'
+      : 'value'
+    element[_prop] = obj[prop]
+    let unwatch = watch(_ => obj[prop], value => (element[_prop] = value))
     const listener = ({target: {value}}) => event ? undefined : (obj[prop] = value)
     let event = element.addEventListener('input', listener)
     return _ => {
