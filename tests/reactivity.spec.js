@@ -1,123 +1,169 @@
-import { reactify, Reactivity, watch, reactivitySymbol } from '../src/index.js'
+import { r, reactivity } from '../src/index.js'
 
-const isProxyResult = function (object) {
-  let react
-  before(function () {
-    react = reactify(object)
+describe('reactify', () => {
+  it('accept an option = { immutable: Boolean } argument', () => {
+    expect(_ => r({}, { immutable: true })).to.not.throw()
   })
-  it('is a copy', function () {
-    expect(react).to.eql(object)
-  })
-  describe('#$watch()', function () {
-    it('is defined', function () {
-      expect(typeof react.$watch).to.equal('function')
-    })
-  })
-  describe('#__reactivity__', function () {
-    it('instance of Reactivity', function () {
-      // expect(react).to.instanceOf(Reactivity)
-      expect(!!react[reactivitySymbol]).to.equal(true)
-    })
-  })
-}
+})
 
-describe('reactify', function () {
-  describe('proxy result', function () {
-    const map = new Map()
-    const object = {
+describe('Reactive Object', () => {
+  let originalObject
+  beforeEach(() => {
+    originalObject = {
       a: 1,
       b: 2,
       get c () {
         return this.a + this.b
       },
-      map
+      d: {
+        e: 10
+      }
     }
-    map.set(0, object)
-    map.set(1, map)
-    const array = [map, object]
-
-    describe('object', isProxyResult.bind(null, object))
-    describe('map', isProxyResult.bind(null, map))
-    describe('array', isProxyResult.bind(null, array))
+    originalObject.d.r = originalObject
   })
-  describe('mutable', function () {
-    describe('watch', function () {
-      let react
-      beforeEach(function () {
-        react = reactify({
-          a: 1,
-          b: 2,
-          get c () {
-            return this.a + this.b
-          },
-          someMap: new Map(),
-          get d () {
-            return this.someMap
-          }
-        })
+  xdescribe('Object', () => {
+    let react
+    beforeEach(() => {
+      react = r(originalObject, { immutable: true })
+    })
+    describe('--immutable', () => {
+      it(`cant' mutate`, () => {
+        react.a = 2
+        expect(react).to.deep.eql(originalObject)
       })
-      describe('#$watch()', function () {
-        it('return watched object value to the watcher function', function () {
-          let object
-          react.$watch(obj => (object = obj))
-          react.b = 3
-          expect(object).to.equal(react)
-        })
-        it('return watched property value to the watcher function', function () {
-          let property
-          react.$watch(_ => react.c, prop => (property = prop))
-          react.b = 3
-          expect(property).to.equal(react.c)
-        })
-        it('return an unwatch function', function () {
-          let i = 0
-          const unwatch = react.$watch(obj => i++)
-          react.b = 3
-          expect(i).to.equal(1)
-          unwatch()
-          react.b = 4
-          expect(i).to.equal(1)
-        })
-        it('watch a built-in object', function () {
-          let map
-          react.someMap.$watch(_map => (map = _map))
-          react.someMap.set('a', 1)
-          expect(map).to.equal(react.someMap)
-        })
+    })
+  })
+  describe('Object', () => {
+    let react
+    beforeEach(() => {
+      react = r(originalObject)
+    })
+    describe(`#[${reactivity.toString()}]`, () => {
+      it(`is accessible with the 'reactivity' named export`, () => {
+        expect(react).to.have.property(reactivity)
       })
-      describe('#watch()', function () {
-        it('return watched object value to the watcher function', function () {
-          let object
-          watch(_ => react, obj => (object = obj))
-          react.b = 3
-          expect(object).to.equal(react)
+      it(`is accessible with Symbol.for('OzReactivity')`, () => {
+        expect(react).to.have.property(Symbol.for('OzReactivity'))
+      })
+      it('is an object', () => {
+        expect(react).to.have.property(reactivity).that.is.a('object')
+      })
+      it('is non-enumerable ', () => {
+        expect(Object.getOwnPropertyDescriptor(react, reactivity)).to.have.property('enumerable').that.equals(false)
+      })
+    })
+    describe('#$watch', () => {
+      it('is a function', () => {
+        expect(react).to.have.property('$watch').that.is.a('function')
+      })
+      it('is non-enumerable ', () => {
+        expect(Object.getOwnPropertyDescriptor(react, '$watch')).to.have.property('enumerable').that.equals(false)
+      })
+      it('accept a function as single argument', () => {
+        expect(react.$watch(_ => {})).to.not.throw()
+      })
+      it('accept a string|function and function as arguments', () => {
+        expect(_ => react.$watch('', _ => {})).to.not.throw()
+        expect(_ => react.$watch(_ => {}, _ => {})).to.not.throw()
+      })
+      it('watch specific property change', () => {
+        let changed
+        react.$watch('a', _ => (changed = true))
+        react.a = 2
+        expect(changed).to.equal(true)
+      })
+      it('watch specific getter change', () => {
+        let changed
+        react.$watch('c', _ => (changed = true))
+        react.a = 2
+        expect(changed).to.equal(true)
+      })
+      it('watch object change', () => {
+        let changed
+        react.$watch(_ => (changed = true))
+        react.a = 2
+        expect(changed).to.equal(true)
+      })
+      it('return a function', () => {
+        expect(react.$watch(_ => {})).to.be.a('function')
+      })
+      it(`by default, doesn't deeply watch`, () => {
+        let changed
+        react.$watch(_ => (changed = true))
+        react.d.e = 0
+        expect(changed).to.equal(undefined)
+      })
+      xit(`--deep`, () => {
+        let changed
+        react.$watch(_ => (changed = true), { deep: true })
+        react.d.e = 0
+        expect(changed).to.equal(true)
+      })
+      describe('unwatch', () => {
+        it('unregister the watcher', () => {
+          let changed
+          react.$watch(_ => (changed = true))()
+          react.a = 2
+          expect(changed).to.equal(undefined)
         })
-        it('return watched property value to the watcher function', function () {
-          let property
-          watch(_ => react.c, prop => (property = prop))
-          react.b = 3
-          expect(property).to.equal(react.c)
-        })
-        it('return an unwatch function', function () {
-          let i = 0
-          const unwatch = watch(_ => react, obj => i++)
-          expect(i).to.equal(0)
-          react.b = 3
-          expect(i).to.equal(1)
-          unwatch()
-          react.b = 4
-          expect(i).to.equal(1)
-        })
-        it('watch a built-in object', function () {
-          let map
-          watch(_ => react.someMap, _map => (map = _map))
-          react.someMap.set('a', 1)
-          expect(map).to.equal(react.someMap)
+        it('return undefined', () => {
+          expect(react.$watch(_ => {})()).to.be.equal(undefined)
         })
       })
     })
   })
-  describe.skip('immutable', function () {
-
+  describe('Array', () => {
+    let react
+    beforeEach(() => {
+      react = r([1, 2])
+    })
+    it('watch array change', () => {
+      let changed
+      react.$watch(_ => (changed = true))
+      react.push(3)
+      expect(changed).to.equal(true)
+    })
+    it('watch specific index change', () => {
+      let changed
+      react.$watch(1, _ => (changed = true))
+      react.splice(1, 1)
+      expect(changed).to.equal(true)
+    })
+  })
+  describe('Map', () => {
+    let react
+    beforeEach(() => {
+      react = r(new Map([[0, 0], [1, 1]]))
+    })
+    it('watch map change', () => {
+      let changed
+      react.$watch(_ => (changed = true))
+      react.set(2, 2)
+      expect(changed).to.equal(true)
+    })
+    it('watch specific value|reference change', () => {
+      let changed
+      react.$watch(1, _ => (changed = true))
+      react.set(1, 2)
+      expect(changed).to.equal(true)
+    })
+  })
+  describe('Set', () => {
+    let react
+    beforeEach(() => {
+      react = r(new Set([0, 1]))
+    })
+    it('watch set change', () => {
+      let changed
+      react.$watch(_ => (changed = true))
+      react.add(3)
+      expect(changed).to.equal(true)
+    })
+    it('watch specific value|reference change', () => {
+      let changed
+      react.$watch(3, _ => (changed = true))
+      react.add(3)
+      expect(changed).to.equal(true)
+    })
   })
 })

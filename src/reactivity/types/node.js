@@ -1,8 +1,5 @@
-import { setObjectReactivity } from '../index.js'
+import { setReactivity } from '../index.js'
 
 export const type = Node
 
-export default node => {
-  setObjectReactivity({target: node, unreactive: true})
-  return node
-}
+export default node => setReactivity({target: node, unreactive: true}) || node

@@ -5,11 +5,24 @@
   "license": "MIT",
   "devDependencies": {
     "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.4",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "chai": "^4.1.2",
     "concurrently": "^3.6.0",
-    "standard": "^11.0.1"
+    "jasmine": "^3.1.0",
+    "karma": "^2.0.4",
+    "karma-chai": "^0.1.0",
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-jasmine": "^1.1.2",
+    "karma-mocha-reporter": "^2.2.5",
+    "karma-sourcemap-loader": "^0.3.7",
+    "karma-webpack": "^3.0.0",
+    "puppeteer": "^1.5.0",
+    "standard": "^11.0.1",
+    "webpack": "^4.14.0"
   },
   "scripts": {
+    "test": "karma start",
     "dev": "concurrently \"cargo watch -i dist/* -s \\\"yarn run rust\\\"\" \"yarn run rollup\"",
     "build": "cargo-web build --target=wasm32-unknown-unknown",
     "rollup": "rollup -c -w",

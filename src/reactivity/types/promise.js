@@ -1,11 +1,12 @@
-import { r, setObjectReactivity, notify, reactivitySymbol } from '../index.js'
+import { r } from '../index.js'
+import { setReactivity, notify, reactivity } from '../utils.js'
 
 export const type = Promise
 
 const promisify = promise => {
   const func = _ => {}
-  Object.defineProperty(func, '$promise', {value: promise})
-  Object.defineProperty(func, '$resolved', {value: false})
+  Object.defineProperty(func, '$promise', { value: promise })
+  Object.defineProperty(func, '$resolved', { value: false })
   const proxy = new Proxy(func, {
     get (target, prop, receiver) {
       if (prop in func) return func[prop]
@@ -20,16 +21,16 @@ const promisify = promise => {
     },
     async apply (target, thisArg, argumentsList) { return (await promise).apply(thisArg, argumentsList) }
   })
-  setObjectReactivity({target: proxy, object: func, original: promise})
+  setReactivity({ target: proxy, object: func, original: promise })
   promise.then(value => {
     if (value && typeof value === 'object') {
       const reactiveValue = r(value)
-      const { object } = reactiveValue[reactivitySymbol]
-      Object.defineProperty(object, '$promise', {value: promise})
-      Object.defineProperty(object, '$resolved', {value: true})
-      Object.defineProperty(object, '$resolvedValue', {value})
+      const { object } = reactiveValue[reactivity]
+      Object.defineProperty(object, '$promise', { value: promise })
+      Object.defineProperty(object, '$resolved', { value: true })
+      Object.defineProperty(object, '$resolvedValue', { value })
     }
-    notify({target: proxy})
+    notify({ target: proxy })
   })
   return proxy
 }
