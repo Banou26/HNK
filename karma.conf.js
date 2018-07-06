@@ -1,6 +1,6 @@
 process.env.CHROME_BIN = require('puppeteer').executablePath()
 
-var webpackConfig = {
+const webpackConfig = {
   mode: 'development',
   module: {
     rules: [
@@ -19,34 +19,27 @@ var webpackConfig = {
 module.exports = function (config) {
   config.set({
     browsers: ['ChromeHeadless'],
-    colors: true,
-    frameworks: ['mocha', 'chai'],
+    frameworks: ['chai', 'jasmine'],
     files: [
       'tests/*.spec.js',
       'tests/**/*.spec.js'
     ],
-    exclude: [],
-    autoWatch: true,
-    singleRun: false,
-    reporters: ['mocha'],
-    port: 9876,
-    logLevel: config.LOG_DEBUG,
+    preprocessors: {
+      'tests/*.spec.js': ['webpack', 'sourcemap'],
+      'tests/**/*.spec.js': ['webpack', 'sourcemap']
+    },
     webpack: webpackConfig,
     webpackMiddleware: {
-      noInfo: true,
-      stats: 'errors-only'
+      noInfo: true
     },
-    preprocessors: {
-      'tests/*.spec.js': ['webpack'],
-      'tests/**/*.spec.js': ['webpack']
-    },
+    reporters: ['mocha'],
     plugins: [
-      'karma-webpack',
-      'karma-mocha',
       'karma-chrome-launcher',
-      'karma-firefox-launcher',
-      'karma-chai',
-      'karma-mocha-reporter'
+      'karma-jasmine',
+      'karma-mocha-reporter',
+      'karma-sourcemap-loader',
+      'karma-webpack',
+      'karma-chai'
     ]
   })
 }

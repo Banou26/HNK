@@ -1,35 +1,33 @@
-import { r, notify, registerDependency, setObjectReactivity, reactivitySymbol } from '../index.js'
+import { r } from '../index.js'
+import { notify, registerDependency, setReactivity, reactivity } from '../utils.js'
 import proxify from '../proxy.js'
 
 export const type = Set
 
-export const reactivePrototype = new Map([
-  ['add', {
-    notify: true
-  }],
-  ['delete', {
-    notify: true
-  }],
-  ['clear', {
-    notify: true
-  }]
-])
+export const getProperty = (reactiveSet, prop) => reactiveSet.has(prop)
 
 export const ReactiveType = class ReactiveSet extends Set {
   constructor (iterator) {
     super()
     const proxy = proxify(this)
-    setObjectReactivity({target: proxy, original: iterator, object: this})
+    setReactivity({target: proxy, original: iterator, object: this})
     if (iterator) for (const val of iterator) proxy.add(val)
     return proxy
   }
   add (val) {
     const value = r(val)
     try {
-      return super.add.apply(this[reactivitySymbol].object, [value])
+      return super.add.apply(this[reactivity].object, [value])
     } finally {
       registerDependency({ target: this })
-      notify({ target: this, value })
+      notify({ target: this, property: val, value })
+    }
+  }
+  has (val) {
+    try {
+      return super.has.apply(this[reactivity].object, [val])
+    } finally {
+      registerDependency({ target: this, property: val })
     }
   }
 }

@@ -1,4 +1,5 @@
-import { r, notify, registerDependency, registerWatcher, propertyReactivity as _propertyReactivity, reactivityProperties, reactivitySymbol } from './index.js'
+import { r } from '../index.js'
+import { reactivity, notify, registerWatcher, registerDependency, reactivityProperties, propertyReactivity as _propertyReactivity } from './utils.js'
 import { getPropertyDescriptor } from '../utils.js'
 
 export default object => new Proxy(object, {
@@ -22,7 +23,7 @@ export default object => new Proxy(object, {
       }
     }
     registerDependency({ target, property })
-    if (value && (typeof value === 'object' || typeof value === 'function') && value[reactivitySymbol]) registerDependency({ target: value })
+    if (value && (typeof value === 'object' || typeof value === 'function') && value[reactivity]) registerDependency({ target: value })
     return value
   },
   set (target, property, _value, receiver) {
@@ -38,8 +39,8 @@ export default object => new Proxy(object, {
     else if (typeof value === 'function' && value.$promise) {
       value.$promise.then(val =>
         target[property] === value
-        ? (receiver[property] = val)
-        : undefined)
+          ? (receiver[property] = val)
+          : undefined)
     }
     try {
       return Reflect.set(target, property, value, receiver)
@@ -54,8 +55,8 @@ export default object => new Proxy(object, {
       return Reflect.deleteProperty(target, property)
     } finally {
       notify({ target, property })
-      const reactivityProperties = target[reactivitySymbol].properties
-      if (!reactivityProperties.get(property).watchers.length) reactivityProperties.delete(property)
+      const { properties } = target[reactivity]
+      if (!properties.get(property).watchers.length) properties.delete(property)
     }
   }
   // defineProperty (target, property, {value, ...rest}) {

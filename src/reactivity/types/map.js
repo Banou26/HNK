@@ -1,60 +1,49 @@
-import { r, notify, registerDependency, setObjectReactivity, reactivitySymbol } from '../index.js'
+import { r } from '../index.js'
+import { notify, registerDependency, setReactivity, reactivity } from '../utils.js'
 import proxify from '../proxy.js'
 
 export const type = Map
 
-export const reactivePrototype = new Map([
-  ['set', {
-    notify: true
-  }],
-  ['delete', {
-    notify: true
-  }],
-  ['clear', {
-    notify: true
-  }]
-])
-
-// Todo: Make a system to improve notify calls by specifying a property
+export const getProperty = (reactiveMap, prop) => reactiveMap.get(prop)
 
 export const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
     super()
     const proxy = proxify(this)
-    setObjectReactivity({target: proxy, original: iterator, object: this})
+    setReactivity({target: proxy, original: iterator, object: this})
     if (iterator) for (const [key, val] of iterator) proxy.set(key, val)
     return proxy
   }
   set (key, val) {
     const value = r(val)
     try {
-      return super.set.apply(this[reactivitySymbol].object, [key, value])
+      return super.set.apply(this[reactivity].object, [key, value])
     } finally {
-      registerDependency({ target: this, key })
-      notify({ target: this, value })
+      registerDependency({ target: this, property: key })
+      notify({ target: this, property: key, value })
     }
   }
   delete (key, val) {
     const value = r(val)
     try {
-      return super.delete.apply(this[reactivitySymbol].object, [key, value])
+      return super.delete.apply(this[reactivity].object, [key, value])
     } finally {
-      registerDependency({ target: this, key })
-      notify({ target: this, value })
+      registerDependency({ target: this, property: key })
+      notify({ target: this, property: key, value })
     }
   }
   get (key) {
     try {
-      return super.get.apply(this[reactivitySymbol].object, [key])
+      return super.get.apply(this[reactivity].object, [key])
     } finally {
-      registerDependency({ target: this, key })
+      registerDependency({ target: this, property: key })
     }
   }
   has (key) {
     try {
-      return super.has.apply(this[reactivitySymbol].object, [key])
+      return super.has.apply(this[reactivity].object, [key])
     } finally {
-      registerDependency({ target: this, key })
+      registerDependency({ target: this, property: key })
     }
   }
 }
