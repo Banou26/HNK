@@ -21,7 +21,7 @@ describe('Reactive Object', () => {
     }
     originalObject.d.r = originalObject
   })
-  xdescribe('Object', () => {
+  describe('Object', () => {
     let react
     beforeEach(() => {
       react = r(originalObject, { immutable: true })
@@ -87,13 +87,13 @@ describe('Reactive Object', () => {
       it('return a function', () => {
         expect(react.$watch(_ => {})).to.be.a('function')
       })
-      it(`by default, doesn't deeply watch`, () => {
+      it(`doesn't deeply watch changes`, () => {
         let changed
         react.$watch(_ => (changed = true))
         react.d.e = 0
         expect(changed).to.equal(undefined)
       })
-      xit(`--deep`, () => {
+      it(`--deep to deeply watch changes`, () => {
         let changed
         react.$watch(_ => (changed = true), { deep: true })
         react.d.e = 0
