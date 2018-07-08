@@ -10,8 +10,8 @@ export const setRoot = ({watchers: w, objects: o}) => (watchers = w) && (objects
 export let cloning
 export let cloningRefs
 
-const reactify = (obj, { clone = false, deep = false } = {}) => {
-  if (!cloning && clone) {
+const reactify = (obj, { immutable = false, deep = false } = {}) => {
+  if (immutable) {
     cloning = true
     cloningRefs = new WeakMap()
   }
@@ -21,7 +21,7 @@ const reactify = (obj, { clone = false, deep = false } = {}) => {
   try {
     return reactify[1](obj)
   } finally {
-    if (clone) {
+    if (immutable) {
       cloning = false
       cloningRefs = undefined
     }
