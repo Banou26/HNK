@@ -4,13 +4,13 @@ import types from './types/index.js'
 export let watchers = []
 export let objects = new WeakMap()
 
-export const getRoot = _ => ({watchers, objects})
-export const setRoot = ({watchers: w, objects: o}) => (watchers = w) && (objects = o)
+export const getReactivityRoot = _ => ({watchers, objects})
+export const setReactivityRoot = ({watchers: w, objects: o}) => (watchers = w) && (objects = o)
 
 export let cloning
 export let cloningRefs
 
-const reactify = (obj, { immutable = false, deep = false } = {}) => {
+const reactify = (obj, { immutable = false } = {}) => {
   if (immutable) {
     cloning = true
     cloningRefs = new WeakMap()
