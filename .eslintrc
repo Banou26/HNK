@@ -14,6 +14,7 @@
     "it": true,
     "beforeEach": true,
     "Node": true,
-    "HTMLElement": true
+    "HTMLElement": true,
+    "customElements": true
   }
 }
