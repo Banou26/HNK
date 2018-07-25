@@ -15,6 +15,8 @@
     "beforeEach": true,
     "Node": true,
     "HTMLElement": true,
-    "customElements": true
+    "customElements": true,
+    "Comment": true,
+    "NodeFilter": true
   }
 }
