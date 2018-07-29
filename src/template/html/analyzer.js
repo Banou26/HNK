@@ -57,6 +57,7 @@ export default ({transform, strings, values}) => {
   while (walker.nextNode()) {
     const { currentNode: node } = walker
     const { nodeType } = node
+    
     if (nodeType === Node.ELEMENT_NODE) {
       const { nodeName, attributes } = node
       const hasPlaceholderName = nodeName.match(placeholderRegex)
@@ -72,5 +73,9 @@ export default ({transform, strings, values}) => {
     } else {
 
     }
+  }
+  return {
+    html: '',
+    placeholders: []
   }
 }
