@@ -9,6 +9,7 @@
     "self": true,
     "xdescribe": true,
     "describe": true,
+    "fdescribe": true,
     "expect": true,
     "xit": true,
     "it": true,

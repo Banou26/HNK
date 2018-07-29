@@ -21,12 +21,10 @@ module.exports = function (config) {
     browsers: ['ChromeHeadless'],
     frameworks: ['chai', 'jasmine'],
     files: [
-      'tests/*.spec.js',
-      'tests/**/*.spec.js'
+      'tests/index.js'
     ],
     preprocessors: {
-      'tests/*.spec.js': ['webpack', 'sourcemap'],
-      'tests/**/*.spec.js': ['webpack', 'sourcemap']
+      'tests/index.js': ['webpack', 'sourcemap']
     },
     webpack: webpackConfig,
     webpackMiddleware: {
