@@ -1,9 +1,9 @@
 import createTemplate from './template.js'
 export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
 
-class OzHTMLTemplate extends HTMLElement {
+export class OzHTMLTemplate extends Comment {
   constructor ({templateId, html, values, placeholders}) {
-    super()
+    super('OzHTMLTemplate')
     this.templateId = templateId
     this.html = html
     this.values = values
@@ -25,7 +25,7 @@ class OzHTMLTemplate extends HTMLElement {
 
   }
 
-  clone (values) { return new OzHTMLTemplate(this.html, values) }
+  clone (values) { return new OzHTMLTemplate({html: this.html, values, placeholders: this.placeholders, templateId: this.templateId}) }
 
   connectedCallback () {
 
@@ -38,4 +38,4 @@ class OzHTMLTemplate extends HTMLElement {
 
 customElements.define('oz-html-template', OzHTMLTemplate)
 
-export default html => new OzHTMLTemplate(html)
+export default options => new OzHTMLTemplate(options)
