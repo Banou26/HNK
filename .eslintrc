@@ -18,6 +18,7 @@
     "HTMLElement": true,
     "customElements": true,
     "Comment": true,
-    "NodeFilter": true
+    "NodeFilter": true,
+    "HTMLUnknownElement": true
   }
 }

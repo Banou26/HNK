@@ -1,6 +1,6 @@
 import { placeholder } from '../utils.js'
 import analyze from './analyzer.js'
-import createTemplate, { OzHTMLTemplate } from './template-element.js'
+import createTemplate, { OzHTMLTemplate } from './elements/template.js'
 
 export {
   OzHTMLTemplate
