@@ -32,6 +32,11 @@ fdescribe('HTML Template', () => {
           expect(_ => html`${'foo'} ${'bar'} ${'baz'}`).to.not.throw()
         })
       })
+      fdescribe('tag name', () => {
+        it('accept static html', () => {
+          expect(_ => html`<my-${'element'}></my-${'element'}><my-${'element'}></my-${'element'}>`).to.not.throw()
+        })
+      })
     })
   })
 })

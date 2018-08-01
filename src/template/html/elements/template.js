@@ -1,4 +1,4 @@
-import createTemplate from './template.js'
+import createTemplate from '../template.js'
 export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
 
 export class OzHTMLTemplate extends Comment {
@@ -8,31 +8,35 @@ export class OzHTMLTemplate extends Comment {
     this.html = html
     this.values = values
     this.placeholders = placeholders
-    this.template = undefined
+    this.template = createTemplate({
+      templateId: templateId,
+      html: html,
+      values,
+      placeholders: placeholders
+    })
   }
 
   static get [OzHTMLTemplateSymbol] () { return true }
 
-  createElements () {
-    this.template = createTemplate({templateId: this.templateId, html: this.html, values: this.values, placeholders: this.placeholders})
+  clone (values) {
+    return new OzHTMLTemplate({
+      html: this.html,
+      values,
+      placeholders: this.placeholders,
+      templateId: this.templateId
+    })
   }
-
-  append () {
-
-  }
-
-  remove () {
-
-  }
-
-  clone (values) { return new OzHTMLTemplate({html: this.html, values, placeholders: this.placeholders, templateId: this.templateId}) }
 
   connectedCallback () {
+    this.parentNode.insertBefore(this.template.content, this)
+  }
 
+  get content () {
+    return this.template.content
   }
 
   disconnectedCallback () {
-
+    this.content // eslint-disable-line no-unused-expressions
   }
 }
 
