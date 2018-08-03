@@ -28,12 +28,12 @@ fdescribe('HTML Template', () => {
     })
     describe('Placeholder', () => {
       describe('text', () => {
-        it('accept static html', () => {
+        it('accept dynamic text', () => {
           expect(_ => html`${'foo'} ${'bar'} ${'baz'}`).to.not.throw()
         })
       })
       fdescribe('tag name', () => {
-        it('accept static html', () => {
+        it('accept dynamic tags', () => {
           expect(_ => html`<my-${'element'}></my-${'element'}><my-${'element'}></my-${'element'}>`).to.not.throw()
         })
       })
