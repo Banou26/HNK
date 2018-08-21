@@ -1,5 +1,5 @@
 import { r } from '../index.js'
-import { notify, registerDependency, setReactivity, reactivity, cloning } from '../utils.js'
+import { notify, registerDependency, setReactivity, reactivity } from '../utils.js'
 import proxify from '../proxy.js'
 
 export const type = Map
@@ -10,7 +10,7 @@ export const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
     super()
     const proxy = proxify(this)
-    setReactivity({target: proxy, original: cloning ? this : iterator, object: this})
+    setReactivity({target: proxy, original: iterator, object: this})
     if (iterator) for (const [key, val] of iterator) proxy.set(key, val)
     return proxy
   }

@@ -1,5 +1,5 @@
-import { setObjectReactivity } from '../utils.js'
+import { setReactivity } from '../utils.js'
 
 export const type = RegExp
 
-export default regexp => setObjectReactivity({target: regexp, unreactive: true}) || regexp
+export default regexp => setReactivity({target: regexp, unreactive: true}) || regexp

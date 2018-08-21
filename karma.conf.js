@@ -1,3 +1,4 @@
+const path = require('path')
 process.env.CHROME_BIN = require('puppeteer').executablePath()
 
 const webpackConfig = {
@@ -11,6 +12,16 @@ const webpackConfig = {
         options: {
           plugins: [require('babel-plugin-transform-object-rest-spread')]
         }
+      },
+      {
+        test: /\.js$/,
+        use: {
+          loader: 'istanbul-instrumenter-loader',
+          options: { esModules: true }
+        },
+        include: path.resolve('src/'),
+        exclude: /node_modules|\.spec\.js$/,
+        enforce: 'post'
       }
     ]
   }
@@ -30,14 +41,25 @@ module.exports = function (config) {
     webpackMiddleware: {
       noInfo: true
     },
-    reporters: ['mocha'],
+    reporters: [/* 'mocha',*/ 'nyan', 'coverage-istanbul'], // eslint-disable-line
+    mochaReporter: {
+      ignoreSkipped: true
+    },
+    coverageIstanbulReporter: {
+      reports: [ 'text-summary' ],
+      fixWebpackSourcePaths: true,
+      esModules: true
+    },
     plugins: [
+      'karma-nyan-reporter',
       'karma-chrome-launcher',
       'karma-jasmine',
       'karma-mocha-reporter',
       'karma-sourcemap-loader',
       'karma-webpack',
-      'karma-chai'
+      'karma-chai',
+      'istanbul-instrumenter-loader',
+      'karma-coverage-istanbul-reporter'
     ]
   })
 }

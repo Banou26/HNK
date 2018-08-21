@@ -12,13 +12,17 @@
     "fdescribe": true,
     "expect": true,
     "xit": true,
+    "fit": true,
     "it": true,
     "beforeEach": true,
+    "afterEach": true,
     "Node": true,
     "HTMLElement": true,
     "customElements": true,
+    "Text": true,
     "Comment": true,
     "NodeFilter": true,
-    "HTMLUnknownElement": true
+    "HTMLUnknownElement": true,
+    "HTMLTemplateElement": true
   }
 }
