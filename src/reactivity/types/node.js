@@ -1,4 +1,4 @@
-import { setReactivity } from '../index.js'
+import { setReactivity } from '../utils.js'
 
 export const type = Node
 

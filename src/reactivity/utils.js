@@ -1,4 +1,4 @@
-import { watchers as rootWatchers, objects as rootObjects, cloning, cloningRefs } from './index.js'
+import { watchers as rootWatchers, objects as rootObjects } from './index.js'
 import { isBuiltIn, getProperty } from './types/index.js'
 
 export const reactivity = Symbol.for('OzReactivity')
@@ -35,7 +35,7 @@ export const notify = ({ target, property, value, deep }) => {
 
 export const setReactivity = ({target, unreactive, original, object}) => {
   if (unreactive) return (target[reactivity] = false)
-  if (original) (cloning ? cloningRefs : rootObjects).set(original, target)
+  if (original) (rootObjects).set(original, target)
   Object.defineProperty(target, reactivity, { value: { watchers: [], properties: new Map(), object }, configurable: true, writable: true })
   Object.defineProperty(target, '$watch', { value: watch(target), configurable: true, writable: true })
 }

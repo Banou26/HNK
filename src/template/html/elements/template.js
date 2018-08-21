@@ -1,45 +1,86 @@
-import createTemplate from '../template.js'
+// import createTemplate from '../template.js'
+import { placeholdersMetadataToPlaceholders, replaceNodes } from '../utils.js'
 export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
 
-export class OzHTMLTemplate extends Comment {
-  constructor ({templateId, html, values, placeholders}) {
-    super('OzHTMLTemplate')
+export class OzHTMLTemplate extends HTMLTemplateElement {
+  constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
+    super()
+
     this.templateId = templateId
-    this.html = html
     this.values = values
-    this.placeholders = placeholders
-    this.template = createTemplate({
-      templateId: templateId,
-      html: html,
-      values,
-      placeholders: placeholders
-    })
+    this.placeholdersMetadata = placeholdersMetadata
+    this.originalFragment = originalFragment
+    this.setAttribute('is', 'oz-html-template')
   }
 
-  static get [OzHTMLTemplateSymbol] () { return true }
+  get [OzHTMLTemplateSymbol] () { return true }
+
+  init () {
+    if (this.placeholders) return
+
+    const fragment = this.originalFragment.cloneNode(true)
+    const { placeholders, childNodes } = placeholdersMetadataToPlaceholders({
+      template: this,
+      placeholdersMetadata: this.placeholdersMetadata,
+      fragment
+    })
+
+    this.placeholders = placeholders
+    this.content.appendChild(fragment)
+    this._childNodes = childNodes
+
+    this.forceUpdate = true
+    this.update(...this.values)
+    this.forceUpdate = false
+  }
 
   clone (values) {
     return new OzHTMLTemplate({
-      html: this.html,
+      originalFragment: this.originalFragment,
       values,
-      placeholders: this.placeholders,
+      placeholdersMetadata: this.placeholdersMetadata,
       templateId: this.templateId
     })
   }
 
-  connectedCallback () {
-    this.parentNode.insertBefore(this.template.content, this)
+  update (...values) {
+    this.init()
+    const oldArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
+    for (const placeholder of this.placeholders) placeholder({ values, forceUpdate: this.forceUpdate })
+    const newArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
+    for (const i in this.placeholders) replaceNodes(oldArrayFragments[i], newArrayFragments[i])
+    this.values = values
   }
 
-  get content () {
-    return this.template.content
+  get childNodes () {
+    this.init()
+    return this._childNodes
+  }
+
+  connectedCallback () {
+    this.insertAfter()
+  }
+
+  insertNodesAfter () {
+    this.init()
+    for (const node of this.childNodes.flat(Infinity)) this.parentNode.insertBefore(node, this.nextSibling)
+  }
+
+  insertNodesToFragment () {
+    this.init()
+    for (const node of this.childNodes.flat(Infinity)) this.content.appendChild(node)
+  }
+
+  insertAfter () {
+    this.init()
+    this.parentNode.insertBefore(this.content, this.nextSibling)
   }
 
   disconnectedCallback () {
-    this.content // eslint-disable-line no-unused-expressions
+    this.insertNodesToFragment()
   }
 }
 
-customElements.define('oz-html-template', OzHTMLTemplate)
+customElements.define('oz-html-template', OzHTMLTemplate, { extends: 'template' })
 
 export default options => new OzHTMLTemplate(options)

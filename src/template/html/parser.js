@@ -1,39 +1,48 @@
-import { placeholderRegex, placeholder } from '../utils.js'
+import { walkPlaceholders, getNodePath } from './utils.js'
+import { placeholderMinRangeChar, placeholderMaxRangeChar, placeholderRegex, placeholder as toPlaceholder, charToN, toPlaceholderString } from '../utils.js'
 
 const attribute = /^\s*([^\s"'<>/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/
-const ncname = '[a-zA-Z_][\\w\\-\\.]*'
+const ncname = '[a-zA-Z_-][-\\w\\-\\.]*'
 const qnameCapture = `((?:${ncname}\\:)?${ncname})`
 const startTagOpen = new RegExp(`^<${qnameCapture}`)
 const startTagClose = /^\s*(\/?)>/
 const endTag = new RegExp(`^<\\/(${qnameCapture}[^>]*)>`)
 
+const textRegex = new RegExp(`([${placeholderMinRangeChar}-${placeholderMaxRangeChar}])|([^${placeholderMinRangeChar}-${placeholderMaxRangeChar}]*)`, 'umg')
+
+const getCharacterDataNodePath = placeholders =>
+  node => {
+    const match = node.data.match(new RegExp(placeholderRegex, 'um'))
+    if (match) {
+      const placeholderNode = node.splitText(match.index)
+      placeholderNode.data = placeholderNode.data.substring(match[0].length)
+      if (placeholderNode.data.length) placeholderNode.splitText(0)
+      placeholders[charToN(match[0])].path = getNodePath(placeholderNode)
+    }
+  }
+
 export default ({transform, strings, values}) => {
-  let source = transform(strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2), '')
+  let source = transform(strings.reduce((str, str2, i) => str + toPlaceholder(i - 1) + str2))
   let html = ''
   const placeholders = []
   const advance = (n, type, ...vals) => {
+    // vals = vals.filter(_ => _)
     let replacement = ''
     let placeholder
     if (type) {
-      placeholder = { type, ids: [], /* values: vals, */ splits: [], path: [] }
-      let { splits } = placeholder
-      for (const val of vals) {
-        if (!val) continue
-        const valSplit = split(val)
-        splits.push(valSplit)
-        placeholder.ids = [...placeholder.ids, ...getSplitIds(valSplit)]
+      placeholder = {
+        type,
+        ids: vals.map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
+        values: vals,
+        path: []
       }
       let { ids } = placeholder
       if (ids.length) {
-        placeholders.push(placeholder)
-        if (type === 'attribute') {
-          replacement = ' ' + placeholderStr(ids[0])
-        } else if (type === 'startTagName') {
-          replacement = execSplit(splits[0], values) + ' ' + placeholderStr(ids[0])
-        } else if (type === 'endTagName') {
-          replacement = execSplit(splits[0], values)
-        } else if (type === 'comment') {
-          replacement = placeholderStr(ids[0])
+        ids.forEach(_ => placeholders.push(placeholder))
+        if (type === 'startTag' || type === 'endTag') {
+          replacement = toPlaceholderString(vals[0])(values) + (type === 'startTag' ? ` ${toPlaceholder(ids[0])}` : '')
+        } else if (type === 'attribute' || type === 'comment') {
+          replacement = `${type === 'attribute' ? ' ' : ''}${toPlaceholder(ids[0])}`
         }
       }
     }
@@ -46,7 +55,11 @@ export default ({transform, strings, values}) => {
     if (textEnd === 0) {
       if (source.startsWith('<!--')) { // Comment
         const commentEnd = source.indexOf('-->')
-        if (commentEnd === -1) throw new Error(`Comment not closed, can't continue the template parsing "${source.substring(0, textEnd)}"`)
+        if (commentEnd === -1) {
+          advance(4)
+          advance(source.length - 1, 'comment', source)
+          continue
+        }
         advance(4)
         advance(commentEnd - 4, 'comment', source.substr(0, commentEnd - 4))
         advance(3)
@@ -54,34 +67,36 @@ export default ({transform, strings, values}) => {
       }
       const endTagMatch = source.match(endTag)
       if (endTagMatch) { // End tag
-        advance(endTagMatch[0].length, 'endTagName', source.substr(0, endTagMatch[0].length))
+        advance(endTagMatch[0].length, 'endTag', source.substr(0, endTagMatch[0].length))
         continue
       }
       const startTagMatch = source.match(startTagOpen)
       if (startTagMatch) { // Start tag
         advance(1)
-        const placeholder = advance(startTagMatch[1].length, 'startTagName', startTagMatch[1])
+        const placeholder = advance(startTagMatch[1].length, 'startTag', startTagMatch[1])
         let attributes = []
         let end, attr
         while (!(end = source.match(startTagClose)) && (attr = source.match(attribute))) {
-          attributes.push(advance(attr[0].length, 'attribute', attr[1], attr[3], attr[4], attr[5]))
+          const attrPlaceholder = advance(attr[0].length, 'attribute', attr[1], attr[3], attr[4], attr[5])
+          attrPlaceholder.dependents = attributes
+          attributes.push(attrPlaceholder)
         }
         attributes = attributes.filter(item => item)
         if (attributes.length) placeholder.dependents = attributes
-        if (!end) throw new Error(`Start tag not closed, can't continue the template parsing "${source.substring(0, textEnd)}"`)
-        advance(end[0].length)
-        continue
+        if (end) {
+          advance(end[0].length)
+          continue
+        }
       }
     }
-    const textContent = source.substring(0, textEnd !== -1 ? textEnd : textEnd.length)
-    const textSplit = split(textContent)
-    for (const i in textSplit) {
-      const str = i % 2 ? placeholderStr(textSplit[i]) : textSplit[i]
-      advance(str.length, 'text', str)
-    }
+    for (const str of source.substring(0, textEnd !== -1 ? textEnd : textEnd.length).match(textRegex)) advance(str.length, 'text', str)
   }
-
   return {
-
+    fragment: walkPlaceholders({
+      html,
+      text: getCharacterDataNodePath(placeholders),
+      comment: getCharacterDataNodePath(placeholders)
+    }),
+    placeholdersMetadata: placeholders
   }
 }

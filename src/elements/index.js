@@ -1,10 +1,10 @@
-import { isHTMLTemplate } from '../template/html/index.js'
-import { isCSSTemplate } from '../template/css/index.js'
+import { OzHTMLTemplateSymbol } from '../template/html/index.js'
+import { OzCSSTemplateSymbol } from '../template/css/index.js'
 import { r, watch } from '../reactivity/index.js'
 import {
   pushContext,
   elementContext,
-  globalMixins,
+  mixins as globalMixins,
   getMixinProp,
   noHTMLTemplateError,
   htmlTemplateChangedError,
@@ -72,7 +72,7 @@ export const registerElement = element => {
       // HTML Template
       if (buildHTMLTemplate) {
         const template = context.template = buildHTMLTemplate()
-        if (!template[isHTMLTemplate]) throw noHTMLTemplateError
+        if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
         template.prepare()
         watch(_ => pushContext(context, buildHTMLTemplate), updatedTemplate => {
           if (template.id !== updatedTemplate.id) throw htmlTemplateChangedError
@@ -82,7 +82,7 @@ export const registerElement = element => {
       // CSS Template
       if (buildCSSTemplate) {
         const template = context.style = buildCSSTemplate()
-        if (!template[isCSSTemplate]) throw noCSSTemplateError
+        if (!template[OzCSSTemplateSymbol]) throw noCSSTemplateError
         watch(buildCSSTemplate, updatedTemplate => {
           if (template.id !== updatedTemplate.id) throw cssTemplateChangedError
           template.update(...updatedTemplate.values)
@@ -124,7 +124,7 @@ export const registerElement = element => {
 
     disconnectedCallback () {
       const { [elementContext]: context, [elementContext]: { style } } = this
-      if (style && !shadowDom) style.parentElement.removeChild(style)
+      if (style && !shadowDom) style.remove()
       // Disconnected mixins & disconnected
       disconnectedMixins.forEach(mixin => mixin(context))
       if (disconnected) disconnected(context)

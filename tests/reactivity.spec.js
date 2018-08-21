@@ -21,21 +21,6 @@ describe('Reactive Object', () => {
     }
     originalObject.d.r = originalObject
   })
-  xdescribe('Object', () => {
-    let react
-    beforeEach(() => {
-      react = r(originalObject, { immutable: true })
-    })
-    describe('--immutable', () => {
-      it(`can't mutate`, () => {
-        react.a = 2
-        expect(react).to.deep.eql(originalObject)
-      })
-      it('#$watch', () => {
-        react.$watch(newVal => (react = newVal))
-      })
-    })
-  })
   describe('Object', () => {
     let react
     beforeEach(() => {

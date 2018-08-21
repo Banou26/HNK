@@ -7,25 +7,10 @@ export let objects = new WeakMap()
 export const getReactivityRoot = _ => ({watchers, objects})
 export const setReactivityRoot = ({watchers: w, objects: o}) => (watchers = w) && (objects = o)
 
-export let cloning
-export let cloningRefs
-
-const reactify = (obj, { immutable = false } = {}) => {
-  if (immutable) {
-    cloning = true
-    cloningRefs = new WeakMap()
-  }
-  if (!obj || typeof obj !== 'object' || (reactivity in obj && cloning && cloningRefs.has(obj))) return obj
-  if (cloning ? cloningRefs.has(obj) : objects.has(obj)) return cloning ? cloningRefs.get(obj) : objects.get(obj)
-  const reactify = Array.from(types).find(([type]) => obj instanceof type)
-  try {
-    return reactify[1](obj)
-  } finally {
-    if (immutable) {
-      cloning = false
-      cloningRefs = undefined
-    }
-  }
+const reactify = (obj) => {
+  if (!obj || typeof obj !== 'object' || (reactivity in obj)) return obj
+  if (objects.has(obj)) return objects.get(obj)
+  return Array.from(types).find(([type]) => obj instanceof type)[1](obj)
 }
 
 export const watch = _watch()
