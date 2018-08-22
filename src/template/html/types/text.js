@@ -37,7 +37,7 @@ const makeText = ({ template, placeholderMetadata, arrayFragment }) => {
             arrayFragment
           })({ value: value.$resolvedValue })
         } else {
-          replace(arrayFragment, new Comment('Oz reactive promise placeholder'))
+          replace(arrayFragment, new Text())
           value.then(resolvedValue =>
             _value === value
               ? template.update(...template.values.map((_, i) =>
