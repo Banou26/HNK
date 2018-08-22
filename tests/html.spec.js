@@ -27,80 +27,44 @@ describe('HTML Template', () => {
           beforeEach(() => container.appendChild(template = html`${'foo'} ${'bar'} ${'baz'}<div>${'foo'} ${'bar'} ${'baz'}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            const div = container.childNodes[7]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('foo')
-            expect(container.childNodes[4].data).to.equal('bar')
-            expect(container.childNodes[6].data).to.equal('baz')
-            expect(div.childNodes[1].data).to.equal('foo')
-            expect(div.childNodes[3].data).to.equal('bar')
-            expect(div.childNodes[5].data).to.equal('baz')
+            expect(container).to.have.html('<template is="oz-html-template"></template>foo bar baz<div>foo bar baz</div>')
           })
           it('update', () => {
-            const div = container.childNodes[7]
             expect(_ => template.update('bar', 'baz', 'foo', 'bar', 'baz', 'foo')).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('bar')
-            expect(container.childNodes[4].data).to.equal('baz')
-            expect(container.childNodes[6].data).to.equal('foo')
-            expect(div.childNodes[1].data).to.equal('bar')
-            expect(div.childNodes[3].data).to.equal('baz')
-            expect(div.childNodes[5].data).to.equal('foo')
+            expect(container).to.have.html('<template is="oz-html-template"></template>bar baz foo<div>bar baz foo</div>')
           })
         })
         describe('number', () => {
           beforeEach(() => container.appendChild(template = html`${1} ${2}<div>${1} ${2}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            const div = container.childNodes[5]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('1')
-            expect(container.childNodes[4].data).to.equal('2')
-            expect(div.childNodes[1].data).to.equal('1')
-            expect(div.childNodes[3].data).to.equal('2')
+            expect(container).to.have.html('<template is="oz-html-template"></template>1 2<div>1 2</div>')
           })
           it('update', () => {
-            const div = container.childNodes[5]
             expect(_ => template.update(2, 3, 2, 3)).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('2')
-            expect(container.childNodes[4].data).to.equal('3')
-            expect(div.childNodes[1].data).to.equal('2')
-            expect(div.childNodes[3].data).to.equal('3')
+            expect(container).to.have.html('<template is="oz-html-template"></template>2 3<div>2 3</div>')
           })
         })
         describe('null', () => {
           beforeEach(() => container.appendChild(template = html`${null}<div>${null}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            const div = container.childNodes[3]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('null')
-            expect(div.childNodes[1].data).to.equal('null')
+            expect(container).to.have.html('<template is="oz-html-template"></template>null<div>null</div>')
           })
           it('update', () => {
-            const div = container.childNodes[3]
             expect(_ => template.update(null, null)).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('null')
-            expect(div.childNodes[1].data).to.equal('null')
+            expect(container).to.have.html('<template is="oz-html-template"></template>null<div>null</div>')
           })
         })
         describe('undefined', () => {
           beforeEach(() => container.appendChild(template = html`${undefined}<div>${undefined}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            const div = container.childNodes[3]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('')
-            expect(div.childNodes[1].data).to.equal('')
+            expect(container).to.have.html('<template is="oz-html-template"></template><div></div>')
           })
           it('update', () => {
-            const div = container.childNodes[3]
             expect(_ => template.update(undefined, undefined)).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('')
-            expect(div.childNodes[1].data).to.equal('')
+            expect(container).to.have.html('<template is="oz-html-template"></template><div></div>')
           })
         })
         describe('reactive promise', () => {
@@ -108,67 +72,39 @@ describe('HTML Template', () => {
           beforeEach(() => container.appendChild(template = html`${promise('foo')}<div>${promise('bar')}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', async () => {
-            const div = container.childNodes[3]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('Oz reactive promise placeholder')
-            expect(div.childNodes[1].data).to.equal('Oz reactive promise placeholder')
+            expect(container).to.have.html('<template is="oz-html-template"></template><div></div>')
             await template.values[0]
             await template.values[1]
-            expect(container.childNodes[2].data).to.equal('foo')
-            expect(div.childNodes[1].data).to.equal('bar')
+            expect(container).to.have.html('<template is="oz-html-template"></template>foo<div>bar</div>')
           })
           it('update', async () => {
-            const div = container.childNodes[3]
             expect(_ => template.update(promise('bar'), promise('baz'))).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('Oz reactive promise placeholder')
-            expect(div.childNodes[1].data).to.equal('Oz reactive promise placeholder')
+            expect(container).to.have.html('<template is="oz-html-template"></template><div></div>')
             await template.values[0]
             await template.values[1]
-            expect(container.childNodes[2].data).to.equal('bar')
-            expect(div.childNodes[1].data).to.equal('baz')
+            expect(container).to.have.html('<template is="oz-html-template"></template>bar<div>baz</div>')
           })
         })
         describe('html template', () => {
           beforeEach(() => container.appendChild(template = html`${html`foo`} ${html`bar`} ${html`baz`}<div>${html`foo`} ${html`bar`} ${html`baz`}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            const div = container.childNodes[7]
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('foo')
-            expect(container.childNodes[4].data).to.equal('bar')
-            expect(container.childNodes[6].data).to.equal('baz')
-            expect(div.childNodes[1].data).to.equal('foo')
-            expect(div.childNodes[3].data).to.equal('bar')
-            expect(div.childNodes[5].data).to.equal('baz')
+            expect(container).to.have.html('<template is="oz-html-template"></template>foo bar baz<div>foo bar baz</div>')
           })
           it('update', () => {
-            const div = container.childNodes[7]
             expect(_ => template.update(html`bar`, html`baz`, html`foo`, html`bar`, html`baz`, html`foo`)).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('bar')
-            expect(container.childNodes[4].data).to.equal('baz')
-            expect(container.childNodes[6].data).to.equal('foo')
-            expect(div.childNodes[1].data).to.equal('bar')
-            expect(div.childNodes[3].data).to.equal('baz')
-            expect(div.childNodes[5].data).to.equal('foo')
+            expect(container).to.have.html('<template is="oz-html-template"></template>bar baz foo<div>bar baz foo</div>')
           })
         })
         describe('array', () => {
           beforeEach(() => container.appendChild(template = html`${['foo', 'bar', 'baz']}`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', () => {
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('foo')
-            expect(container.childNodes[3].data).to.equal('bar')
-            expect(container.childNodes[4].data).to.equal('baz')
+            expect(container).to.have.html('<template is="oz-html-template"></template>foobarbaz')
           })
           it('update', () => {
             expect(_ => template.update(['bar', 'baz', 'foo'])).to.not.throw()
-            expect(container.childNodes[0]).to.equal(template)
-            expect(container.childNodes[2].data).to.equal('bar')
-            expect(container.childNodes[3].data).to.equal('baz')
-            expect(container.childNodes[4].data).to.equal('foo')
+            expect(container).to.have.html('<template is="oz-html-template"></template>barbazfoo')
           })
         })
       })

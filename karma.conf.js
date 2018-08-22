@@ -30,7 +30,7 @@ const webpackConfig = {
 module.exports = function (config) {
   config.set({
     browsers: ['ChromeHeadless'],
-    frameworks: ['chai', 'jasmine'],
+    frameworks: ['chai-dom', 'chai', 'jasmine'],
     files: [
       'tests/index.js'
     ],
@@ -59,7 +59,8 @@ module.exports = function (config) {
       'karma-webpack',
       'karma-chai',
       'istanbul-instrumenter-loader',
-      'karma-coverage-istanbul-reporter'
+      'karma-coverage-istanbul-reporter',
+      'karma-chai-dom'
     ]
   })
 }
