@@ -1,4 +1,3 @@
-// import createTemplate from '../template.js'
 import { placeholdersMetadataToPlaceholders, replaceNodes } from '../utils.js'
 export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
 
@@ -15,7 +14,7 @@ export class OzHTMLTemplate extends HTMLTemplateElement {
 
   get [OzHTMLTemplateSymbol] () { return true }
 
-  init () {
+  init (isUpdate) {
     if (this.placeholders) return
 
     const fragment = this.originalFragment.cloneNode(true)
@@ -29,9 +28,8 @@ export class OzHTMLTemplate extends HTMLTemplateElement {
     this.content.appendChild(fragment)
     this._childNodes = childNodes
 
-    this.forceUpdate = true
-    this.update(...this.values)
-    this.forceUpdate = false
+    if (isUpdate) this.forceUpdate = true
+    else this.update(...this.values)
   }
 
   clone (values) {
@@ -44,12 +42,13 @@ export class OzHTMLTemplate extends HTMLTemplateElement {
   }
 
   update (...values) {
-    this.init()
+    this.init(true)
     const oldArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
     for (const placeholder of this.placeholders) placeholder({ values, forceUpdate: this.forceUpdate })
     const newArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
     for (const i in this.placeholders) replaceNodes(oldArrayFragments[i], newArrayFragments[i])
     this.values = values
+    this.forceUpdate = false
   }
 
   get childNodes () {
