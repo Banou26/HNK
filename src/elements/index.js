@@ -20,7 +20,6 @@ export const registerElement = element => {
     shadowDom: elementShadowDom,
     state: _state,
     props: elementProps = [],
-    methods,
     watchers: elementWatchers = [],
     template: buildHTMLTemplate,
     style: buildCSSTemplate,
@@ -49,10 +48,13 @@ export const registerElement = element => {
           : this
       const context = this[elementContext] = r({
         ...rest,
+        ...Object.entries(rest)
+          .filter(([, value]) => typeof value === 'function')
+          .map(([prop, value]) => [prop, value.bind(context, context)])
+          .reduce((obj, [k, v]) => ({ ...obj, [k]: v }), {}), // binding functions with the context
         element: this,
         host,
         props: {},
-        methods: {},
         template: undefined,
         style: undefined
       })
@@ -75,7 +77,7 @@ export const registerElement = element => {
         if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
         template.prepare()
         watch(_ => pushContext(context, buildHTMLTemplate), updatedTemplate => {
-          if (template.id !== updatedTemplate.id) throw htmlTemplateChangedError
+          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
         })
       }
@@ -84,14 +86,14 @@ export const registerElement = element => {
         const template = context.style = buildCSSTemplate()
         if (!template[OzCSSTemplateSymbol]) throw noCSSTemplateError
         watch(buildCSSTemplate, updatedTemplate => {
-          if (template.id !== updatedTemplate.id) throw cssTemplateChangedError
+          if (template.templateId !== updatedTemplate.templateId) throw cssTemplateChangedError
           template.update(...updatedTemplate.values)
         })
       }
       // Watchers mixins & watchers
       for (const item of watchers) {
-        if (Array.isArray(item)) watch(item[0].bind(undefined, context), item[1].bind(undefined, context))
-        else watch(item.bind(undefined, context))
+        if (Array.isArray(item)) watch(item[0].bind(context, context), item[1].bind(context, context))
+        else watch(item.bind(context, context))
       }
       // Created mixins & created
       createdMixins.forEach(mixin => mixin(context))
