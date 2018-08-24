@@ -96,6 +96,17 @@ describe('HTML Template', () => {
             expect(container).to.have.html('<template is="oz-html-template"></template>bar baz foo<div>bar baz foo</div>')
           })
         })
+        describe('node', () => {
+          beforeEach(() => container.appendChild(template = html`${document.createElement('div')}`))
+          afterEach(() => template.remove() || (template = undefined))
+          it('append', () => {
+            expect(container).to.have.html('<template is="oz-html-template"></template><div></div>')
+          })
+          it('update', () => {
+            expect(_ => template.update(document.createElement('span'))).to.not.throw()
+            expect(container).to.have.html('<template is="oz-html-template"></template><span></span>')
+          })
+        })
         describe('array', () => {
           beforeEach(() => container.appendChild(template = html`${['foo', 'bar', 'baz']}`))
           afterEach(() => template.remove() || (template = undefined))
@@ -108,19 +119,28 @@ describe('HTML Template', () => {
           })
         })
       })
-      xdescribe('tag name', () => {
-        it('accept dynamic tags', () => {
-          expect(_ => html`<foo-${'bar'}></foo-${'bar'}>`).to.not.throw()
+      describe('element', () => {
+        describe('tag name', () => {
+          beforeEach(() => container.appendChild(template = html`<foo-${'bar'}></foo-${'bar'}>`))
+          afterEach(() => template.remove() || (template = undefined))
+          it('append', () => {
+            expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar></foo-bar>')
+          })
+          it('update', () => {
+            expect(_ => template.update('baz', 'baz')).to.not.throw()
+            expect(container).to.have.html('<template is="oz-html-template"></template><foo-baz></foo-baz>')
+          })
         })
       })
-      xdescribe('comment', () => {
-        it('accept dynamic comment', () => {
-          expect(_ => html`<!-- foo ${'bar'} ${'baz'} -->`).to.not.throw()
+      describe('comment', () => {
+        beforeEach(() => container.appendChild(template = html`<!-- ${'foo'} bar ${'baz'} -->`))
+        afterEach(() => template.remove() || (template = undefined))
+        it('append', () => {
+          expect(container).to.have.html('<template is="oz-html-template"></template><!-- foo bar baz -->')
         })
-      })
-      xdescribe('attribute', () => {
-        it('accept dynamic attributes', () => {
-          expect(_ => html`<foo bar${'baz'}="foo ${'bar'} baz"></foo>`).to.not.throw()
+        it('update', () => {
+          expect(_ => template.update('baz', 'foo')).to.not.throw()
+          expect(container).to.have.html('<template is="oz-html-template"></template><!-- baz bar foo -->')
         })
       })
     })
