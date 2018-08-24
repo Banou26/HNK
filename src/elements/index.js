@@ -48,10 +48,9 @@ export const registerElement = element => {
           : this
       const context = this[elementContext] = r({
         ...rest,
-        ...Object.entries(rest)
+        ...Object.entries(rest) // binding functions with the context
           .filter(([, value]) => typeof value === 'function')
-          .map(([prop, value]) => [prop, value.bind(context, context)])
-          .reduce((obj, [k, v]) => ({ ...obj, [k]: v }), {}), // binding functions with the context
+          .reduce((obj, [k, v]) => void (obj[k] = v.bind(context, context)) || obj, {}),
         element: this,
         host,
         props: {},
