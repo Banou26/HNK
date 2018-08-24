@@ -14,9 +14,12 @@ const getCharacterDataNodePath = placeholders =>
   node => {
     const match = node.data.match(new RegExp(placeholderRegex, 'um'))
     if (match) {
-      const placeholderNode = node.splitText(match.index)
-      placeholderNode.data = placeholderNode.data.substring(match[0].length)
-      if (placeholderNode.data.length) placeholderNode.splitText(0)
+      const isTextNode = node.nodeType === Node.TEXT_NODE
+      const placeholderNode = isTextNode ? node.splitText(match.index) : node
+      if (isTextNode) {
+        placeholderNode.data = placeholderNode.data.substring(match[0].length)
+        if (placeholderNode.data.length) placeholderNode.splitText(0)
+      }
       placeholders[charToN(match[0])].path = getNodePath(placeholderNode)
     }
   }
@@ -82,7 +85,7 @@ export default ({transform, strings, values}) => {
           attributes.push(attrPlaceholder)
         }
         attributes = attributes.filter(item => item)
-        if (attributes.length) placeholder.dependents = attributes
+        placeholder.dependents = attributes
         if (end) {
           advance(end[0].length)
           continue
