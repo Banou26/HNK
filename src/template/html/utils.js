@@ -89,22 +89,29 @@ export const placeholdersMetadataToPlaceholders = ({ template, placeholdersMetad
   const placeholders = []
   for (const i in placeholdersMetadata) {
     const placeholderMetadata = placeholdersMetadata[i]
-    const { type, path } = placeholderMetadata
-    const node = type === 'element' || type === 'attribute'
-      ? fragment.querySelector(toPlaceholder(i))
+    const { type, path, ids } = placeholderMetadata
+    if (type === 'endTag') continue
+    const node = type === 'startTag' || type === 'attribute'
+      ? fragment.querySelector(`[${toPlaceholder(ids[0])}]`)
       : path.reduce((node, nodeIndex) => node.childNodes[nodeIndex], fragment)
     const arrayFragment = [node]
     if (childNodes.includes(node)) childNodes.splice(childNodes.indexOf(node), 1, arrayFragment)
-    if (type === 'element' || type === 'attribute') placeholders.push(makeElement({ template, placeholderMetadata, arrayFragment }))
-    else {
-      const placeholder = (type === 'text' ? makeText : makeComment)({ template, placeholderMetadata, arrayFragment })
-      placeholder.metadata = placeholderMetadata
-      placeholder.arrayFragment = arrayFragment
-      placeholders.push(placeholder)
-    }
+    let placeholder =
+      (type === 'text'
+        ? makeText
+        : type === 'comment'
+          ? makeComment
+          : makeElement /* type === 'startTag' || type === 'attribute' */
+      )({ template, placeholderMetadata, arrayFragment })
+    placeholder.metadata = placeholderMetadata
+    placeholder.arrayFragment = arrayFragment
+    placeholders.push(placeholder)
   }
   return {
     childNodes,
     placeholders
   }
 }
+
+export const replace = (arrayFragment, ...vals) =>
+  arrayFragment.splice(0, arrayFragment.length, ...vals)
