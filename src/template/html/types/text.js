@@ -1,18 +1,14 @@
 import { OzHTMLTemplateSymbol } from '../elements/template.js'
-import { replaceNodes } from '../utils.js'
-
-const replace = (arrayFragment, ...vals) =>
-  arrayFragment.splice(0, arrayFragment.length, ...vals)
+import { replace } from '../utils.js'
 
 const makeText = ({ template, placeholderMetadata, arrayFragment }) => {
-  let _value, _placeholders, _fragments, _template, _arrayFragment
+  let _value, _placeholders, _fragments, _arrayFragment
   return ({values, value = values[placeholderMetadata.ids[0]], forceUpdate}) => {
     const type = typeof value
     if (value && type === 'object') {
       if (value && value[OzHTMLTemplateSymbol]) {
-        const template = value
-        replace(arrayFragment, template.childNodes)
-        _template = template
+        // if (_value.) todo: update the current template if its the same id
+        replace(arrayFragment, value.childNodes)
       } else if (Array.isArray(value)) {
         const values = value
         const [ placeholders, fragments ] = values.reduce(tuple =>
