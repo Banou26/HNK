@@ -23,6 +23,7 @@
     "Comment": true,
     "NodeFilter": true,
     "HTMLUnknownElement": true,
-    "HTMLTemplateElement": true
+    "HTMLTemplateElement": true,
+    "MouseEvent": true
   }
 }
