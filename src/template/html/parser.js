@@ -29,13 +29,17 @@ export default ({transform, strings, values}) => {
   let html = ''
   const placeholders = []
   const advance = (n, type, ...vals) => {
-    // vals = vals.filter(_ => _)
     let replacement = ''
     let placeholder
     if (type) {
       placeholder = {
         type,
-        ids: vals.map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
+        ids:
+          vals
+            .filter(_ => _)
+            .map(val => (val.match(placeholderRegex) || [])
+              .map(char => charToN(char)))
+            .flat(Infinity),
         values: vals,
         path: []
       }
