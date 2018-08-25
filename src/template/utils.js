@@ -10,7 +10,9 @@ export const placeholder = (n = 0) => String.fromCodePoint(placeholderMinRangeCo
 
 export const charToN = str => str.codePointAt() - placeholderMinRangeCode
 
+export const toPlaceholdersNumber = str => (str.match(placeholderRegex) || []).map(i => charToN(i))
+
 export const toPlaceholderString =
-  (str, placeholders = str.match(placeholderRegex).map(i => charToN(i))) =>
+  (str, placeholders = toPlaceholdersNumber(str)) =>
     values =>
       placeholders.reduce((str, i) => str.replace(placeholder(i), values[i]), str)
