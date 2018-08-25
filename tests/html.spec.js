@@ -68,7 +68,7 @@ describe('HTML Template', () => {
           })
         })
         describe('reactive promise', () => {
-          const promise = val => r(new Promise((resolve, reject) => setTimeout(_ => resolve(val), 0.5)))
+          const promise = val => r(new Promise((resolve, reject) => setTimeout(_ => resolve(val), 25)))
           beforeEach(() => container.appendChild(template = html`${promise('foo')}<div>${promise('bar')}</div>`))
           afterEach(() => template.remove() || (template = undefined))
           it('append', async () => {
@@ -129,6 +129,74 @@ describe('HTML Template', () => {
           it('update', () => {
             expect(_ => template.update('baz', 'baz')).to.not.throw()
             expect(container).to.have.html('<template is="oz-html-template"></template><foo-baz></foo-baz>')
+          })
+        })
+        describe('attribute name', () => {
+          beforeEach(() => container.appendChild(template = html`<foo-bar foo${'-bar'}="baz"></foo-bar>`))
+          afterEach(() => template.remove() || (template = undefined))
+          it('append', () => {
+            expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo-bar="baz"></foo-bar>')
+          })
+          it('update', () => {
+            expect(_ => template.update('-baz')).to.not.throw()
+            expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo-baz="baz"></foo-bar>')
+          })
+        })
+        describe('attribute value', () => {
+          describe('double quote', () => {
+            beforeEach(() => container.appendChild(template = html`<foo-bar foo="${'bar'}"></foo-bar>`))
+            afterEach(() => template.remove() || (template = undefined))
+            it('append', () => {
+              expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo="bar"></foo-bar>')
+            })
+            it('update', () => {
+              expect(_ => template.update('baz')).to.not.throw()
+              expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo="baz"></foo-bar>')
+            })
+          })
+          describe('single quote', () => {
+            beforeEach(() => container.appendChild(template = html`<foo-bar foo='${'bar'}'></foo-bar>`))
+            afterEach(() => template.remove() || (template = undefined))
+            it('append', () => {
+              expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo="bar"></foo-bar>')
+            })
+            it('update', () => {
+              expect(_ => template.update('baz')).to.not.throw()
+              expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar foo="baz"></foo-bar>')
+            })
+          })
+          describe('unquoted', () => {
+            describe('property', () => {
+              let element
+              beforeEach(() => container.appendChild(template = html`<foo-bar foo=${'bar'}></foo-bar>`) && (element = container.childNodes[1]))
+              afterEach(() => template.remove() || (template = undefined))
+              it('append', () => {
+                expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar></foo-bar>')
+                expect(element).to.have.property('foo').equal('bar')
+              })
+              it('update', () => {
+                expect(_ => template.update('baz')).to.not.throw()
+                expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar></foo-bar>')
+                expect(element).to.have.property('foo').equal('baz')
+              })
+            })
+            describe('event listener', () => {
+              let element, test, test2
+              beforeEach(() => container.appendChild(template = html`<foo-bar on-click=${ev => (test = ev)}></foo-bar>`) && (element = container.childNodes[1]))
+              afterEach(() => template.remove() || (template = undefined) || (test = undefined) || (test2 = undefined))
+              it('append', () => {
+                element.click()
+                expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar></foo-bar>')
+                expect(test).to.instanceof(MouseEvent)
+              })
+              it('update', () => {
+                expect(_ => template.update(ev => (test2 = ev))).to.not.throw()
+                element.click()
+                expect(container).to.have.html('<template is="oz-html-template"></template><foo-bar></foo-bar>')
+                expect(test).to.equal(undefined)
+                expect(test2).to.instanceof(MouseEvent)
+              })
+            })
           })
         })
       })
