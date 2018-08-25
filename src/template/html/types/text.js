@@ -1,9 +1,21 @@
 import { OzHTMLTemplateSymbol } from '../elements/template.js'
 import { replace } from '../utils.js'
 
-const makeText = ({ template, placeholderMetadata, arrayFragment }) => {
-  let _value, _placeholders, _fragments, _arrayFragment
-  return ({values, value = values[placeholderMetadata.ids[0]], forceUpdate}) => {
+const makeText = ({
+  template,
+  placeholderMetadata,
+  arrayFragment,
+
+  _value,
+  _placeholders,
+  _fragments,
+  _arrayFragment
+}) =>
+  ({
+    values,
+    value = values[placeholderMetadata.ids[0]],
+    forceUpdate
+  }) => {
     const type = typeof value
     if (value && type === 'object') {
       if (value && value[OzHTMLTemplateSymbol]) {
@@ -55,6 +67,5 @@ const makeText = ({ template, placeholderMetadata, arrayFragment }) => {
     _value = value
     _arrayFragment = arrayFragment.flat(Infinity)
   }
-}
 
 export default makeText
