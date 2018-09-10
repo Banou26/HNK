@@ -10,10 +10,8 @@ export class OzStyle extends HTMLStyleElement {
     this.templateId = templateId
     this.values = values
     this.placeholdersMetadata = placeholdersMetadata
-
     this.css = css
     this.setAttribute('is', 'oz-style')
-    this.innerHTML = css
   }
 
   get [OzStyleSymbol] () { return true }
@@ -34,8 +32,8 @@ export class OzStyle extends HTMLStyleElement {
   }
 
   connectedCallback (ast, childRules) {
-    let newRules
-    if (childRules) newRules = (void replace(childRules, ...replaceRules(ast, childRules, this.ast.rules))) || childRules   
+    if (childRules) replace(childRules, ...replaceRules(ast, childRules, this.ast.rules))
+    else if (this.innerHTML !== this.css) this.innerHTML = this.css
     const { placeholders } = placeholdersMetadataToPlaceholders({
       element: this,
       placeholdersMetadata: this.placeholdersMetadata,
@@ -47,7 +45,7 @@ export class OzStyle extends HTMLStyleElement {
     this.forceUpdate = true
     this.update(...this.values)
     this.forceUpdate = false
-    return newRules
+    return childRules
   }
 }
 
