@@ -18,7 +18,11 @@ describe('HTML Template', () => {
       const template = html``
       expect(_ => container.appendChild(template)).to.not.throw()
       expect(Array.from(container.childNodes).includes(template)).to.equal(true)
-      container.removeChild(template)
+    })
+    xdescribe('#.scoped', () => {
+      it('return is a HTMLTemplateElement node', () => {
+        expect(html.scoped``).to.instanceof(HTMLTemplateElement)
+      })
     })
     describe('Placeholder', () => {
       let template
@@ -94,6 +98,17 @@ describe('HTML Template', () => {
           it('update', () => {
             expect(_ => template.update(html`bar`, html`baz`, html`foo`, html`bar`, html`baz`, html`foo`)).to.not.throw()
             expect(container).to.have.html('<template is="oz-html-template"></template>bar baz foo<div>bar baz foo</div>')
+          })
+        })
+        xdescribe('unsafe html', () => {
+          beforeEach(() => container.appendChild(template = html`${html.unsafe('foo')}${html.unsafe('<div>bar</div>')}`))
+          afterEach(() => template.remove() || (template = undefined))
+          it('append', () => {
+            expect(container).to.have.html('<template is="oz-html-template"></template>foo<div>bar</div>')
+          })
+          it('update', () => {
+            expect(_ => template.update(html.unsafe('bar'), html.unsafe('<div>baz</div>'))).to.not.throw()
+            expect(container).to.have.html('<template is="oz-html-template"></template>bar<div>baz</div>')
           })
         })
         describe('node', () => {
