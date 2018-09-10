@@ -22,5 +22,5 @@ export const pushContext = (context, func) => {
 
 export const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed')
 export const noHTMLTemplateError = new Error('No HTML template returned in the template method')
-export const cssTemplateChangedError = new Error('The CSS template returned in the style changed')
-export const noCSSTemplateError = new Error('No CSS template returned in the style method')
+export const ozStyleChangedError = new Error('The OzStyle element returned in the style changed')
+export const noOzStyleError = new Error('No OzStyle element returned in the style method')
