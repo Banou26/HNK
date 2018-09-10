@@ -1,5 +1,5 @@
 import { OzHTMLTemplateSymbol } from '../template/html/index.js'
-import { OzCSSTemplateSymbol } from '../template/css/index.js'
+import { OzStyleSymbol } from '../template/css/index.js'
 import { r, watch } from '../reactivity/index.js'
 import {
   pushContext,
@@ -8,8 +8,8 @@ import {
   getMixinProp,
   noHTMLTemplateError,
   htmlTemplateChangedError,
-  noCSSTemplateError,
-  cssTemplateChangedError
+  noOzStyleError,
+  ozStyleChangedError
 } from './utils.js'
 
 export const registerElement = element => {
@@ -83,9 +83,9 @@ export const registerElement = element => {
       // CSS Template
       if (buildCSSTemplate) {
         const template = context.style = buildCSSTemplate()
-        if (!template[OzCSSTemplateSymbol]) throw noCSSTemplateError
+        if (!template[OzStyleSymbol]) throw noOzStyleError
         watch(buildCSSTemplate, updatedTemplate => {
-          if (template.templateId !== updatedTemplate.templateId) throw cssTemplateChangedError
+          if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
         })
       }

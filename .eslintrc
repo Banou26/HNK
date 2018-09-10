@@ -24,6 +24,8 @@
     "NodeFilter": true,
     "HTMLUnknownElement": true,
     "HTMLTemplateElement": true,
-    "MouseEvent": true
+    "MouseEvent": true,
+    "HTMLStyleElement": true,
+    "File": true
   }
 }
