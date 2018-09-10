@@ -1,5 +1,5 @@
 import { OzHTMLTemplateSymbol } from '../elements/template.js'
-import { replace } from '../utils.js'
+import { replace } from '../../utils.js'
 
 const makeText = ({
   template,

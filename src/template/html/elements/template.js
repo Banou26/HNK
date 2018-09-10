@@ -32,7 +32,7 @@ export class OzHTMLTemplate extends HTMLTemplateElement {
     else this.update(...this.values)
   }
 
-  clone (values) {
+  clone (values = this.values) {
     return new OzHTMLTemplate({
       originalFragment: this.originalFragment,
       values,

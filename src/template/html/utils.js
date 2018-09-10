@@ -1,36 +1,6 @@
 import { comment as makeComment, element as makeElement, text as makeText } from './types/index.js'
 import { placeholderRegex, placeholder as toPlaceholder } from '../utils.js'
 
-// const getSplitIds = split => split.filter((str, i) => i % 2)
-// const execSplit = (split, values) => split.map((str, i) => i % 2 ? values[str] : str).join('')
-// const indexToPlaceholder = (placeholders) => {
-//   const arr = []
-//   for (const placeholder of placeholders) {
-//     for (const id of placeholder.ids) arr.push(placeholder) // eslint-disable-line no-unused-vars
-//   }
-//   return arr
-// }
-// const valuesDif = (values, values2) => {
-//   let dif = []
-//   const highestLength = values.length > values2.length ? values.length : values2.length
-//   for (let i = 0; i < highestLength; i++) {
-//     if (values[i] !== values2[i]) dif.push(i)
-//   }
-//   return dif
-// }
-
-// export const getSiblingIndex = ({previousSibling} = {}, i = 0) => previousSibling ? getSiblingIndex(previousSibling, i + 1) : i
-
-// export const getNodePath2 = ({node, node: {parentElement: parent} = {}, path = []}) =>
-//   parent
-//     ? getNodePath({node: parent, path: [...path, [...parent.childNodes].indexOf(node)]})
-//     : [...path, getSiblingIndex(node)].reverse()
-
-// export const getNodePath = ({ node, node: { parentNode: parent } = {}, path = [] }) =>
-//   parent
-//     ? getNodePath({ node: parent, path: path.concat(Array.from(parent.childNodes).indexOf(node)) })
-//     : path.reverse()
-
 export const replaceNodes = (oldNodes, newNodes) => {
   for (const i in newNodes) {
     // `oldNode` can be undefined if the number of
@@ -40,7 +10,7 @@ export const replaceNodes = (oldNodes, newNodes) => {
     if (oldNode !== newNode) {
       if (oldNode) {
         oldNode.parentNode.insertBefore(newNode, oldNode)
-        oldNode.remove()
+        if (newNodes[i + 1] !== oldNode) oldNode.remove()
       } else { // Will place the new node after the previous newly placed new node
         const previousNewNode = newNodes[i - 1]
         const { parentNode } = previousNewNode
@@ -112,6 +82,3 @@ export const placeholdersMetadataToPlaceholders = ({ template, placeholdersMetad
     placeholders
   }
 }
-
-export const replace = (arrayFragment, ...vals) =>
-  arrayFragment.splice(0, arrayFragment.length, ...vals)

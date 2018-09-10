@@ -1,5 +1,4 @@
-import { replace } from '../utils.js'
-import { placeholder, toPlaceholderString, toPlaceholdersNumber } from '../../utils.js'
+import { placeholder, toPlaceholderString, toPlaceholdersNumber, replace } from '../../utils.js'
 
 const getDependentsPlaceholders = ({ template, placeholdersMetadata, ids, self }) =>
   placeholdersMetadata
