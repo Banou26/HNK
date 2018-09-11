@@ -9,8 +9,13 @@ import {
   noHTMLTemplateError,
   htmlTemplateChangedError,
   noOzStyleError,
-  ozStyleChangedError
+  ozStyleChangedError,
+  OzElementSymbol
 } from './utils.js'
+
+export {
+  OzElementSymbol
+}
 
 export const registerElement = element => {
   const {
@@ -28,7 +33,7 @@ export const registerElement = element => {
     disconnected,
     ...rest
   } = element
-  const mixins = globalMixins.concat(elementMixins)
+  const mixins = globalMixins.concat(elementMixins || [])
   const props = elementProps.concat(getMixinProp(mixins, 'props')).flat(1)
   const states = elementProps.concat(getMixinProp(mixins, 'state')).flat(1)
   const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat(1))
@@ -67,14 +72,13 @@ export const registerElement = element => {
       })))
       // State mixins & state
       const state = context.state = r(typeof _state === 'function' ? _state(context) : _state || {})
-      states.reverse().reduce(stateMixin =>
+      states.reverse().forEach(stateMixin =>
         Object.entries(Object.getOwnPropertyDescriptors(stateMixin()))
           .forEach(([prop, desc]) => !(prop in state) ? undefined : Object.defineProperty(state, prop, desc)))
       // HTML Template
       if (buildHTMLTemplate) {
         const template = context.template = buildHTMLTemplate()
         if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
-        template.prepare()
         watch(_ => pushContext(context, buildHTMLTemplate), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
@@ -99,6 +103,7 @@ export const registerElement = element => {
       if (created) created(context)
     }
 
+    get [OzElementSymbol] () { return true }
     static get name () { return name }
     static get observedAttributes () { return props }
 
@@ -108,7 +113,7 @@ export const registerElement = element => {
 
     connectedCallback () {
       const { [elementContext]: context, [elementContext]: { host, style, template } } = this
-      if (template) pushContext(context, _ => host.appendChild(template))
+      if (template) pushContext(context, _ => host.appendChild(template.content))
       if (style) {
         if (shadowDom) host.appendChild(style)
         else {

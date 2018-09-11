@@ -1,15 +1,17 @@
+export const OzElementSymbol = Symbol.for('OzElementSymbol')
 export const elementContext = Symbol.for('OzElementContext')
 
 export const mixins = []
 export const mixin = obj => mixins.push(obj)
 const currentContexts = []
 
-export const callMixin = (context, options, mixin) => {
-  const parentContext = currentContexts[currentContexts.length - 1]
+export const callMixin = (context, options, mixin, parentContext = currentContexts[currentContexts.length - 1]) =>
   mixin({ context, options, ...parentContext && parentContext !== context && { parentContext: parentContext } })
-}
 
-export const getMixinProp = (mixins, prop) => mixins.filter(mixin => prop in mixin).map(mixin => mixin[prop])
+export const getMixinProp = (mixins, prop) =>
+  mixins
+    .filter(mixin => prop in mixin)
+    .map(mixin => mixin[prop])
 
 export const pushContext = (context, func) => {
   currentContexts.push(context)
