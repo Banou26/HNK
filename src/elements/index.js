@@ -14,6 +14,7 @@ import {
 } from './utils.js'
 
 export {
+  elementContext as OzElementContextSymbol,
   OzElementSymbol
 }
 
@@ -77,16 +78,16 @@ export const registerElement = element => {
           .forEach(([prop, desc]) => !(prop in state) ? undefined : Object.defineProperty(state, prop, desc)))
       // HTML Template
       if (buildHTMLTemplate) {
-        const template = context.template = buildHTMLTemplate()
+        const template = context.template = buildHTMLTemplate(context)
         if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
-        watch(_ => pushContext(context, buildHTMLTemplate), updatedTemplate => {
+        watch(_ => pushContext(context, buildHTMLTemplate.bind(context, context)), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
         })
       }
       // CSS Template
       if (buildCSSTemplate) {
-        const template = context.style = buildCSSTemplate()
+        const template = context.style = buildCSSTemplate(context)
         if (!template[OzStyleSymbol]) throw noOzStyleError
         watch(buildCSSTemplate, updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError

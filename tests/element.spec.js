@@ -1,4 +1,4 @@
-import { html, css, registerElement, OzElementSymbol } from '../src/index.js'
+import { html, css, registerElement, OzElementSymbol, OzElementContextSymbol } from '../src/index.js'
 
 const usedTags = []
 
@@ -30,6 +30,29 @@ describe('OzElement', () => {
       it('set the element content', () => {
         setElement({ template: _ => html`foo bar` })
         expect(instance.childNodes[0].data).to.equal('foo bar')
+      })
+      it('throw an error if template changed', () => {
+        setElement({ template: ({ state: { foo } }) => foo ? html`foo bar` : html`bar baz` })
+        expect(instance.childNodes[0].data).to.equal('bar baz')
+        expect(_ => (instance[OzElementContextSymbol].state.foo = true)).to.throw()
+      })
+    })
+    describe('#style', () => {
+      it('set the element content', () => {
+        setElement({ style: _ => css`.foo {}` })
+        expect(Array.from(document.head.childNodes).pop().sheet.cssRules[0].selectorText).to.equal('.foo')
+      })
+      xdescribe('scoped', () => {
+        it('set the element content', () => {
+          setElement({ style: _ => css.scoped`.foo {}` })
+          expect(Array.from(document.head.childNodes).pop().sheet.cssRules[0].selectorText).to.equal('.foo')
+        })
+      })
+      describe('shadowDom', () => {
+        it('set the element content', () => {
+          setElement({ shadowDom: 'open', style: _ => css`.foo {}` })
+          expect(instance.shadowRoot.childNodes[0].sheet.cssRules[0].selectorText).to.equal('.foo')
+        })
       })
     })
   })
