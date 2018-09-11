@@ -43,7 +43,7 @@ export default object => {
             ? (receiver[property] = val)
             : undefined)
       }
-      if (value && typeof value === 'object' && reactivity in value) {
+      if (value && typeof value === 'object' && value[reactivity]) {
         let unwatch = value.$watch(_ => target[property] === value ? notify({ target, property, value, deep: true }) : unwatch(), { deep: true })
       }
       try {
@@ -80,7 +80,7 @@ export default object => {
             ? (proxy[property] = val)
             : undefined)
       }
-      if (value && typeof value === 'object' && reactivity in value) {
+      if (value && typeof value === 'object' && value[reactivity]) {
         let unwatch = value.$watch(_ => target[property] === value ? notify({ target, property, value, deep: true }) : unwatch(), { deep: true })
       }
       try {
