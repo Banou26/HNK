@@ -56,6 +56,11 @@ export class OzHTMLTemplate extends HTMLTemplateElement {
     return this._childNodes
   }
 
+  get content () {
+    this.init()
+    return super.content
+  }
+
   connectedCallback () {
     this.insertAfter()
   }
