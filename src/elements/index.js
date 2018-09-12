@@ -36,7 +36,7 @@ export const registerElement = element => {
   } = element
   const mixins = globalMixins.concat(elementMixins || [])
   const props = elementProps.concat(getMixinProp(mixins, 'props')).flat(1)
-  const states = elementProps.concat(getMixinProp(mixins, 'state')).flat(1)
+  const states = getMixinProp(mixins, 'state').flat(1)
   const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat(1))
   const shadowDom = 'shadowDom' in element ? elementShadowDom : getMixinProp(mixins, 'shadowDom').pop()
   const createdMixins = getMixinProp(mixins, 'created')
@@ -64,17 +64,16 @@ export const registerElement = element => {
         style: undefined
       })
       // Props mixins & props
-      Object.defineProperties(this, props.map(prop => ({
+      Object.defineProperties(this, props.reduce((props, prop) => (props[prop] = {
         enumerable: true,
-        writable: true,
         configurable: true,
         get: _ => context.props[prop],
         set: val => (context.props[prop] = val)
-      })))
+      }) && props, {}))
       // State mixins & state
-      const state = context.state = r(typeof _state === 'function' ? _state(context) : _state || {})
+      const state = context.state = r((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {})
       states.reverse().forEach(stateMixin =>
-        Object.entries(Object.getOwnPropertyDescriptors(stateMixin()))
+        Object.entries(Object.getOwnPropertyDescriptors(stateMixin(context)))
           .forEach(([prop, desc]) => !(prop in state) ? undefined : Object.defineProperty(state, prop, desc)))
       // HTML Template
       if (buildHTMLTemplate) {
@@ -89,7 +88,7 @@ export const registerElement = element => {
       if (buildCSSTemplate) {
         const template = context.style = buildCSSTemplate(context)
         if (!template[OzStyleSymbol]) throw noOzStyleError
-        watch(buildCSSTemplate, updatedTemplate => {
+        watch(_ => pushContext(context, buildCSSTemplate.bind(context, context)), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
         })
