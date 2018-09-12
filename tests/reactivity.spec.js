@@ -1,8 +1,48 @@
-import { r, reactivity } from '../src/index.js'
+import { r, watch, reactivity } from '../src/index.js'
 
 describe('reactify', () => {
   it('accept no parameters at all', () => {
     expect(_ => r()).to.not.throw()
+  })
+})
+
+describe('watch', () => {
+  let originalObject, react
+  beforeEach(() => {
+    originalObject = {
+      a: 1,
+      b: 2,
+      get c () {
+        return this.a + this.b
+      },
+      d: {
+        e: 10
+      }
+    }
+    originalObject.d.r = originalObject
+    react = r(originalObject)
+  })
+  afterEach(() => (react = undefined))
+  it('accept one or two function(s) as arguments', () => {
+    expect(_ => watch(_ => {})).to.not.throw()
+    expect(_ => watch(_ => {}, _ => {})).to.not.throw()
+  })
+  describe('watcher', () => {
+    it('re-evaluate watcher for each watcher dependency change', () => {
+      let value
+      expect(_ => watch(_ => (value = react.a))).to.not.throw()
+      expect(_ => (react.a = 2)).to.not.throw()
+      expect(value).to.equal(2)
+    })
+  })
+  describe('watcher + handler', () => {
+    it('re-evaluate watcher for each watcher dependency change and call handler with watcher return', () => {
+      let value, value2
+      expect(_ => watch(_ => (value = react.a), val => (value2 = val))).to.not.throw()
+      expect(_ => (react.a = 2)).to.not.throw()
+      expect(value).to.equal(2)
+      expect(value2).to.equal(2)
+    })
   })
 })
 
@@ -21,11 +61,11 @@ describe('Reactive Object', () => {
     }
     originalObject.d.r = originalObject
   })
+  afterEach(() => (originalObject = undefined))
   describe('Object', () => {
     let react
-    beforeEach(() => {
-      react = r(originalObject)
-    })
+    beforeEach(() => (react = r(originalObject)))
+    afterEach(() => (react = undefined))
     describe(`#[${reactivity.toString()}]`, () => {
       it(`is accessible with the 'reactivity' named export`, () => {
         expect(react).to.have.property(reactivity)
@@ -102,9 +142,8 @@ describe('Reactive Object', () => {
   })
   describe('Array', () => {
     let react
-    beforeEach(() => {
-      react = r([1, 2])
-    })
+    beforeEach(() => (react = r([1, 2])))
+    afterEach(() => (react = undefined))
     it('watch array change', () => {
       let changed
       react.$watch(_ => (changed = true))
@@ -120,9 +159,8 @@ describe('Reactive Object', () => {
   })
   describe('Map', () => {
     let react
-    beforeEach(() => {
-      react = r(new Map([[0, 0], [1, 1]]))
-    })
+    beforeEach(() => (react = r(new Map([[0, 0], [1, 1]]))))
+    afterEach(() => (react = undefined))
     it('watch map change', () => {
       let changed
       react.$watch(_ => (changed = true))
@@ -138,9 +176,8 @@ describe('Reactive Object', () => {
   })
   describe('Set', () => {
     let react
-    beforeEach(() => {
-      react = r(new Set([0, 1]))
-    })
+    beforeEach(() => (react = r(new Set([0, 1]))))
+    afterEach(() => (react = undefined))
     it('watch set change', () => {
       let changed
       react.$watch(_ => (changed = true))
