@@ -95,7 +95,7 @@ describe('OzElement', () => {
       })
     })
     describe('#created()', () => {
-      fit('called at element construction', () => {
+      it('called at element construction', () => {
         let value
         setElement({ created: _ => (value = true) })
         expect(value).to.equal(true)
