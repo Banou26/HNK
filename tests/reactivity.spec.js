@@ -1,5 +1,9 @@
 import { r, watch, reactivity } from '../src/index.js'
 
+// TODO: Implement optimized immutability
+// https://github.com/juliangruber/proxy-clone
+// https://github.com/mweststrate/immer
+
 describe('reactify', () => {
   it('accept no parameters at all', () => {
     expect(_ => r()).to.not.throw()
@@ -46,7 +50,7 @@ describe('watch', () => {
   })
 })
 
-describe('Reactive Object', () => {
+describe('Reactive', () => {
   let originalObject
   beforeEach(() => {
     originalObject = {
