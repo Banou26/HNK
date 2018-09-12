@@ -1,5 +1,5 @@
 import { replace } from '../../utils.js'
-import { OzStyleSymbol } from '../elements/style.js'
+import { OzStyleSymbol } from '../elements/utils.js'
 
 export const makeStylesheet = ({
   placeholderMetadata: {

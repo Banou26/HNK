@@ -1,9 +1,14 @@
-import { watchers as rootWatchers, objects as rootObjects } from './index.js'
 import { isBuiltIn, getProperty } from './types/index.js'
 
 export const reactivity = Symbol.for('OzReactivity')
 
 export const reactivityProperties = ['$watch', reactivity]
+
+export let rootWatchers = []
+export let rootObjects = new WeakMap()
+
+export const getReactivityRoot = _ => ({rootWatchers, rootObjects})
+export const setReactivityRoot = ({watchers: w, objects: o}) => (rootWatchers = w) && (rootObjects = o)
 
 const callWatcher = (watcher, deep, obj) =>
   deep

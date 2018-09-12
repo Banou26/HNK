@@ -1,6 +1,5 @@
 import { placeholdersMetadataToPlaceholders, replaceNodes } from '../utils.js'
-export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
-
+import { OzHTMLTemplateSymbol } from './utils.js'
 export class OzHTMLTemplate extends HTMLTemplateElement {
   constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
     super()

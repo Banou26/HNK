@@ -1,6 +1,6 @@
 import { placeholdersMetadataToPlaceholders, replaceRules } from '../utils.js'
 import { replace } from '../../utils.js'
-export const OzStyleSymbol = Symbol.for('OzStyleSymbol')
+import { OzStyleSymbol } from './utils.js'
 
 export class OzStyle extends HTMLStyleElement {
   constructor ({ templateId, css, values, ast, placeholdersMetadata }) {
