@@ -34,6 +34,7 @@
     "rust": "cargo +nightly build --target wasm32-unknown-unknown && wasm-bindgen target/wasm32-unknown-unknown/debug/ozjs_rust.wasm --out-dir ./dist"
   },
   "dependencies": {
+    "path-to-regexp": "^2.4.0",
     "shady-css-parser": "^0.1.0"
   }
 }
