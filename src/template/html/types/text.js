@@ -64,6 +64,7 @@ const makeText = ({
     } else {
       replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value))
     }
+    if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment())
     _value = value
     _arrayFragment = arrayFragment.flat(Infinity)
   }
