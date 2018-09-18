@@ -1,10 +1,9 @@
 import { placeholder } from '../utils.js'
 import parse from './parser.js'
-import { createTemplate, OzHTMLTemplate, OzHTMLTemplateSymbol } from './elements/index.js'
+import { createTemplate, OzHTMLTemplate } from './elements/index.js'
 
 export {
-  OzHTMLTemplate,
-  OzHTMLTemplateSymbol
+  OzHTMLTemplate
 }
 
 const styles = new Map()

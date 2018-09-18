@@ -1,1 +1,1 @@
-export const OzStyleSymbol = Symbol.for('OzStyleSymbol')
+export const OzStyle = Symbol.for('OzStyle')

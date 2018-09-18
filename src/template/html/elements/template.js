@@ -1,6 +1,6 @@
 import { placeholdersMetadataToPlaceholders, replaceNodes } from '../utils.js'
-import { OzHTMLTemplateSymbol } from './utils.js'
-export class OzHTMLTemplate extends HTMLTemplateElement {
+import { OzHTMLTemplate as OzHTMLTemplateSymbol } from './utils.js'
+class OzHTMLTemplate extends HTMLTemplateElement {
   constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
     super()
 

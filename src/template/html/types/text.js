@@ -1,5 +1,5 @@
 import { replace } from '../../utils.js'
-import { OzHTMLTemplateSymbol } from '../elements/utils.js'
+import { OzHTMLTemplate } from '../elements/utils.js'
 
 const makeText = ({
   template,
@@ -18,7 +18,7 @@ const makeText = ({
   }) => {
     const type = typeof value
     if (value && type === 'object') {
-      if (value && value[OzHTMLTemplateSymbol]) {
+      if (value && value[OzHTMLTemplate]) {
         // if (_value.) todo: update the current template if its the same id
         replace(arrayFragment, value.childNodes)
       } else if (Array.isArray(value)) {

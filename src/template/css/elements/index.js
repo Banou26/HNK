@@ -1,8 +1,7 @@
-import createStyle, { OzStyle } from './style.js'
-import { OzStyleSymbol } from './utils.js'
+import createStyle from './style.js'
+import { OzStyle } from './utils.js'
 
 export {
   createStyle,
-  OzStyle,
-  OzStyleSymbol
+  OzStyle
 }

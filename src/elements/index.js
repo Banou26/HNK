@@ -1,21 +1,22 @@
-import { OzHTMLTemplateSymbol } from '../template/html/index.js'
-import { OzStyleSymbol } from '../template/css/index.js'
+import { OzHTMLTemplate } from '../template/html/index.js'
+import { OzStyle } from '../template/css/index.js'
 import { r, watch } from '../reactivity/index.js'
 import {
-  pushContext,
-  elementContext,
+  OzElementContext,
   mixins as globalMixins,
   getMixinProp,
   noHTMLTemplateError,
   htmlTemplateChangedError,
   noOzStyleError,
   ozStyleChangedError,
-  OzElementSymbol
+  OzElement as OzElementSymbol,
+  mixin
 } from './utils.js'
 
 export {
-  elementContext as OzElementContextSymbol,
-  OzElementSymbol
+  OzElementContext,
+  OzElementSymbol as OzElement,
+  mixin
 }
 
 export const registerElement = element => {
@@ -52,7 +53,7 @@ export const registerElement = element => {
         : shadowDomType === 'boolean'
           ? this.attachShadow({ mode: shadowDom ? 'open' : 'closed' })
           : this
-      const context = this[elementContext] = r({
+      const context = this[OzElementContext] = r({
         ...rest,
         ...Object.entries(rest) // binding functions with the context
           .filter(([, value]) => typeof value === 'function')
@@ -78,8 +79,8 @@ export const registerElement = element => {
       // HTML Template
       if (buildHTMLTemplate) {
         const template = context.template = buildHTMLTemplate(context)
-        if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
-        watch(_ => pushContext(context, buildHTMLTemplate.bind(context, context)), updatedTemplate => {
+        if (!template[OzHTMLTemplate]) throw noHTMLTemplateError
+        watch(buildHTMLTemplate.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
         })
@@ -87,8 +88,8 @@ export const registerElement = element => {
       // CSS Template
       if (buildCSSTemplate) {
         const template = context.style = buildCSSTemplate(context)
-        if (!template[OzStyleSymbol]) throw noOzStyleError
-        watch(_ => pushContext(context, buildCSSTemplate.bind(context, context)), updatedTemplate => {
+        if (!template[OzStyle]) throw noOzStyleError
+        watch(buildCSSTemplate.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
         })
@@ -112,8 +113,8 @@ export const registerElement = element => {
     }
 
     connectedCallback () {
-      const { [elementContext]: context, [elementContext]: { host, style, template } } = this
-      if (template) pushContext(context, _ => host.appendChild(template.content))
+      const { [OzElementContext]: context, [OzElementContext]: { host, style, template } } = this
+      if (template) host.appendChild(template.content)
       if (style) {
         if (shadowDom) host.appendChild(style)
         else {
@@ -129,13 +130,13 @@ export const registerElement = element => {
     }
 
     disconnectedCallback () {
-      const { [elementContext]: context, [elementContext]: { style } } = this
+      const { [OzElementContext]: context, [OzElementContext]: { style } } = this
       if (style && !shadowDom) style.remove()
       // Disconnected mixins & disconnected
       disconnectedMixins.forEach(mixin => mixin(context))
       if (disconnected) disconnected(context)
     }
   }
-  customElements.define(name, OzElement, { ...extend ? { extends: extend } : undefined })
+  window.customElements.define(name, OzElement, { ...extend ? { extends: extend } : undefined })
   return OzElement
 }

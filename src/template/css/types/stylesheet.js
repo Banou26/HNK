@@ -1,5 +1,5 @@
 import { replace } from '../../utils.js'
-import { OzStyleSymbol } from '../elements/utils.js'
+import { OzStyle } from '../elements/utils.js'
 
 export const makeStylesheet = ({
   placeholderMetadata: {
@@ -17,8 +17,8 @@ export const makeStylesheet = ({
     value = values[ids[0]],
     forceUpdate
   }) => {
-    if (value && typeof value === 'object' && OzStyleSymbol in value) {
-      if (_value && typeof _value === 'object' && OzStyleSymbol in _value && _value.templateId === value.templateId) {
+    if (value && typeof value === 'object' && OzStyle in value) {
+      if (_value && typeof _value === 'object' && OzStyle in _value && _value.templateId === value.templateId) {
         _value.update(...value.values)
         replace(rules, ..._value.childRules)
       } else replace(rules, ...value.connectedCallback([ast], rules))
