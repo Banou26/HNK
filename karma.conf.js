@@ -10,7 +10,7 @@ const webpackConfig = {
         loader: 'babel-loader',
         exclude: /node_modules/,
         options: {
-          plugins: [require('babel-plugin-transform-object-rest-spread')]
+          plugins: [require('@babel/plugin-proposal-object-rest-spread')]
         }
       },
       {

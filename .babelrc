@@ -1,5 +1,3 @@
 {
-  "plugins": [
-    ["transform-object-rest-spread", { "useBuiltIns": true }]
-  ]
+  "plugins": ["@babel/plugin-proposal-object-rest-spread"]
 }
