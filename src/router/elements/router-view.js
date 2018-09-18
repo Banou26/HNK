@@ -1,11 +1,11 @@
-import { registerElement } from './element.js'
-import { html } from '../template/html.js'
+import { registerElement } from '../../elements/index.js'
+import { html } from '../../template/html/index.js'
 
-const RouterViewSymbol = Symbol.for('RouterView')
+const RouterView = Symbol.for('RouterView')
 
 const getRouterViewPosition = ({parentElement}, n = 0) =>
   parentElement
-    ? getRouterViewPosition(parentElement, n + (RouterViewSymbol in parentElement ? 1 : 0))
+    ? getRouterViewPosition(parentElement, n + (RouterView in parentElement ? 1 : 0))
     : n
 const getRouterViewPositionElement = (route, n) =>
   n
@@ -26,12 +26,14 @@ export const RouterViewMixin = {
     }
   }),
   created ({element}) {
-    element[RouterViewSymbol] = true
+    element[RouterView] = true
   }
 }
 
-export const RouterView = customElements.get('router-view') || registerElement({
-  name: 'router-view',
-  template: ({state: {components}}) => html`${components}`,
-  mixins: [RouterViewMixin]
-})
+export default _ => {
+  customElements.get('router-view') || registerElement({
+    name: 'router-view',
+    template: ({state: {components}}) => html`${components}`,
+    mixins: [RouterViewMixin]
+  })
+}
