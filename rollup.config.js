@@ -1,3 +1,5 @@
+import babel from 'rollup-plugin-babel'
+
 export default {
   input: 'src/index.js',
   output: [
@@ -9,5 +11,10 @@ export default {
       file: 'dist/cjs-oz.js',
       format: 'cjs'
     }
+  ],
+  plugins: [
+    babel({
+      exclude: 'node_modules/**' // only transpile our source code
+    })
   ]
 }
