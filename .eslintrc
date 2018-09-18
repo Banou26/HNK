@@ -2,7 +2,6 @@
   "extends": "standard",
   "globals": {
     "fetch": true,
-    "caches": true,
     "DOMParser": true,
     "chai": true,
     "assert": true,
@@ -18,7 +17,6 @@
     "afterEach": true,
     "Node": true,
     "HTMLElement": true,
-    "customElements": true,
     "Text": true,
     "Comment": true,
     "NodeFilter": true,
