@@ -1,7 +1,8 @@
 {
   "name": "oz.js",
-  "version": "0.1.0",
-  "main": "index.js",
+  "version": "0.1.2",
+  "main": "dist/cjs-oz.js",
+  "module": "dist/esm-oz.js",
   "license": "MIT",
   "devDependencies": {
     "babel-core": "^6.26.3",
