@@ -1,6 +1,6 @@
 {
   "name": "oz.js",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "main": "dist/cjs-oz.js",
   "module": "dist/esm-oz.js",
   "license": "MIT",
