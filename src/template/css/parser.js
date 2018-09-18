@@ -1,12 +1,12 @@
 import { NodeFactory, Stringifier, Parser } from 'shady-css-parser'
-import { placeholderRegex, singlePlaceholderRegex, placeholder as toPlaceholder, toPlaceholderString, charToN } from '../utils.js'
+import { placeholderRegex, singlePlaceholderRegex, placeholder as toPlaceholder, charToN } from '../utils.js'
 
 const makeMethod = name => (_this, ...args) => ({
   ...NodeFactory.prototype[name].apply(_this, args),
   ...singlePlaceholderRegex.test(args[0]) ? { type: `${name}Placeholder` } : undefined
 })
 
-const parser = new Parser(new class extends NodeFactory {
+const parser = new Parser(new class Factory extends NodeFactory {
   constructor () {
     super()
     for (const name of ['ruleset', 'expression']) this[name] = makeMethod(name).bind(undefined, this)
