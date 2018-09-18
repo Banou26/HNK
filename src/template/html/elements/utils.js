@@ -1,1 +1,1 @@
-export const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate')
+export const OzHTMLTemplate = Symbol.for('OzHTMLTemplate')

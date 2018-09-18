@@ -1,8 +1,7 @@
-import createTemplate, { OzHTMLTemplate } from './template.js'
-import { OzHTMLTemplateSymbol } from './utils.js'
+import createTemplate from './template.js'
+import { OzHTMLTemplate } from './utils.js'
 
 export {
   createTemplate,
-  OzHTMLTemplate,
-  OzHTMLTemplateSymbol
+  OzHTMLTemplate
 }
