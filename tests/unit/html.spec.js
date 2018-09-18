@@ -1,4 +1,4 @@
-import { html, OzHTMLTemplate, r } from '../src/index.js'
+import { html, OzHTMLTemplate, r } from '../../src/index.js'
 
 describe('HTML Template', () => {
   let container
@@ -6,7 +6,7 @@ describe('HTML Template', () => {
   afterEach(() => container.remove() || (container = undefined))
   describe('Template literal tag', () => {
     it('return an OzHTMLTemplate instance', () => {
-      expect(html``).to.instanceof(OzHTMLTemplate)
+      expect(html``).to.have.property(OzHTMLTemplate)
     })
     it('return is a DOM node', () => {
       expect(html``).to.instanceof(Node)

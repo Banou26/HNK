@@ -1,4 +1,4 @@
-import { html, css, registerElement, OzElementSymbol, OzElementContextSymbol, reactivity } from '../src/index.js'
+import { html, css, registerElement, OzElement, OzElementContext, reactivity } from '../../src/index.js'
 
 const usedTags = []
 
@@ -16,7 +16,7 @@ describe('OzElement', () => {
   afterEach(() => container.remove() || (container = undefined) || (instance = undefined))
   it('return an OzElement instance', () => {
     setElement()
-    expect(instance).to.have.property(OzElementSymbol)
+    expect(instance).to.have.property(OzElement)
   })
   describe('options', () => {
     describe('#name', () => {
@@ -29,7 +29,7 @@ describe('OzElement', () => {
     describe('#state', () => {
       it('define an empty reactive object by default', () => {
         setElement({})
-        expect(instance[OzElementContextSymbol].state).to.have.property(reactivity).not.equal(false)
+        expect(instance[OzElementContext].state).to.have.property(reactivity).not.equal(false)
       })
       describe('is function', () => {
         it('call with context as this and first argument', () => {
@@ -41,14 +41,14 @@ describe('OzElement', () => {
               return {}
             }
           })
-          expect(ctxThis).to.equal(instance[OzElementContextSymbol])
-          expect(ctxArg).to.equal(instance[OzElementContextSymbol])
+          expect(ctxThis).to.equal(instance[OzElementContext])
+          expect(ctxArg).to.equal(instance[OzElementContext])
         })
       })
       describe('is object', () => {
         it('call with context as this and first argument', () => {
           setElement({ state: {} })
-          expect(instance[OzElementContextSymbol]).to.have.property('state').to.have.property(reactivity).not.equal(false)
+          expect(instance[OzElementContext]).to.have.property('state').to.have.property(reactivity).not.equal(false)
         })
       })
     })
@@ -63,7 +63,7 @@ describe('OzElement', () => {
         setElement({ props: ['foo'] })
         expect(instance.constructor.observedAttributes).to.eql(['foo'])
         expect(_ => (instance.foo = 'bar')).to.not.throw()
-        expect(instance[OzElementContextSymbol].props.foo).to.equal('bar')
+        expect(instance[OzElementContext].props.foo).to.equal('bar')
       })
     })
     describe('#watchers', () => {
@@ -75,7 +75,7 @@ describe('OzElement', () => {
             watchers: [(_ctx) => (ctx = _ctx) && (value = _ctx.props.foo)]
           })
           expect(_ => (instance.foo = 'bar')).to.not.throw()
-          expect(ctx).to.equal(instance[OzElementContextSymbol])
+          expect(ctx).to.equal(instance[OzElementContext])
           expect(value).to.equal('bar')
         })
       })
@@ -87,9 +87,9 @@ describe('OzElement', () => {
             watchers: [[(_ctx) => (ctx = _ctx) && (value = _ctx.props.foo), (ctx, val) => (ctx2 = ctx) && (value2 = val)]]
           })
           expect(_ => (instance.foo = 'bar')).to.not.throw()
-          expect(ctx).to.equal(instance[OzElementContextSymbol])
+          expect(ctx).to.equal(instance[OzElementContext])
           expect(value).to.equal('bar')
-          expect(ctx2).to.equal(instance[OzElementContextSymbol])
+          expect(ctx2).to.equal(instance[OzElementContext])
           expect(value2).to.equal('bar')
         })
       })
@@ -109,7 +109,7 @@ describe('OzElement', () => {
       it('throw an error if template changed', () => {
         setElement({ template: ({ state: { foo } }) => foo ? html`foo bar` : html`bar baz` })
         expect(instance.childNodes[0].data).to.equal('bar baz')
-        expect(_ => (instance[OzElementContextSymbol].state.foo = true)).to.throw()
+        expect(_ => (instance[OzElementContext].state.foo = true)).to.throw()
       })
     })
     describe('#style', () => {
@@ -120,7 +120,7 @@ describe('OzElement', () => {
       it('throw an error if template changed', () => {
         setElement({ style: ({ state: { foo } }) => foo ? css`.foo {}` : css`.bar {}` })
         expect(Array.from(document.head.childNodes).pop().sheet.cssRules[0].selectorText).to.equal('.bar')
-        expect(_ => (instance[OzElementContextSymbol].state.foo = true)).to.throw()
+        expect(_ => (instance[OzElementContext].state.foo = true)).to.throw()
       })
       xdescribe('scoped', () => {
         it('...', () => {

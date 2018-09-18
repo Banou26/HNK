@@ -1,4 +1,4 @@
-import { r, watch, reactivity } from '../src/index.js'
+import { r, watch, reactivity } from '../../src/index.js'
 
 // TODO: Implement optimized immutability
 // https://github.com/juliangruber/proxy-clone

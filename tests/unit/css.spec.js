@@ -1,12 +1,12 @@
-import { css, OzStyle } from '../src/index.js'
+import { css, OzStyle } from '../../src/index.js'
 
 describe('CSS Template', () => {
   let container
   beforeEach(() => document.body.appendChild(container = document.createElement('div')))
   afterEach(() => container.remove() || (container = undefined))
   describe('Template literal tag', () => {
-    it('return an OzHTMLTemplate instance', () => {
-      expect(css``).to.instanceof(OzStyle)
+    it('return an OzStyleTemplate instance', () => {
+      expect(css``).to.have.property(OzStyle)
     })
     it('return is a DOM node', () => {
       expect(css``).to.instanceof(Node)
