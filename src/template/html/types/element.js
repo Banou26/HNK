@@ -72,8 +72,8 @@ const makeElement = ({
         }
       } else {
         if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName)
-        const value = (toDoubleQuoteValue || toSingleQuoteValue)(values)
-        element.setAttribute(attributeName, value)
+        const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values)
+        if (attributeName) element.setAttribute(attributeName, value || '')
         _value = value
       }
       _attributeName = attributeName
