@@ -32,10 +32,10 @@ module.exports = function (config) {
     browsers: ['ChromeHeadless'],
     frameworks: ['chai-dom', 'chai', 'jasmine'],
     files: [
-      'tests/index.js'
+      'tests/unit/index.js'
     ],
     preprocessors: {
-      'tests/index.js': ['webpack', 'sourcemap']
+      'tests/unit/index.js': ['webpack', 'sourcemap']
     },
     webpack: webpackConfig,
     webpackMiddleware: {
