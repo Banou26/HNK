@@ -1,4 +1,5 @@
 import { NodeFactory, Stringifier, Parser } from 'shady-css-parser';
+import pathToRegexp, { compile } from 'path-to-regexp';
 
 const placeholderMinRangeChar = '';
 const placeholderMinRangeCode = placeholderMinRangeChar.charCodeAt();
@@ -107,7 +108,7 @@ const makeElement = ({
   return self
 };
 
-const OzHTMLTemplateSymbol = Symbol.for('OzHTMLTemplate');
+const OzHTMLTemplate = Symbol.for('OzHTMLTemplate');
 
 const makeText = ({
   template,
@@ -126,7 +127,7 @@ const makeText = ({
   }) => {
     const type = typeof value;
     if (value && type === 'object') {
-      if (value && value[OzHTMLTemplateSymbol]) {
+      if (value && value[OzHTMLTemplate]) {
         // if (_value.) todo: update the current template if its the same id
         replace(arrayFragment, value.childNodes);
       } else if (Array.isArray(value)) {
@@ -365,7 +366,7 @@ var parse = ({transform, strings, values}) => {
   }
 };
 
-class OzHTMLTemplate extends HTMLTemplateElement {
+class OzHTMLTemplate$1 extends HTMLTemplateElement {
   constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
     super();
 
@@ -376,7 +377,7 @@ class OzHTMLTemplate extends HTMLTemplateElement {
     this.setAttribute('is', 'oz-html-template');
   }
 
-  get [OzHTMLTemplateSymbol] () { return true }
+  get [OzHTMLTemplate] () { return true }
 
   init (isUpdate) {
     if (this.placeholders) return
@@ -397,7 +398,7 @@ class OzHTMLTemplate extends HTMLTemplateElement {
   }
 
   clone (values = this.values) {
-    return new OzHTMLTemplate({
+    return new OzHTMLTemplate$1({
       originalFragment: this.originalFragment,
       values,
       placeholdersMetadata: this.placeholdersMetadata,
@@ -449,9 +450,9 @@ class OzHTMLTemplate extends HTMLTemplateElement {
   }
 }
 
-customElements.define('oz-html-template', OzHTMLTemplate, { extends: 'template' });
+customElements.define('oz-html-template', OzHTMLTemplate$1, { extends: 'template' });
 
-var createTemplate = options => new OzHTMLTemplate(options);
+var createTemplate = options => new OzHTMLTemplate$1(options);
 
 const styles = new Map();
 
@@ -573,7 +574,7 @@ var makeStyleProperty = ({
     style.setProperty(_name, getValueResult(values));
   };
 
-const OzStyleSymbol = Symbol.for('OzStyleSymbol');
+const OzStyle = Symbol.for('OzStyle');
 
 const makeStylesheet = ({
   placeholderMetadata: {
@@ -591,8 +592,8 @@ const makeStylesheet = ({
     value = values[ids[0]],
     forceUpdate
   }) => {
-    if (value && typeof value === 'object' && OzStyleSymbol in value) {
-      if (_value && typeof _value === 'object' && OzStyleSymbol in _value && _value.templateId === value.templateId) {
+    if (value && typeof value === 'object' && OzStyle in value) {
+      if (_value && typeof _value === 'object' && OzStyle in _value && _value.templateId === value.templateId) {
         _value.update(...value.values);
         replace(rules, ..._value.childRules);
       } else replace(rules, ...value.connectedCallback([ast], rules));
@@ -660,7 +661,7 @@ const placeholdersMetadataToPlaceholders$1 = ({ element: { sheet }, placeholders
   }
 };
 
-class OzStyle extends HTMLStyleElement {
+class OzStyle$1 extends HTMLStyleElement {
   constructor ({ templateId, css, values, ast, placeholdersMetadata }) {
     super();
 
@@ -672,10 +673,10 @@ class OzStyle extends HTMLStyleElement {
     this.setAttribute('is', 'oz-style');
   }
 
-  get [OzStyleSymbol] () { return true }
+  get [OzStyle] () { return true }
 
   clone (values = this.values) {
-    return new OzStyle({
+    return new OzStyle$1({
       ast: this.ast,
       css: this.css,
       values,
@@ -707,9 +708,9 @@ class OzStyle extends HTMLStyleElement {
   }
 }
 
-customElements.define('oz-style', OzStyle, { extends: 'style' });
+customElements.define('oz-style', OzStyle$1, { extends: 'style' });
 
-var createStyle = options => new OzStyle(options);
+var createStyle = options => new OzStyle$1(options);
 
 const elements = new Map();
 
@@ -1191,22 +1192,16 @@ const reactify = (obj) => {
 
 const watch$1 = watch();
 
-const OzElementSymbol = Symbol.for('OzElementSymbol');
-const elementContext = Symbol.for('OzElementContext');
+const OzElement = Symbol.for('OzElement');
+const OzElementContext = Symbol.for('OzElementContext');
 
 const mixins = [];
+const mixin = obj => mixins.push(obj);
 
 const getMixinProp = (mixins, prop) =>
   mixins
     .filter(mixin => prop in mixin)
     .map(mixin => mixin[prop]);
-
-const pushContext = (context, func) => {
-  try {
-    return func()
-  } finally {
-  }
-};
 
 const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed');
 const noHTMLTemplateError = new Error('No HTML template returned in the template method');
@@ -1238,7 +1233,7 @@ const registerElement = element => {
   const connectedMixins = getMixinProp(mixins$$1, 'connected');
   const disconnectedMixins = getMixinProp(mixins$$1, 'disconnected');
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement;
-  class OzElement extends Class {
+  class OzElement$$1 extends Class {
     constructor () {
       super();
       const shadowDomType = typeof shadowDom;
@@ -1247,7 +1242,7 @@ const registerElement = element => {
         : shadowDomType === 'boolean'
           ? this.attachShadow({ mode: shadowDom ? 'open' : 'closed' })
           : this;
-      const context = this[elementContext] = reactify({
+      const context = this[OzElementContext] = reactify({
         ...rest,
         ...Object.entries(rest) // binding functions with the context
           .filter(([, value]) => typeof value === 'function')
@@ -1273,8 +1268,8 @@ const registerElement = element => {
       // HTML Template
       if (buildHTMLTemplate) {
         const template = context.template = buildHTMLTemplate(context);
-        if (!template[OzHTMLTemplateSymbol]) throw noHTMLTemplateError
-        watch$1(_ => pushContext(context, buildHTMLTemplate.bind(context, context)), updatedTemplate => {
+        if (!template[OzHTMLTemplate]) throw noHTMLTemplateError
+        watch$1(buildHTMLTemplate.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values);
         });
@@ -1282,8 +1277,8 @@ const registerElement = element => {
       // CSS Template
       if (buildCSSTemplate) {
         const template = context.style = buildCSSTemplate(context);
-        if (!template[OzStyleSymbol]) throw noOzStyleError
-        watch$1(_ => pushContext(context, buildCSSTemplate.bind(context, context)), updatedTemplate => {
+        if (!template[OzStyle]) throw noOzStyleError
+        watch$1(buildCSSTemplate.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values);
         });
@@ -1298,7 +1293,7 @@ const registerElement = element => {
       if (created) created(context);
     }
 
-    get [OzElementSymbol] () { return true }
+    get [OzElement] () { return true }
     static get name () { return name }
     static get observedAttributes () { return props }
 
@@ -1307,8 +1302,8 @@ const registerElement = element => {
     }
 
     connectedCallback () {
-      const { [elementContext]: context, [elementContext]: { host, style, template } } = this;
-      if (template) pushContext(context, _ => host.appendChild(template.content));
+      const { [OzElementContext]: context, [OzElementContext]: { host, style, template } } = this;
+      if (template) host.appendChild(template.content);
       if (style) {
         if (shadowDom) host.appendChild(style);
         else {
@@ -1324,15 +1319,120 @@ const registerElement = element => {
     }
 
     disconnectedCallback () {
-      const { [elementContext]: context, [elementContext]: { style } } = this;
+      const { [OzElementContext]: context, [OzElementContext]: { style } } = this;
       if (style && !shadowDom) style.remove();
       // Disconnected mixins & disconnected
       disconnectedMixins.forEach(mixin$$1 => mixin$$1(context));
       if (disconnected) disconnected(context);
     }
   }
-  customElements.define(name, OzElement, { ...extend ? { extends: extend } : undefined });
-  return OzElement
+  window.customElements.define(name, OzElement$$1, { ...extend ? { extends: extend } : undefined });
+  return OzElement$$1
 };
 
-export { OzHTMLTemplate, OzHTMLTemplateSymbol, HTMLTag, html, OzStyle, OzStyleSymbol, CSSTag, css, elementContext as OzElementContextSymbol, OzElementSymbol, registerElement, getReactivityRoot, setReactivityRoot, watch$1 as watch, reactify as r, reactify as react, reactivity };
+const RouterView = Symbol.for('RouterView');
+
+const getRouterViewPosition = ({parentElement}, n = 0) =>
+  parentElement
+    ? getRouterViewPosition(parentElement, n + (RouterView in parentElement ? 1 : 0))
+    : n;
+
+const RouterViewMixin = {
+  props: ['name'],
+  state: ctx => ({
+    get components () {
+      const { router: { currentRoutesComponents, currentRoute: { matched } = {} } = {}, props: { name = 'default' } } = ctx;
+      if (matched) {
+        const routeConfig = matched[getRouterViewPosition(ctx.host)];
+        // todo: manage the stuff with selecting router-view name prop ect
+        return [...currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig).values()]/* components */
+        // return currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig)/* components */.get(name)/* component */
+      }
+    }
+  }),
+  created ({element}) {
+    element[RouterView] = true;
+  }
+};
+
+var registerRouterView = _ => {
+  customElements.get('router-view') || registerElement({
+    name: 'router-view',
+    template: ({state: {components}}) => html`${components}`,
+    mixins: [RouterViewMixin]
+  });
+};
+
+let mixinRegistered, customElementsRegistered;
+
+const registerRouterMixins = _ =>
+  mixinRegistered
+    ? undefined
+    : (mixinRegistered = true) &&
+      mixin({
+        created: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) =>
+          (ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router)
+      });
+
+const registerCustomElements = _ =>
+  customElementsRegistered
+    ? undefined
+    : (customElementsRegistered = true) &&
+      registerRouterView();
+
+// const normalizePath = (path, parent, strict) => {
+//   if (!strict) path = path.replace(/\/$/, '')
+//   if (path[0] === '/') return path
+//   if (parent == null) return path
+//   return `${parent.path}/${path}`.replace(/\/\//g, '/')
+// }
+
+const flattenRoutes = ({routes, path = '', parent, map = new Map()}) =>
+  routes.forEach(route => {
+    const pathToRegexpOptions = route.pathToRegexpOptions || {};
+    const keys = [];
+    const childPath = `${path}${route.path ? `${path ? '/' : ''}${route.path}` : '?'}`;
+    // const normalizedPath = normalizePath(route.path, {path}, pathToRegexpOptions.strict)
+    console.log(childPath);
+    const obj = {...childPath, ...parent && {parent}, keys, regex: pathToRegexp(childPath, [], pathToRegexpOptions), toPath: compile(childPath)};
+    map.set(childPath, obj);
+    route.children && flattenRoutes({routes: route.children, path: childPath, parent: obj, map});
+  }) ||
+  map;
+
+const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) =>
+  isOzElement
+    ? parentNode
+    : parentNode && getClosestOzElementParent(parentNode);
+
+const history = window.history;
+
+const Router = ({
+  routes: _routes,
+  base: _base = '',
+  linkActiveClass = 'linkActiveClass',
+  linkExactActiveClass = 'linkExactActiveClass',
+  base = new URL(_base, window.location.origin),
+  _: routes = flattenRoutes({routes: _routes})
+} = {}) => {
+  registerRouterMixins();
+  registerCustomElements();
+
+  console.log(routes);
+
+  const resolve = (location, current = undefined.currentRoute, append = false) => {};
+
+  const go = (replace = false) =>
+    (location, url = typeof location === 'string' ? location : undefined) =>
+      (replace
+        ? history.replaceState
+        : history.pushState).call(history, {}, '', new URL(url, base.href));
+
+  return reactify({
+    resolve,
+    push: go(),
+    replace: go(true)
+  })
+};
+
+export { OzHTMLTemplate, HTMLTag, html, OzStyle, CSSTag, css, OzElementContext, OzElement, mixin, registerElement, getReactivityRoot, setReactivityRoot, watch$1 as watch, reactify as r, reactify as react, reactivity, registerRouterMixins, Router };
