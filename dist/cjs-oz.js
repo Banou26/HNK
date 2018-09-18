@@ -105,8 +105,8 @@ const makeElement = ({
         }
       } else {
         if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName);
-        const value = (toDoubleQuoteValue || toSingleQuoteValue)(values);
-        element.setAttribute(attributeName, value);
+        const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values);
+        if (attributeName) element.setAttribute(attributeName, value || '');
         _value = value;
       }
       _attributeName = attributeName;
@@ -180,6 +180,7 @@ const makeText = ({
     } else {
       replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value));
     }
+    if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment());
     _value = value;
     _arrayFragment = arrayFragment.flat(Infinity);
   };
@@ -478,7 +479,7 @@ const makeMethod = name => (_this, ...args) => ({
   ...singlePlaceholderRegex.test(args[0]) ? { type: `${name}Placeholder` } : undefined
 });
 
-const parser = new shadyCssParser.Parser(new class extends shadyCssParser.NodeFactory {
+const parser = new shadyCssParser.Parser(new class Factory extends shadyCssParser.NodeFactory {
   constructor () {
     super();
     for (const name of ['ruleset', 'expression']) this[name] = makeMethod(name).bind(undefined, this);
@@ -1251,16 +1252,17 @@ const registerElement = element => {
           : this;
       const context = this[OzElementContext] = reactify({
         ...rest,
-        ...Object.entries(rest) // binding functions with the context
-          .filter(([, value]) => typeof value === 'function')
-          .reduce((obj, [k, v]) => void (obj[k] = v.bind(context, context)) || obj, {}),
         element: this,
         host,
         props: {},
         template: undefined,
         style: undefined
       });
+      Object.entries(rest) // binding functions with the context
+        .filter(([, value]) => typeof value === 'function')
+        .forEach(([k, v]) => void (context[k] = v.bind(context, context)));
       // Props mixins & props
+      props.forEach((prop) => (context.props[prop] = this[prop]));
       Object.defineProperties(this, props.reduce((props, prop) => (props[prop] = {
         enumerable: true,
         configurable: true,
