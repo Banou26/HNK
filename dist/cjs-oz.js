@@ -164,7 +164,10 @@ const makeText = ({
       replace(arrayFragment, value);
     }
   } else if (type === 'function') {
-    if (value.$promise) {
+    if (value.prototype instanceof Node) {
+      const Constructor = value;
+      replace(arrayFragment, new Constructor());
+    } else if (value.$promise) {
       if (value.$resolved) {
         makeText({
           template,
@@ -908,6 +911,69 @@ const CSSTag = (transform = str => str) => (strings, ...values) => {
   return elements.get(templateId).clone(values);
 };
 const css = CSSTag();
+
+const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
+const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/;
+const gRegex = new RegExp(regex, 'gm');
+const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/;
+const gIdentifierRegex = new RegExp(identifierRegex, 'g');
+const classRegex = /class="(.*)"/;
+
+const makeHTML = ({
+  tag,
+  attributes,
+  childs,
+  textContent,
+  id,
+  classList
+}) => {
+  const classStr = classList.join(' ');
+  let attrStr = attributes ? ' ' + attributes : '';
+  if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`);else if (classStr) attrStr += ` class="${classStr}"`;
+  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map(line => makeHTML(line)).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`;else return '\n' + textContent;
+};
+
+const pushLine = ({
+  childs: currentChilds
+}, line) => {
+  if (currentChilds.length && currentChilds[currentChilds.length - 1].indentation < line.indentation) pushLine(currentChilds[currentChilds.length - 1], line);else currentChilds.push(line);
+};
+
+const hierarchise = arr => {
+  const hierarchisedArr = [];
+
+  for (let line of arr) {
+    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line);else hierarchisedArr.push(line);
+  }
+
+  return hierarchisedArr;
+};
+
+const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(regex)).filter(match => match[0].trim().length).map(match => {
+  if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
+    return {
+      indentation: match[1].split('\n').pop().length,
+      textContent: match[3],
+      classList: []
+    };
+  }
+
+  const tag = match[3] ? match[3].match(/^([a-z0-9-]*)/)[1] : undefined;
+  const identifiers = match[3] ? match[3].slice(tag.length).match(gIdentifierRegex) || [] : [];
+  const id = identifiers.find(identifier => identifier.match(identifierRegex)[2]);
+  const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1));
+  return {
+    indentation: match[1].split('\n').pop().length,
+    tag: match[2] ? undefined : tag || 'div',
+    attributes: match[4],
+    id,
+    classList,
+    textContent: match[5],
+    childs: []
+  };
+})).map(line => makeHTML(line)).join('');
+
+const poz = HTMLTag(pozToHTML);
 
 const getPropertyDescriptorPair = (prototype, property) => {
   let descriptor = Object.getOwnPropertyDescriptor(prototype, property);
@@ -1764,7 +1830,7 @@ const RouterViewMixin = {
 
 };
 var registerRouterView = (_ => {
-  customElements.get('router-view') || registerElement({
+  window.customElements.get('router-view') || registerElement({
     name: 'router-view',
     template: ({
       state: {
@@ -1779,41 +1845,18 @@ let mixinRegistered, customElementsRegistered;
 const registerRouterMixins = _ => mixinRegistered ? undefined : (mixinRegistered = true) && mixin({
   created: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router
 });
-const registerCustomElements = _ => customElementsRegistered ? undefined : (customElementsRegistered = true) && registerRouterView(); // const makeRoute = ({ path, params, hash, fullPath, matched, name, redirectedFrom }) => ({
-//   if (!strict) path = path.replace(/\/$/, '')
-//   if (path[0] === '/') return path
-//   if (parent == null) return path
-//   return `${parent.path}/${path}`.replace(/\/\//g, '/')
-// }
-
-const flattenRoutes = ({
-  routes,
-  path = '',
-  parent,
-  map = new Map()
-}) => routes.forEach(route => {
-  const pathToRegexpOptions = route.pathToRegexpOptions || {};
-  const keys = [];
-  const childPath = `${path}${route.path ? `${path ? '/' : ''}${route.path}` : '?'}`; // const normalizedPath = normalizePath(route.path, {path}, pathToRegexpOptions.strict)
-
-  console.log(childPath);
-
-  const obj = _objectSpread({}, childPath, parent && {
-    parent
-  }, {
-    keys,
-    regex: pathToRegexp__default(childPath, [], pathToRegexpOptions),
-    toPath: pathToRegexp.compile(childPath)
-  });
-
-  map.set(childPath, obj);
-  route.children && flattenRoutes({
-    routes: route.children,
-    path: childPath,
-    parent: obj,
-    map
-  });
-}) || map;
+const registerCustomElements = _ => customElementsRegistered ? undefined : (customElementsRegistered = true) && registerRouterView();
+const compileRoutes = ({
+  routes = []
+} = {}) => routes.map(route => _objectSpread({}, route, {
+  regex: pathToRegexp__default(route.path, [], {
+    end: false
+  }),
+  resolve: ((toPath, params) => toPath(params)).bind(undefined, pathToRegexp.compile(route.path))
+}));
+const matchRoutes = routes => url => routes.filter(({
+  regex
+}) => regex.test(url.pathname));
 const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) => isOzElement ? parentNode : parentNode && getClosestOzElementParent(parentNode);
 
 const history = window.history;
@@ -1823,25 +1866,44 @@ const Router = ({
   linkActiveClass = 'linkActiveClass',
   linkExactActiveClass = 'linkExactActiveClass',
   base = new URL(_base, window.location.origin),
-  _: routes = flattenRoutes({
+  _: routes = compileRoutes({
     routes: _routes
-  })
+  }),
+  matchRoutes: matchRoutes$$1 = matchRoutes(routes)
 } = {}) => {
   registerRouterMixins();
   registerCustomElements();
-  console.log(routes);
 
-  const resolve = (location, current = undefined.currentRoute, append = false) => {};
+  const go = (replace = false) => location => (replace ? history.replaceState : history.pushState).call(history, {}, '', resolve(location));
 
-  const go = (replace = false) => (location, url = typeof location === 'string' ? location : undefined) => (replace ? history.replaceState : history.pushState).call(history, {}, '', new URL(url, base.href));
+  const push = go();
 
-  return reactify({
+  const resolve = (location, url = typeof location === 'string' || location instanceof URL ? new URL(location, window.location) : new URL(`${(location.route || routes.find(({
+    name
+  }) => name === location.route.name)).resolve(location.params)}${new URLSearchParams(location.query).toString()}#${location.hash}`, window.location)) => url.pathname.startsWith(base.pathname) ? url : new URL(url.pathname, base);
+
+  const state = reactify({
+    _url: window.location,
+
+    set url(url) {
+      push(this._url = resolve(url));
+    },
+
+    get url() {
+      return this._url;
+    },
+
     resolve,
-    push: go(),
+    push,
     replace: go(true)
   });
+
+  window.onpopstate = ev => state.url = window.location;
+
+  return state;
 };
 
+exports.poz = poz;
 exports.OzHTMLTemplate = OzHTMLTemplate;
 exports.HTMLTag = HTMLTag;
 exports.html = html;
