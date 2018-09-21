@@ -132,6 +132,17 @@ describe('HTML Template', () => {
             expect(container).to.have.html('<span></span>')
           })
         })
+        describe('node constructor', () => {
+          beforeEach(() => container.appendChild((template = html`${Comment}`).content))
+          afterEach(() => (template = undefined))
+          it('append', () => {
+            expect(container).to.have.html('<!---->')
+          })
+          it('update', () => {
+            expect(_ => template.update(Text)).to.not.throw()
+            expect(container).to.have.html('')
+          })
+        })
         describe('array', () => {
           beforeEach(() => container.appendChild((template = html`${['foo', 'bar', 'baz']}`).content))
           afterEach(() => (template = undefined))

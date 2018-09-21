@@ -37,7 +37,10 @@ const makeText = ({
         replace(arrayFragment, value)
       }
     } else if (type === 'function') {
-      if (value.$promise) {
+      if (value.prototype instanceof Node) {
+        const Constructor = value
+        replace(arrayFragment, new Constructor())
+      } else if (value.$promise) {
         if (value.$resolved) {
           makeText({
             template,
