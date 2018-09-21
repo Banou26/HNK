@@ -13,7 +13,7 @@ const getRand = _ => Math.random().toString(36).substring(7)
 
 const getPathName = _ => window.location.pathname
 
-xdescribe('Router', () => {
+describe('Router', () => {
   let container, router, view, Foo, Bar, Baz, Qux
   beforeEach(() => {
     document.body.appendChild(container = document.createElement('div'))
