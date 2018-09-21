@@ -31,7 +31,7 @@ export const RouterViewMixin = {
 }
 
 export default _ => {
-  customElements.get('router-view') || registerElement({
+  window.customElements.get('router-view') || registerElement({
     name: 'router-view',
     template: ({state: {components}}) => html`${components}`,
     mixins: [RouterViewMixin]
