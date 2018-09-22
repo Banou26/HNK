@@ -1338,18 +1338,7 @@ var set$2 = /*#__PURE__*/Object.freeze({
   default: set$1
 });
 
-const type$4 = RegExp;
-var regexp = (regexp => setReactivity({
-  target: regexp,
-  unreactive: true
-}) || regexp);
-
-var regexp$1 = /*#__PURE__*/Object.freeze({
-  type: type$4,
-  default: regexp
-});
-
-const type$5 = Promise;
+const type$4 = Promise;
 
 const promisify = promise => {
   const func = _ => {};
@@ -1409,22 +1398,30 @@ const promisify = promise => {
 };
 
 var promise = /*#__PURE__*/Object.freeze({
-  type: type$5,
+  type: type$4,
   default: promisify
 });
 
-const type$6 = Node;
+const type$5 = Node;
 var node = (node => setReactivity({
   target: node,
   unreactive: true
 }) || node);
 
 var node$1 = /*#__PURE__*/Object.freeze({
-  type: type$6,
+  type: type$5,
   default: node
 });
 
-const builtIn = [map$1, set$2, regexp$1, promise, node$1];
+var unreactive = [RegExp, URL, window.Location].map(type => ({
+  type,
+  default: obj => setReactivity({
+    target: obj,
+    unreactive: true
+  }) || obj
+}));
+
+const builtIn = [map$1, set$2, promise, node$1, ...unreactive];
 const isBuiltIn = reactiveObject => (builtIn.find(({
   type: type$$1
 }) => reactiveObject instanceof type$$1) || {}).type; // Has to be from most specific(e.g: Map) to less specific(Object)
@@ -1665,6 +1662,7 @@ const registerElement = element => {
   const createdMixins = getMixinProp(mixins$$1, 'created');
   const connectedMixins = getMixinProp(mixins$$1, 'connected');
   const disconnectedMixins = getMixinProp(mixins$$1, 'disconnected');
+  const templateMixins = getMixinProp(mixins$$1, 'template');
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement;
 
   class OzElement$$1 extends Class {
@@ -1695,12 +1693,15 @@ const registerElement = element => {
       }) && props, {})); // State mixins & state
 
       const state = context.state = reactify((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {});
-      states.reverse().forEach(stateMixin => Object.entries(Object.getOwnPropertyDescriptors(stateMixin(context))).forEach(([prop, desc]) => !(prop in state) ? undefined : Object.defineProperty(state, prop, desc))); // HTML Template
+      states.reverse().forEach(stateMixin => Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context)))); // HTML Template
 
-      if (buildHTMLTemplate) {
-        const template = context.template = buildHTMLTemplate(context);
+      if (buildHTMLTemplate || templateMixins.length) {
+        const _template = buildHTMLTemplate || templateMixins[0];
+
+        const template = context.template = _template(context);
+
         if (!template[OzHTMLTemplate]) throw noHTMLTemplateError;
-        watch$1(buildHTMLTemplate.bind(context, context), updatedTemplate => {
+        watch$1(_template.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
           template.update(...updatedTemplate.values);
         });
@@ -1791,61 +1792,82 @@ const registerElement = element => {
 
 const RouterView = Symbol.for('RouterView');
 
-const getRouterViewPosition = ({
-  parentElement
-}, n = 0) => parentElement ? getRouterViewPosition(parentElement, n + (RouterView in parentElement ? 1 : 0)) : n;
+const getClosestRouterView = (node, closestOzElementParent = getClosestOzElementParent(node), isRouter = closestOzElementParent && RouterView in closestOzElementParent) => isRouter ? closestOzElementParent : closestOzElementParent && getClosestRouterView(closestOzElementParent);
 
 const RouterViewMixin = {
   props: ['name'],
   state: ctx => ({
-    get components() {
-      const {
-        router: {
-          currentRoutesComponents,
-          currentRoute: {
-            matched
-          } = {}
-        } = {},
-        props: {
-          name = 'default'
-        }
-      } = ctx;
+    get url() {
+      var _getClosestRouterView, _ctx$router;
 
-      if (matched) {
-        const routeConfig = matched[getRouterViewPosition(ctx.host)]; // todo: manage the stuff with selecting router-view name prop ect
+      return ((_getClosestRouterView = getClosestRouterView(ctx.element)) === null || _getClosestRouterView === void 0 ? void 0 : _getClosestRouterView.childPathname) || ((_ctx$router = ctx.router) === null || _ctx$router === void 0 ? void 0 : _ctx$router.url);
+    },
 
-        return [...(currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig).values())];
-        /* components */
-        // return currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig)/* components */.get(name)/* component */
-      }
+    get pathname() {
+      var _this$url;
+
+      return (_this$url = this.url) === null || _this$url === void 0 ? void 0 : _this$url.pathname;
+    },
+
+    get matches() {
+      var _ctx$router2;
+
+      return this.url && ((_ctx$router2 = ctx.router) === null || _ctx$router2 === void 0 ? void 0 : _ctx$router2.matchRoutes(this.url));
+    },
+
+    get route() {
+      var _this$matches;
+
+      return (_this$matches = this.matches) === null || _this$matches === void 0 ? void 0 : _this$matches[0];
+    },
+
+    get content() {
+      var _this$route;
+
+      return (_this$route = this.route) === null || _this$route === void 0 ? void 0 : _this$route.content;
+    },
+
+    get childPathname() {
+      var _this$pathname, _this$pathname$replac, _this$route2;
+
+      return (_this$pathname = this.pathname) === null || _this$pathname === void 0 ? void 0 : (_this$pathname$replac = _this$pathname.replace) === null || _this$pathname$replac === void 0 ? void 0 : _this$pathname$replac.call(_this$pathname, (_this$route2 = this.route) === null || _this$route2 === void 0 ? void 0 : _this$route2.regex, '');
     }
 
   }),
+  template: ({
+    state: {
+      content
+    }
+  }) => html`${content}`,
 
   created({
     element
   }) {
     element[RouterView] = true;
-  }
+  },
 
+  watchers: [({
+    element,
+    state: {
+      route
+    }
+  }) => element.route = route, ({
+    element,
+    state: {
+      childPathname
+    }
+  }) => element.childPathname = childPathname]
 };
-var registerRouterView = (_ => {
-  window.customElements.get('router-view') || registerElement({
-    name: 'router-view',
-    template: ({
-      state: {
-        components
-      }
-    }) => html`${components}`,
-    mixins: [RouterViewMixin]
-  });
-});
+var registerRouterView = (_ => customElements.get('router-view') || registerElement({
+  name: 'router-view',
+  mixins: [RouterViewMixin]
+}));
 
-let mixinRegistered, customElementsRegistered;
-const registerRouterMixins = _ => mixinRegistered ? undefined : (mixinRegistered = true) && mixin({
+const routerGlobalMixin = {
   created: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router
-});
-const registerCustomElements = _ => customElementsRegistered ? undefined : (customElementsRegistered = true) && registerRouterView();
+};
+const registerRouterMixins = _ => mixins.includes(routerGlobalMixin) || mixin(routerGlobalMixin);
+const registerCustomElements = _ => registerRouterView();
 const compileRoutes = ({
   routes = []
 } = {}) => routes.map(route => _objectSpread({}, route, {
@@ -1883,6 +1905,8 @@ const Router = ({
   }) => name === location.route.name)).resolve(location.params)}${new URLSearchParams(location.query).toString()}#${location.hash}`, window.location)) => url.pathname.startsWith(base.pathname) ? url : new URL(url.pathname, base);
 
   const state = reactify({
+    routes,
+    matchRoutes: matchRoutes$$1,
     _url: window.location,
 
     set url(url) {
@@ -1922,3 +1946,4 @@ exports.react = reactify;
 exports.reactivity = reactivity;
 exports.registerRouterMixins = registerRouterMixins;
 exports.Router = Router;
+exports.RouterViewMixin = RouterViewMixin;
