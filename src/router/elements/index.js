@@ -1,1 +1,1 @@
-export { default as registerRouterView } from './router-view.js'
+export { default as registerRouterView, RouterViewMixin } from './router-view.js'

@@ -1,5 +1,6 @@
 import { r } from '../reactivity/index.js'
 import { registerRouterMixins, registerCustomElements, compileRoutes, matchRoutes as _matchRoutes } from './utils.js'
+export { RouterViewMixin } from './elements/index.js'
 
 export {
   registerRouterMixins
@@ -45,6 +46,8 @@ export const Router = ({
       : new URL(url.pathname, base)
 
   const state = r({
+    routes,
+    matchRoutes,
     _url: window.location,
     set url (url) { push(this._url = resolve(url)) },
     get url () { return this._url },

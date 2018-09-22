@@ -43,6 +43,7 @@ export const registerElement = element => {
   const createdMixins = getMixinProp(mixins, 'created')
   const connectedMixins = getMixinProp(mixins, 'connected')
   const disconnectedMixins = getMixinProp(mixins, 'disconnected')
+  const templateMixins = getMixinProp(mixins, 'template')
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement
   class OzElement extends Class {
     constructor () {
@@ -74,14 +75,16 @@ export const registerElement = element => {
       }) && props, {}))
       // State mixins & state
       const state = context.state = r((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {})
-      states.reverse().forEach(stateMixin =>
-        Object.entries(Object.getOwnPropertyDescriptors(stateMixin(context)))
-          .forEach(([prop, desc]) => !(prop in state) ? undefined : Object.defineProperty(state, prop, desc)))
+      states
+        .reverse()
+        .forEach(stateMixin =>
+          Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context))))
       // HTML Template
-      if (buildHTMLTemplate) {
-        const template = context.template = buildHTMLTemplate(context)
+      if (buildHTMLTemplate || templateMixins.length) {
+        const _template = buildHTMLTemplate || templateMixins[0]
+        const template = context.template = _template(context)
         if (!template[OzHTMLTemplate]) throw noHTMLTemplateError
-        watch(buildHTMLTemplate.bind(context, context), updatedTemplate => {
+        watch(_template.bind(context, context), updatedTemplate => {
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
         })
