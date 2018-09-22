@@ -1,6 +1,6 @@
 {
   "name": "oz.js",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "main": "dist/cjs-oz.js",
   "module": "dist/esm-oz.js",
   "source": "src/index.js",
@@ -8,6 +8,7 @@
   "devDependencies": {
     "@babel/core": "^7.1.0",
     "@babel/plugin-proposal-object-rest-spread": "^7.0.0",
+    "@babel/plugin-proposal-optional-chaining": "^7.0.0",
     "babel-loader": "^8.0.2",
     "chai": "^4.1.2",
     "chai-dom": "^1.8.0",
