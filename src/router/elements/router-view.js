@@ -1,39 +1,39 @@
 import { registerElement } from '../../elements/index.js'
 import { html } from '../../template/html/index.js'
+import { getClosestOzElementParent } from '../utils.js'
 
 const RouterView = Symbol.for('RouterView')
 
-const getRouterViewPosition = ({parentElement}, n = 0) =>
-  parentElement
-    ? getRouterViewPosition(parentElement, n + (RouterView in parentElement ? 1 : 0))
-    : n
-const getRouterViewPositionElement = (route, n) =>
-  n
-    ? getRouterViewPositionElement(route.parent, n - 1)
-    : route
+const getClosestRouterView = (
+  node,
+  closestOzElementParent = getClosestOzElementParent(node),
+  isRouter = closestOzElementParent && RouterView in closestOzElementParent
+) =>
+  isRouter
+    ? closestOzElementParent
+    : closestOzElementParent && getClosestRouterView(closestOzElementParent)
 
 export const RouterViewMixin = {
   props: ['name'],
   state: ctx => ({
-    get components () {
-      const { router: { currentRoutesComponents, currentRoute: { matched } = {} } = {}, props: { name = 'default' } } = ctx
-      if (matched) {
-        const routeConfig = matched[getRouterViewPosition(ctx.host)]
-        // todo: manage the stuff with selecting router-view name prop ect
-        return [...currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig).values()]/* components */
-        // return currentRoutesComponents.has(routeConfig) && currentRoutesComponents.get(routeConfig)/* components */.get(name)/* component */
-      }
-    }
+    get url () { return (getClosestRouterView(ctx.element)?.childPathname || ctx.router?.url) },
+    get pathname () { return this.url?.pathname },
+    get matches () { return this.url && ctx.router?.matchRoutes(this.url) },
+    get route () { return this.matches?.[0] },
+    get content () { return this.route?.content },
+    get childPathname () { return this.pathname?.replace?.(this.route?.regex, '') }
   }),
-  created ({element}) {
-    element[RouterView] = true
-  }
+  template: ({ state: { content } }) => html`${content}`,
+  created ({element}) { element[RouterView] = true },
+  watchers: [
+    ({ element, state: { route }}) => (element.route = route),
+    ({ element, state: { childPathname }}) => (element.childPathname = childPathname)
+  ]
 }
 
-export default _ => {
-  window.customElements.get('router-view') || registerElement({
+export default _ =>
+  customElements.get('router-view') ||
+  registerElement({
     name: 'router-view',
-    template: ({state: {components}}) => html`${components}`,
     mixins: [RouterViewMixin]
   })
-}
