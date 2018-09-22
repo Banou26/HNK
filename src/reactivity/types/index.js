@@ -3,16 +3,16 @@ import * as object from './object.js'
 import * as array from './array.js'
 import * as map from './map.js'
 import * as set from './set.js'
-import * as regexp from './regexp.js'
 import * as promise from './promise.js'
 import * as node from './node.js'
+import unreactive from './unreactive.js'
 
 const builtIn = [
   map,
   set,
-  regexp,
   promise,
-  node
+  node,
+  ...unreactive
 ]
 
 export const isBuiltIn = reactiveObject => (builtIn.find(({type}) => reactiveObject instanceof type) || {}).type
