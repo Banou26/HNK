@@ -63,7 +63,7 @@ const findPlaceholdersAndPaths = (
         .filter(({type}) => type === 'declarationPlaceholder')
         .forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name]))
       : rule.type.startsWith('atRule')
-        ? undefined
+        ? rule.rulelist?.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]))
         : rule.type.startsWith('stylesheet')
           ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]))
           : undefined) ||
