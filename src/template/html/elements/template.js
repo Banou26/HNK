@@ -84,6 +84,6 @@ class OzHTMLTemplate extends HTMLTemplateElement {
   }
 }
 
-customElements.define('oz-html-template', OzHTMLTemplate, { extends: 'template' })
+customElements.get('oz-html-template') || customElements.define('oz-html-template', OzHTMLTemplate, { extends: 'template' })
 
 export default options => new OzHTMLTemplate(options)
