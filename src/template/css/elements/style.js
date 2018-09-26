@@ -5,7 +5,6 @@ import { OzStyle as OzStyleSymbol } from './utils.js'
 export class OzStyle extends HTMLStyleElement {
   constructor ({ templateId, css, values, ast, placeholdersMetadata }) {
     super()
-
     this.ast = ast
     this.templateId = templateId
     this.values = values
@@ -27,6 +26,7 @@ export class OzStyle extends HTMLStyleElement {
   }
 
   update (...values) {
+    if (!this.placeholders) return void (this.values = values)
     for (const placeholder of this.placeholders) placeholder({ values, forceUpdate: this.forceUpdate })
     this.values = values
   }
@@ -49,6 +49,6 @@ export class OzStyle extends HTMLStyleElement {
   }
 }
 
-customElements.define('oz-style', OzStyle, { extends: 'style' })
+customElements.get('oz-style') || customElements.define('oz-style', OzStyle, { extends: 'style' })
 
 export default options => new OzStyle(options)
