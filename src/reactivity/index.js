@@ -1,9 +1,10 @@
-import { reactivity, watch as _watch, rootObjects, getReactivityRoot, setReactivityRoot } from './utils.js'
+import { reactivity, watch as _watch, rootObjects, getReactivityRoot, setReactivityRoot, isolate } from './utils.js'
 import types from './types/index.js'
 
 export {
   getReactivityRoot,
-  setReactivityRoot
+  setReactivityRoot,
+  isolate
 }
 
 const reactify = (obj) => {
