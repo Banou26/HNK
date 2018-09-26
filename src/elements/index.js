@@ -1,6 +1,6 @@
 import { OzHTMLTemplate } from '../template/html/index.js'
 import { OzStyle } from '../template/css/index.js'
-import { r, watch } from '../reactivity/index.js'
+import { r, watch, isolate } from '../reactivity/index.js'
 import {
   OzElementContext,
   mixins as globalMixins,
@@ -44,10 +44,16 @@ export const registerElement = element => {
   const connectedMixins = getMixinProp(mixins, 'connected')
   const disconnectedMixins = getMixinProp(mixins, 'disconnected')
   const templateMixins = getMixinProp(mixins, 'template')
+  const styleMixins = getMixinProp(mixins, 'style')
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement
   class OzElement extends Class {
+    // TODO: test if i need to make a helper function from the reactivity side to isolate the constructors
+    // because they can register some dependencies in the parent templates dependencies
     constructor () {
       super()
+      // isolate(_ => {
+
+      // })
       const shadowDomType = typeof shadowDom
       const host = shadowDomType === 'string'
         ? this.attachShadow({ mode: shadowDom })
@@ -82,18 +88,29 @@ export const registerElement = element => {
       // HTML Template
       if (buildHTMLTemplate || templateMixins.length) {
         const _template = buildHTMLTemplate || templateMixins[0]
-        const template = context.template = _template(context)
-        if (!template[OzHTMLTemplate]) throw noHTMLTemplateError
-        watch(_template.bind(context, context), updatedTemplate => {
+        let template
+        // eslint-disable-next-line no-return-assign
+        watch(_ =>
+          template
+            ? _template.call(context, context)
+            : (template = context.template = _template.call(context, context)),
+        updatedTemplate => {
+          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
         })
       }
       // CSS Template
-      if (buildCSSTemplate) {
-        const template = context.style = buildCSSTemplate(context)
-        if (!template[OzStyle]) throw noOzStyleError
-        watch(buildCSSTemplate.bind(context, context), updatedTemplate => {
+      if (buildCSSTemplate || styleMixins.length) {
+        const _style = buildCSSTemplate || styleMixins[0]
+        let template
+        // eslint-disable-next-line no-return-assign
+        watch(_ =>
+          template
+            ? _style.call(context, context)
+            : (template = context.style = _style.call(context, context)),
+        updatedTemplate => {
+          if (!updatedTemplate[OzStyle]) throw noOzStyleError
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
         })
@@ -126,7 +143,7 @@ export const registerElement = element => {
           if (root === document) host.getRootNode({composed: true}).head.appendChild(style)
           else root.appendChild(style)
         }
-        style.update()
+        // style.update(...style.values)
       }
       // Connected mixins & connected
       connectedMixins.forEach(mixin => mixin(context))
