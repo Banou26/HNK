@@ -3,7 +3,7 @@ import { placeholderRegex } from './utils.js'
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 
-const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/
+const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?:(.*))?/
 const gRegex = new RegExp(regex, 'gm')
 
 const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/
@@ -26,7 +26,9 @@ const pushLine = ({childs: currentChilds}, line) => {
 const hierarchise = arr => {
   const hierarchisedArr = []
   for (let line of arr) {
-    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line)
+    if (hierarchisedArr.length &&
+      hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation &&
+      hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line)
     else hierarchisedArr.push(line)
   }
   return hierarchisedArr
@@ -52,7 +54,7 @@ const pozToHTML = str =>
             ? undefined
             : tag || 'div',
           attributes: match[4],
-          id,
+          id: id?.replace(/^#/, ''),
           classList,
           textContent: match[5],
           childs: []
