@@ -56,7 +56,7 @@ describe('Router', () => {
   })
   describe('#replace', () => {
     it('is defined', () => expect(router).to.have.property('replace'))
-    fit('push the url to the history', () => {
+    it('push the url to the history', () => {
       const rand = getRand()
       router.push(`/${rand}`)
       expect(getPathName()).to.equal(`/${rand}`)
