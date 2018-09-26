@@ -6,14 +6,14 @@ export {
   OzHTMLTemplate
 }
 
-const styles = new Map()
+const elements = new Map()
 
 export const HTMLTag = (transform = str => str) => (strings, ...values) => {
   const templateId = 'html' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2)
-  if (styles.has(templateId)) return styles.get(templateId).clone(values)
+  if (elements.has(templateId)) return elements.get(templateId).clone(values)
   const { fragment, placeholdersMetadata } = parse({ transform, strings, values })
-  styles.set(templateId, createTemplate({ templateId, originalFragment: fragment, values, placeholdersMetadata }))
-  return styles.get(templateId).clone(values)
+  elements.set(templateId, createTemplate({ templateId, originalFragment: fragment, values, placeholdersMetadata }))
+  return elements.get(templateId).clone(values)
 }
 
 export const html = HTMLTag()
