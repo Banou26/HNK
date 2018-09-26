@@ -38,14 +38,14 @@ export const notify = ({ target, property, value, deep }) => {
   callWatchers(watchers)
 }
 
-export const setReactivity = ({target, unreactive, original, object}) => {
+export const setReactivity = ({ target, unreactive, original, object }) => {
   if (unreactive) return (target[reactivity] = false)
   if (original) (rootObjects).set(original, target)
   Object.defineProperty(target, reactivity, { value: { watchers: [], properties: new Map(), object }, configurable: true, writable: true })
   Object.defineProperty(target, '$watch', { value: watch(target), configurable: true, writable: true })
 }
 
-export const registerWatcher = (getter, watcher, {object, property} = {}) => {
+export const registerWatcher = (getter, watcher, { object, property } = {}) => {
   watcher.object = object
   watcher.property = property
   rootWatchers.push(watcher)
@@ -68,7 +68,7 @@ export const propertyReactivity = (target, property) => {
 export const pushWatcher = (object, watcher) =>
   object &&
   typeof object === 'object' &&
-  reactivity in object &&
+  object[reactivity] &&
   !object[reactivity].watchers.includes(watcher) &&
   object[reactivity].watchers.push(watcher)
 
@@ -80,13 +80,13 @@ export const includeWatcher = (arr, watcher) =>
     watcher.object === _watcher.object &&
     watcher.property === _watcher.property)
 
-const pushCurrentWatcher = ({watchers}) => {
+const pushCurrentWatcher = ({ watchers }) => {
   const currentWatcher = rootWatchers[rootWatchers.length - 1]
   if (currentWatcher && !includeWatcher(watchers, currentWatcher)) watchers.push(currentWatcher)
 }
 
 export const registerDependency = ({ target, property }) => {
-  if (!rootWatchers.length || !(reactivity in target)) return
+  if (!rootWatchers.length || !target[reactivity]) return
   if (property) pushCurrentWatcher(propertyReactivity(target, property))
   else pushCurrentWatcher(target[reactivity])
 }
@@ -117,8 +117,15 @@ export const watch = target => (getter, handler) => {
       pushWatcher(target, watcher)
     }
   }
-  watcher.deep = options && options.deep
+  watcher.deep = options?.deep
   if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher)
   pushWatcher(getter ? oldValue : target, watcher)
-  return _ => (unwatch = true) && undefined
+  return _ => void (unwatch = true)
+}
+
+export const isolate = func => {
+  rootWatchers.push(_ => {})
+  const value = func()
+  rootWatchers.pop()
+  return value
 }
