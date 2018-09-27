@@ -166,7 +166,7 @@ const makeText = ({
   } else if (type === 'function') {
     if (value.prototype instanceof Node) {
       const Constructor = value;
-      replace(arrayFragment, new Constructor());
+      if (arrayFragment[0] instanceof Constructor) replace(arrayFragment, arrayFragment[0]);else replace(arrayFragment, new Constructor());
     } else if (value.$promise) {
       if (value.$resolved) {
         makeText({
@@ -526,15 +526,15 @@ class OzHTMLTemplate$1 extends HTMLTemplateElement {
 
 }
 
-customElements.define('oz-html-template', OzHTMLTemplate$1, {
+customElements.get('oz-html-template') || customElements.define('oz-html-template', OzHTMLTemplate$1, {
   extends: 'template'
 });
 var createTemplate = (options => new OzHTMLTemplate$1(options));
 
-const styles = new Map();
+const elements = new Map();
 const HTMLTag = (transform = str => str) => (strings, ...values) => {
   const templateId = 'html' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
-  if (styles.has(templateId)) return styles.get(templateId).clone(values);
+  if (elements.has(templateId)) return elements.get(templateId).clone(values);
   const {
     fragment,
     placeholdersMetadata
@@ -543,13 +543,13 @@ const HTMLTag = (transform = str => str) => (strings, ...values) => {
     strings,
     values
   });
-  styles.set(templateId, createTemplate({
+  elements.set(templateId, createTemplate({
     templateId,
     originalFragment: fragment,
     values,
     placeholdersMetadata
   }));
-  return styles.get(templateId).clone(values);
+  return elements.get(templateId).clone(values);
 };
 const html = HTMLTag();
 
@@ -681,17 +681,22 @@ const findPlaceholdersAndPaths = (rule, placeholders = [], _path = [], path = [.
   value,
   parameters,
   text = type.startsWith('declaration') ? value.text : undefined
-} = rule, vals = [selector || name || value, text || parameters]) => // match, create PlaceholderMetadata and push to placeholders
-(void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
-  type: type.slice(0, -'Placeholder'.length),
-  values: vals,
-  ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
-  path,
-  rule
-})) || // search for placeholders in childs
-Array.isArray(rule) ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i])) : rule.type.startsWith('ruleset') ? rule.rulelist.rules.filter(({
-  type
-}) => type === 'declarationPlaceholder').forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])) : rule.type.startsWith('atRule') ? undefined : rule.type.startsWith('stylesheet') ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : undefined) || placeholders;
+} = rule, vals = [selector || name || value, text || parameters]) => {
+  var _rule$rulelist;
+
+  return (// match, create PlaceholderMetadata and push to placeholders
+    (void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
+      type: type.slice(0, -'Placeholder'.length),
+      values: vals,
+      ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
+      path,
+      rule
+    })) || // search for placeholders in childs
+    Array.isArray(rule) ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i])) : rule.type.startsWith('ruleset') ? rule.rulelist.rules.filter(({
+      type
+    }) => type === 'declarationPlaceholder').forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])) : rule.type.startsWith('atRule') ? (_rule$rulelist = rule.rulelist) === null || _rule$rulelist === void 0 ? void 0 : _rule$rulelist.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : rule.type.startsWith('stylesheet') ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : undefined) || placeholders
+  );
+};
 
 var parse$1 = (({
   transform,
@@ -857,6 +862,8 @@ class OzStyle$1 extends HTMLStyleElement {
   }
 
   update(...values) {
+    if (!this.placeholders) return void (this.values = values);
+
     for (const placeholder$$1 of this.placeholders) placeholder$$1({
       values,
       forceUpdate: this.forceUpdate
@@ -883,15 +890,15 @@ class OzStyle$1 extends HTMLStyleElement {
   }
 
 }
-customElements.define('oz-style', OzStyle$1, {
+customElements.get('oz-style') || customElements.define('oz-style', OzStyle$1, {
   extends: 'style'
 });
 var createStyle = (options => new OzStyle$1(options));
 
-const elements = new Map();
+const styles = new Map();
 const CSSTag = (transform = str => str) => (strings, ...values) => {
   const templateId = 'css' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
-  if (elements.has(templateId)) return elements.get(templateId).clone(values);
+  if (styles.has(templateId)) return styles.get(templateId).clone(values);
   const {
     ast,
     css,
@@ -901,19 +908,19 @@ const CSSTag = (transform = str => str) => (strings, ...values) => {
     strings,
     values
   });
-  elements.set(templateId, createStyle({
+  styles.set(templateId, createStyle({
     templateId,
     css,
     values,
     ast,
     placeholdersMetadata
   }));
-  return elements.get(templateId).clone(values);
+  return styles.get(templateId).clone(values);
 };
 const css = CSSTag();
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
-const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: (.*))?/;
+const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?:(.*))?/;
 const gRegex = new RegExp(regex, 'gm');
 const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/;
 const gIdentifierRegex = new RegExp(identifierRegex, 'g');
@@ -966,7 +973,7 @@ const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(rege
     indentation: match[1].split('\n').pop().length,
     tag: match[2] ? undefined : tag || 'div',
     attributes: match[4],
-    id,
+    id: id === null || id === void 0 ? void 0 : id.replace(/^#/, ''),
     classList,
     textContent: match[5],
     childs: []
@@ -974,6 +981,55 @@ const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(rege
 })).map(line => makeHTML(line)).join('');
 
 const poz = HTMLTag(pozToHTML);
+
+const strictWhitespaceRegex = /[^\S\r\n]*/;
+const propertyNameRegex = /[a-zA-Z0-9-]*/;
+const unnestedAtRule = ['@charset', '@import', '@namespace'];
+
+const makeCSS = ({
+  indent,
+  str,
+  childs
+}, {
+  selector: selectorPrefix = ''
+} = {}) => {
+  str = str.trim();
+  const isAtRule = str.startsWith('@');
+
+  if (unnestedAtRule.some(atRule => str.startsWith(atRule))) {
+    return `${str};`;
+  } else if (childs.length) {
+    const selector = isAtRule ? str : str.split(',').map(str => str.includes('&') ? str.replace('&', selectorPrefix) : `${selectorPrefix} ${str}`, '').join(',').trim();
+    return `${selector}{${childs.filter(({
+      childs
+    }) => !childs.length || isAtRule).map(node => makeCSS(node)).join('')}}${isAtRule ? '' : childs.filter(({
+      childs
+    }) => childs.length).map(node => makeCSS(node, {
+      selector
+    })).join('')}`;
+  } else {
+    const propertyName = str.match(propertyNameRegex)[0];
+    const rest = str.slice(propertyName.length + 1).trim();
+    const propertyValue = rest.startsWith(':') ? rest.slice(1) : rest;
+    return `${propertyName}:${propertyValue.trim()};`;
+  }
+};
+
+const hierarchise$1 = (childs, item, lastChild = childs === null || childs === void 0 ? void 0 : childs[(childs === null || childs === void 0 ? void 0 : childs.length) - 1]) => (lastChild === null || lastChild === void 0 ? void 0 : lastChild.multiline) || item.indent > (lastChild === null || lastChild === void 0 ? void 0 : lastChild.indent) || 0 ? hierarchise$1(lastChild.childs, item) : childs.push(item);
+
+const sozToCSS = str => str.split('\n').filter(str => str.trim().length).map(_str => {
+  const indent = _str.match(strictWhitespaceRegex)[0].length;
+
+  const str = _str.slice(indent);
+
+  return {
+    indent,
+    str,
+    childs: []
+  };
+}).reduce((arr, item) => (hierarchise$1(arr, item), arr), []).map(item => makeCSS(item)).join('');
+
+const soz = CSSTag(sozToCSS);
 
 const getPropertyDescriptorPair = (prototype, property) => {
   let descriptor = Object.getOwnPropertyDescriptor(prototype, property);
@@ -995,6 +1051,10 @@ var proxify = (object => {
   const proxy = new Proxy(object, {
     get(target, property, receiver) {
       if (reactivityProperties.includes(property)) return Reflect.get(target, property, receiver);
+      registerDependency({
+        target,
+        property
+      });
 
       const propertyReactivity$$1 = propertyReactivity(target, property);
 
@@ -1009,84 +1069,27 @@ var proxify = (object => {
         if ('cache' in propertyReactivity$$1) {
           value = propertyReactivity$$1.cache;
         } else {
-          const watcher = _ => {
-            notify({
-              target,
-              property
-            });
-          };
-
-          watcher.propertyReactivity = propertyReactivity$$1;
-          watcher.cache = true;
-          value = registerWatcher(_ => propertyReactivity$$1.cache = Reflect.get(target, property, receiver), watcher, {
-            object,
+          value = registerWatcher(_ => propertyReactivity$$1.cache = Reflect.get(target, property, receiver), _ => notify({
+            target,
             property
+          }), {
+            object,
+            property,
+            propertyReactivity: propertyReactivity$$1,
+            cache: true
           });
         }
       }
 
-      registerDependency({
-        target,
-        property
-      });
-      if (value && (typeof value === 'object' || typeof value === 'function') && value[reactivity]) registerDependency({
-        target: value
-      });
       return value;
     },
 
-    set(target, property, _value, receiver) {
-      registerDependency({
-        target: receiver,
-        property
-      });
-      if (_value === target[property]) return true;
-
-      if (reactivityProperties.includes(property)) {
-        registerDependency({
-          target: _value,
-          property
-        });
-        return Reflect.set(target, property, _value, receiver);
-      }
-
-      let value = reactify(_value);
-      registerDependency({
-        target: value,
-        property
-      });
-      if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue;else if (typeof value === 'function' && value.$promise) {
-        value.$promise.then(val => target[property] === value ? receiver[property] = val : undefined);
-      }
-
-      if (value && typeof value === 'object' && value[reactivity]) {
-        let unwatch = value.$watch(_ => target[property] === value ? notify({
-          target,
-          property,
-          value,
-          deep: true
-        }) : unwatch(), {
-          deep: true
-        });
-      }
-
-      try {
-        return Reflect.set(target, property, value, receiver);
-      } finally {
-        notify({
-          target,
-          property,
-          value
-        });
-      }
-    },
-
     deleteProperty(target, property) {
+      if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property);
       registerDependency({
         target: target,
         property
       });
-      if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property);
 
       try {
         return Reflect.deleteProperty(target, property);
@@ -1102,7 +1105,7 @@ var proxify = (object => {
       }
     },
 
-    defineProperty(target, property, _ref
+    defineProperty(target, property, desc, _ref = desc
     /* desc */
     ) {
       let {
@@ -1110,41 +1113,48 @@ var proxify = (object => {
       } = _ref,
           rest = _objectWithoutProperties(_ref, ["value"]);
 
-      if (reactivityProperties.includes(property)) {
-        registerDependency({
-          target: _value,
-          property
-        });
-        return Reflect.defineProperty(target, property, _objectSpread({}, _value !== undefined && {
-          value: _value
-        }, rest)) || true;
+      if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc);
+      registerDependency({
+        target,
+        property
+      });
+
+      if (!_value) {
+        try {
+          // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
+          return Reflect.defineProperty(target, property, _objectSpread({}, _value !== undefined && {
+            value: _value
+          }, rest));
+        } finally {
+          notify({
+            target,
+            property,
+            value: _value
+          });
+        }
       }
 
       let value = reactify(_value);
-      registerDependency({
-        target: value,
-        property
-      });
       if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue;else if (typeof value === 'function' && value.$promise) {
         value.$promise.then(val => target[property] === value ? proxy[property] = val : undefined);
-      }
-
-      if (value && typeof value === 'object' && value[reactivity]) {
-        let unwatch = value.$watch(_ => target[property] === value ? notify({
-          target,
-          property,
-          value,
-          deep: true
-        }) : unwatch(), {
-          deep: true
-        });
       }
 
       try {
         return Reflect.defineProperty(target, property, _objectSpread({}, value !== undefined && {
           value: value
-        }, rest)) || true;
+        }, rest));
       } finally {
+        if (value && typeof value === 'object' && value[reactivity]) {
+          let unwatch = value.$watch(_ => target[property] === value ? notify({
+            target,
+            property,
+            value,
+            deep: true
+          }) : unwatch(), {
+            deep: true
+          });
+        }
+
         notify({
           target,
           property,
@@ -1539,12 +1549,8 @@ const setReactivity = ({
     writable: true
   });
 };
-const registerWatcher = (getter, watcher, {
-  object,
-  property
-} = {}) => {
-  watcher.object = object;
-  watcher.property = property;
+const registerWatcher = (getter, watcher, options = {}) => {
+  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options));
   rootWatchers.push(watcher);
   const value = getter();
   rootWatchers.pop();
@@ -1562,7 +1568,7 @@ const propertyReactivity = (target, property) => {
   properties.set(property, propertyReactivity);
   return propertyReactivity;
 };
-const pushWatcher = (object, watcher) => object && typeof object === 'object' && reactivity in object && !object[reactivity].watchers.includes(watcher) && object[reactivity].watchers.push(watcher);
+const pushWatcher = (object, watcher, options = {}) => Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) && object && typeof object === 'object' && object[reactivity] && !object[reactivity].watchers.includes(watcher) && object[reactivity].watchers.push(watcher);
 const includeWatcher = (arr, watcher) => arr.includes(watcher) || arr.some(_watcher => watcher.object && watcher.property && watcher.object === _watcher.object && watcher.property === _watcher.property);
 
 const pushCurrentWatcher = ({
@@ -1576,7 +1582,7 @@ const registerDependency = ({
   target,
   property
 }) => {
-  if (!rootWatchers.length || !(reactivity in target)) return;
+  if (!rootWatchers.length || !target[reactivity]) return;
   if (property) pushCurrentWatcher(propertyReactivity(target, property));else pushCurrentWatcher(target[reactivity]);
 };
 const watch = target => (getter, handler) => {
@@ -1603,21 +1609,21 @@ const watch = target => (getter, handler) => {
     if (unwatch) return;
 
     if (getter) {
-      let newValue = registerWatcher(getter, watcher);
-      pushWatcher(newValue, watcher);
+      let newValue = registerWatcher(getter, watcher, options);
+      pushWatcher(newValue, watcher, options);
       if (handler) handler(newValue, oldValue);
       oldValue = newValue;
     } else {
       handler(target, target);
-      pushWatcher(target, watcher);
+      pushWatcher(target, watcher, options);
     }
   };
 
-  watcher.deep = options && options.deep;
-  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher);
-  pushWatcher(getter ? oldValue : target, watcher);
-  return _ => (unwatch = true) && undefined;
+  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options);
+  pushWatcher(getter ? oldValue : target, watcher, options);
+  return _ => void (unwatch = true);
 };
+const isolate = func => registerWatcher(func, _ => {});
 
 const reactify = obj => {
   if (!obj || typeof obj !== 'object' || reactivity in obj) return obj;
@@ -1663,9 +1669,12 @@ const registerElement = element => {
   const connectedMixins = getMixinProp(mixins$$1, 'connected');
   const disconnectedMixins = getMixinProp(mixins$$1, 'disconnected');
   const templateMixins = getMixinProp(mixins$$1, 'template');
+  const styleMixins = getMixinProp(mixins$$1, 'style');
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement;
 
   class OzElement$$1 extends Class {
+    // TODO: test if i need to make a helper function from the reactivity side to isolate the constructors
+    // because they can register some dependencies in the parent templates dependencies
     constructor() {
       super();
       const shadowDomType = typeof shadowDom;
@@ -1698,20 +1707,23 @@ const registerElement = element => {
       if (buildHTMLTemplate || templateMixins.length) {
         const _template = buildHTMLTemplate || templateMixins[0];
 
-        const template = context.template = _template(context);
+        let template; // eslint-disable-next-line no-return-assign
 
-        if (!template[OzHTMLTemplate]) throw noHTMLTemplateError;
-        watch$1(_template.bind(context, context), updatedTemplate => {
+        watch$1(_ => template ? _template.call(context, context) : template = context.template = _template.call(context, context), updatedTemplate => {
+          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError;
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
           template.update(...updatedTemplate.values);
         });
       } // CSS Template
 
 
-      if (buildCSSTemplate) {
-        const template = context.style = buildCSSTemplate(context);
-        if (!template[OzStyle]) throw noOzStyleError;
-        watch$1(buildCSSTemplate.bind(context, context), updatedTemplate => {
+      if (buildCSSTemplate || styleMixins.length) {
+        const _style = buildCSSTemplate || styleMixins[0];
+
+        let template; // eslint-disable-next-line no-return-assign
+
+        watch$1(_ => template ? _style.call(context, context) : template = context.style = _style.call(context, context), updatedTemplate => {
+          if (!updatedTemplate[OzStyle]) throw noOzStyleError;
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError;
           template.update(...updatedTemplate.values);
         });
@@ -1760,8 +1772,7 @@ const registerElement = element => {
           if (root === document) host.getRootNode({
             composed: true
           }).head.appendChild(style);else root.appendChild(style);
-        }
-        style.update();
+        } // style.update(...style.values)
       } // Connected mixins & connected
 
 
@@ -1792,7 +1803,9 @@ const registerElement = element => {
 
 const RouterView = Symbol.for('RouterView');
 
-const getClosestRouterView = (node, closestOzElementParent = getClosestOzElementParent(node), isRouter = closestOzElementParent && RouterView in closestOzElementParent) => isRouter ? closestOzElementParent : closestOzElementParent && getClosestRouterView(closestOzElementParent);
+const getClosestRouterView = (node, closestOzElementParent = getClosestOzElementParent(node), isRouter = closestOzElementParent && RouterView in closestOzElementParent) => isRouter ? closestOzElementParent : closestOzElementParent && getClosestRouterView(closestOzElementParent); // TODO(reactivity optimisation): find why there's 3 first renders instead of just 1, it has to do with the reactivity & the dependency chain:
+// matches -> route -> content, maybe calling the template everytime, it should only be called 1 time at the first render
+
 
 const RouterViewMixin = {
   props: ['name'],
@@ -1896,21 +1909,23 @@ const Router = ({
   registerRouterMixins();
   registerCustomElements();
 
-  const go = (replace = false) => location => (replace ? history.replaceState : history.pushState).call(history, {}, '', resolve(location));
+  let _state;
+
+  const go = (replace = false) => location => (replace ? history.replaceState : history.pushState).call(history, {}, '', _state._url = resolve(location));
 
   const push = go();
 
-  const resolve = (location, url = typeof location === 'string' || location instanceof URL ? new URL(location, window.location) : new URL(`${(location.route || routes.find(({
+  const resolve = (location, url = typeof location === 'string' || location instanceof URL || location instanceof window.Location ? new URL(location, window.location) : new URL(`${(location.route || routes.find(({
     name
   }) => name === location.route.name)).resolve(location.params)}${new URLSearchParams(location.query).toString()}#${location.hash}`, window.location)) => url.pathname.startsWith(base.pathname) ? url : new URL(url.pathname, base);
 
   const state = reactify({
     routes,
     matchRoutes: matchRoutes$$1,
-    _url: window.location,
+    _url: new URL(window.location),
 
     set url(url) {
-      push(this._url = resolve(url));
+      return push(this._url = resolve(url)) && url;
     },
 
     get url() {
@@ -1921,13 +1936,15 @@ const Router = ({
     push,
     replace: go(true)
   });
+  _state = state;
 
-  window.onpopstate = ev => state.url = window.location;
+  window.onpopstate = ev => state.replace(window.location);
 
   return state;
 };
 
 exports.poz = poz;
+exports.soz = soz;
 exports.OzHTMLTemplate = OzHTMLTemplate;
 exports.HTMLTag = HTMLTag;
 exports.html = html;
@@ -1938,9 +1955,10 @@ exports.OzElementContext = OzElementContext;
 exports.OzElement = OzElement;
 exports.mixin = mixin;
 exports.registerElement = registerElement;
+exports.watch = watch$1;
 exports.getReactivityRoot = getReactivityRoot;
 exports.setReactivityRoot = setReactivityRoot;
-exports.watch = watch$1;
+exports.isolate = isolate;
 exports.r = reactify;
 exports.react = reactify;
 exports.reactivity = reactivity;

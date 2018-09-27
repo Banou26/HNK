@@ -1,6 +1,6 @@
 {
   "name": "oz.js",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "main": "dist/cjs-oz.js",
   "module": "dist/esm-oz.js",
   "source": "src/index.js",
