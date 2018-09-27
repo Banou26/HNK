@@ -20,17 +20,19 @@ export const Router = ({
   registerRouterMixins()
   registerCustomElements()
 
+  let _state
+
   const go = (replace = false) =>
     location =>
       (replace
         ? history.replaceState
-        : history.pushState).call(history, {}, '', resolve(location))
+        : history.pushState).call(history, {}, '', (_state._url = resolve(location)))
 
   const push = go()
 
   const resolve = (
     location,
-    url = typeof location === 'string' || location instanceof URL
+    url = typeof location === 'string' || location instanceof URL || location instanceof window.Location
       ? new URL(location, window.location)
       : new URL(`${(
         location.route ||
@@ -48,15 +50,16 @@ export const Router = ({
   const state = r({
     routes,
     matchRoutes,
-    _url: window.location,
-    set url (url) { push(this._url = resolve(url)) },
+    _url: new URL(window.location),
+    set url (url) { return push(this._url = resolve(url)) && url },
     get url () { return this._url },
     resolve,
     push,
     replace: go(true)
   })
+  _state = state
 
-  window.onpopstate = ev => (state.url = window.location)
+  window.onpopstate = ev => state.replace(window.location)
 
   return state
 }
