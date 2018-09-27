@@ -1,6 +1,6 @@
 import { OzHTMLTemplate } from '../template/html/index.js'
 import { OzStyle } from '../template/css/index.js'
-import { r, watch, isolate } from '../reactivity/index.js'
+import { r, watch } from '../reactivity/index.js'
 import {
   OzElementContext,
   mixins as globalMixins,
@@ -51,9 +51,6 @@ export const registerElement = element => {
     // because they can register some dependencies in the parent templates dependencies
     constructor () {
       super()
-      // isolate(_ => {
-
-      // })
       const shadowDomType = typeof shadowDom
       const host = shadowDomType === 'string'
         ? this.attachShadow({ mode: shadowDom })
