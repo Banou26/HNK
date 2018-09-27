@@ -6,6 +6,7 @@ export default object => {
   const proxy = new Proxy(object, {
     get (target, property, receiver) {
       if (reactivityProperties.includes(property)) return Reflect.get(target, property, receiver)
+      registerDependency({ target, property })
       const propertyReactivity = _propertyReactivity(target, property)
       const descriptor = getPropertyDescriptor(target, property)
       let value
@@ -15,46 +16,17 @@ export default object => {
         if ('cache' in propertyReactivity) {
           value = propertyReactivity.cache
         } else {
-          const watcher = _ => {
-            notify({ target, property })
-          }
-          watcher.propertyReactivity = propertyReactivity
-          watcher.cache = true
-          value = registerWatcher(_ => (propertyReactivity.cache = Reflect.get(target, property, receiver)), watcher, {object, property})
+          value = registerWatcher(
+            _ => (propertyReactivity.cache = Reflect.get(target, property, receiver)),
+            _ => notify({ target, property }),
+            { object, property, propertyReactivity, cache: true })
         }
       }
-      registerDependency({ target, property })
-      if (value && (typeof value === 'object' || typeof value === 'function') && value[reactivity]) registerDependency({ target: value })
       return value
     },
-    set (target, property, _value, receiver) {
-      registerDependency({ target: receiver, property })
-      if (_value === target[property]) return true
-      if (reactivityProperties.includes(property)) {
-        registerDependency({ target: _value, property })
-        return Reflect.set(target, property, _value, receiver)
-      }
-      let value = r(_value)
-      registerDependency({ target: value, property })
-      if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue
-      else if (typeof value === 'function' && value.$promise) {
-        value.$promise.then(val =>
-          target[property] === value
-            ? (receiver[property] = val)
-            : undefined)
-      }
-      if (value && typeof value === 'object' && value[reactivity]) {
-        let unwatch = value.$watch(_ => target[property] === value ? notify({ target, property, value, deep: true }) : unwatch(), { deep: true })
-      }
-      try {
-        return Reflect.set(target, property, value, receiver)
-      } finally {
-        notify({ target, property, value })
-      }
-    },
     deleteProperty (target, property) {
-      registerDependency({ target: target, property })
       if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property)
+      registerDependency({ target: target, property })
       try {
         return Reflect.deleteProperty(target, property)
       } finally {
@@ -63,16 +35,21 @@ export default object => {
         if (!properties.get(property).watchers.length) properties.delete(property)
       }
     },
-    defineProperty (target, property, {value: _value, ...rest}/* desc */) {
-      if (reactivityProperties.includes(property)) {
-        registerDependency({ target: _value, property })
-        return Reflect.defineProperty(target, property, {
-          ..._value !== undefined && { value: _value },
-          ...rest
-        }) || true
+    defineProperty (target, property, desc, { value: _value, ...rest } = desc/* desc */) {
+      if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc)
+      registerDependency({ target, property })
+      if (!_value) {
+        try {
+          // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
+          return Reflect.defineProperty(target, property, {
+            ..._value !== undefined && { value: _value },
+            ...rest
+          })
+        } finally {
+          notify({ target, property, value: _value })
+        }
       }
       let value = r(_value)
-      registerDependency({ target: value, property })
       if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue
       else if (typeof value === 'function' && value.$promise) {
         value.$promise.then(val =>
@@ -80,15 +57,19 @@ export default object => {
             ? (proxy[property] = val)
             : undefined)
       }
-      if (value && typeof value === 'object' && value[reactivity]) {
-        let unwatch = value.$watch(_ => target[property] === value ? notify({ target, property, value, deep: true }) : unwatch(), { deep: true })
-      }
       try {
         return Reflect.defineProperty(target, property, {
           ...value !== undefined && { value: value },
           ...rest
-        }) || true
+        })
       } finally {
+        if (value && typeof value === 'object' && value[reactivity]) {
+          let unwatch = value.$watch(_ =>
+            target[property] === value
+              ? notify({ target, property, value, deep: true })
+              : unwatch()
+            , { deep: true })
+        }
         notify({ target, property, value })
       }
     }

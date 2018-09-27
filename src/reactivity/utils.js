@@ -45,9 +45,8 @@ export const setReactivity = ({ target, unreactive, original, object }) => {
   Object.defineProperty(target, '$watch', { value: watch(target), configurable: true, writable: true })
 }
 
-export const registerWatcher = (getter, watcher, { object, property } = {}) => {
-  watcher.object = object
-  watcher.property = property
+export const registerWatcher = (getter, watcher, options = {}) => {
+  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options))
   rootWatchers.push(watcher)
   const value = getter()
   rootWatchers.pop()
@@ -65,7 +64,8 @@ export const propertyReactivity = (target, property) => {
   return propertyReactivity
 }
 
-export const pushWatcher = (object, watcher) =>
+export const pushWatcher = (object, watcher, options = {}) =>
+  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) &&
   object &&
   typeof object === 'object' &&
   object[reactivity] &&
@@ -108,24 +108,18 @@ export const watch = target => (getter, handler) => {
   const watcher = _ => {
     if (unwatch) return
     if (getter) {
-      let newValue = registerWatcher(getter, watcher)
-      pushWatcher(newValue, watcher)
+      let newValue = registerWatcher(getter, watcher, options)
+      pushWatcher(newValue, watcher, options)
       if (handler) handler(newValue, oldValue)
       oldValue = newValue
     } else {
       handler(target, target)
-      pushWatcher(target, watcher)
+      pushWatcher(target, watcher, options)
     }
   }
-  watcher.deep = options?.deep
-  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher)
-  pushWatcher(getter ? oldValue : target, watcher)
+  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options)
+  pushWatcher(getter ? oldValue : target, watcher, options)
   return _ => void (unwatch = true)
 }
 
-export const isolate = func => {
-  rootWatchers.push(_ => {})
-  const value = func()
-  rootWatchers.pop()
-  return value
-}
+export const isolate = func => registerWatcher(func, _ => {})

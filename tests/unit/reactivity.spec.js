@@ -132,6 +132,12 @@ describe('Reactive', () => {
         expect(changed).to.equal(true)
       })
       describe('unwatch', () => {
+        it(`--deep unregister the watcher`, () => {
+          let changed
+          react.$watch(_ => (changed = true), { deep: true })()
+          react.d.e = 0
+          expect(changed).to.equal(undefined)
+        })
         it('unregister the watcher', () => {
           let changed
           react.$watch(_ => (changed = true))()
