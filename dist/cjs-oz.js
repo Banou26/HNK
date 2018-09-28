@@ -727,12 +727,10 @@ var makeStyleProperty = (({
   getValueResult = toPlaceholderString(values[1]),
   _name = `--${path[path.length - 1]}`
 }) => ({
-  values,
-  forceUpdate
+  values
 }) => {
   style.removeProperty(_name);
-  _name = getNameResult(values);
-  style.setProperty(_name, getValueResult(values));
+  style.setProperty(_name = getNameResult(values), getValueResult(values));
 });
 
 const OzStyle = Symbol.for('OzStyle');
