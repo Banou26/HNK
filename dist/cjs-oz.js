@@ -974,7 +974,7 @@ const stringifier = new class extends shadyCssParser.Stringifier {
   expressionPlaceholder({
     text
   }) {
-    return text.replace(placeholderRegex, 'var(--$&)');
+    return `${text.replace(placeholderRegex, 'var(--$&)')}${text.endsWith(';') ? '' : ';'}`;
   }
 
 }();

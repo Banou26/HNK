@@ -967,7 +967,7 @@ const stringifier = new class extends Stringifier {
   expressionPlaceholder({
     text
   }) {
-    return text.replace(placeholderRegex, 'var(--$&)');
+    return `${text.replace(placeholderRegex, 'var(--$&)')}${text.endsWith(';') ? '' : ';'}`;
   }
 
 }();
