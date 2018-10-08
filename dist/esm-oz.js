@@ -108,7 +108,7 @@ const makeElement = ({
 
         const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values);
 
-        if (attributeName) element.setAttribute(attributeName, value || '');
+        if (attributeName) element.setAttribute(attributeName, value.trim() || '');
         _value = value;
       }
 
@@ -616,99 +616,191 @@ function _objectWithoutProperties(source, excluded) {
   return target;
 }
 
-const makeMethod = name => (_this, ...args) => _objectSpread({}, NodeFactory.prototype[name].apply(_this, args), singlePlaceholderRegex.test(args[0]) ? {
-  type: `${name}Placeholder`
-} : undefined);
+const globalRemovedIds = [];
+const globalIds = [];
 
-const parser = new Parser(new class Factory extends NodeFactory {
-  constructor() {
-    super();
-
-    for (const name of ['ruleset', 'expression']) this[name] = makeMethod(name).bind(undefined, this);
-  }
-
-  atRule(...args) {
-    return _objectSpread({}, super.atRule(...args), args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) ? {
-      type: 'atRulePlaceholder'
-    } : undefined);
-  }
-
-  declaration(...args) {
-    return _objectSpread({}, super.declaration(...args), singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text) ? {
-      type: 'declarationPlaceholder'
-    } : undefined);
-  }
-
-}());
-const stringifier = new class extends Stringifier {
-  atRulePlaceholder(...args) {
-    return super.atRule(...args);
-  }
-
-  rulesetPlaceholder({
-    selector,
-    rulelist
-  }) {
-    return `${selector}${this.visit(rulelist)}`;
-  }
-
-  declarationPlaceholder({
-    name,
-    value
-  }) {
-    return `--${name}${value ? `:${this.visit(value)}` : ''}`;
-  }
-
-  expressionPlaceholder({
-    text
-  }) {
-    return text.replace(placeholderRegex, 'var(--$&)');
-  }
-
-}();
-
-const findPlaceholdersAndPaths = (rule, placeholders = [], _path = [], path = [..._path], {
-  type,
-  selector,
-  name,
-  value,
-  parameters,
-  text = type.startsWith('declaration') ? value.text : undefined
-} = rule, vals = [selector || name || value, text || parameters]) => {
-  var _rule$rulelist;
-
-  return (// match, create PlaceholderMetadata and push to placeholders
-    (void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
-      type: type.slice(0, -'Placeholder'.length),
-      values: vals,
-      ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
-      path,
-      rule
-    })) || // search for placeholders in childs
-    Array.isArray(rule) ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i])) : rule.type.startsWith('ruleset') ? rule.rulelist.rules.filter(({
-      type
-    }) => type === 'declarationPlaceholder').forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])) : rule.type.startsWith('atRule') ? (_rule$rulelist = rule.rulelist) === null || _rule$rulelist === void 0 ? void 0 : _rule$rulelist.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : rule.type.startsWith('stylesheet') ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : undefined) || placeholders
-  );
+const makeUniqueId = (n = globalRemovedIds.length ? globalRemovedIds.shift() : (globalIds[globalIds.length - 1] === undefined ? -1 : 0) + 1) => {
+  globalIds.splice(n, 0, n);
+  return {
+    id: n,
+    match: undefined,
+    strId: undefined,
+    strAttrId: undefined,
+    originalSelector: undefined,
+    selector: undefined,
+    nodeSelector: undefined,
+    nodes: new Map(),
+    unregister: _ => {
+      globalRemovedIds.push(n);
+      globalIds.splice(globalIds.indexOf(n), 1);
+    }
+  };
 };
 
-var parse$1 = (({
-  transform,
-  strings,
-  values
-}, ast = parser.parse(transform(strings.reduce((str, str2, i) => `${str}${typeof values[i - 1] === 'object' ? `@supports (${placeholder(i - 1)}) {}` : placeholder(i - 1)}${str2}`)))) => ast.rules.forEach(rule => rule.string = stringifier.stringify(rule)) || {
-  ast,
-  css: stringifier.stringify(ast),
-  placeholdersMetadata: findPlaceholdersAndPaths(ast)
+const watchedElements = new Map();
+let measuringElement = document.createElement('div');
+measuringElement.style.display = 'none';
+var resizeObserver = new ResizeObserver(entries => {
+  for (let entry of entries) {
+    const {
+      target
+    } = entry;
+    const containerQueries = watchedElements.get(entry.target);
+    const cr = entry.contentRect;
+    target.parentNode.insertBefore(measuringElement, target);
+
+    for (const containerQuery$$1 of containerQueries) {
+      measuringElement.style.height = containerQuery$$1.match[3];
+      const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height);
+      const property = containerQuery$$1.match[2].endsWith('height') ? 'height' : containerQuery$$1.match[2].endsWith('width') ? 'width' : undefined;
+
+      if (containerQuery$$1.match[2].startsWith('min') && cr[property] > containerQueryPxValue || containerQuery$$1.match[2].startsWith('max') && cr[property] < containerQueryPxValue) {
+        target.setAttribute(containerQuery$$1.strId, '');
+      } else {
+        target.removeAttribute(containerQuery$$1.strId);
+      }
+    }
+
+    measuringElement.remove();
+    measuringElement.style.height = '';
+  }
 });
+
+const watchElement = (elem, containerQuery$$1) => {
+  const _containerQueries = watchedElements.get(elem);
+
+  const containerQueries = _containerQueries || [];
+  containerQueries.push(containerQuery$$1);
+  if (!_containerQueries) watchedElements.set(elem, containerQueries);
+  resizeObserver.observe(elem);
+  return _ => {
+    containerQueries.splice(containerQueries.indexOf(containerQuery$$1), 1);
+    if (!containerQueries.length) watchedElements.delete(elem);
+    resizeObserver.unobserve(elem);
+
+    for (const [node] of containerQuery$$1.nodes) node.removeAttribute(containerQuery$$1.strId);
+  };
+};
 
 var makeStyle = (({
   placeholderMetadata,
+  placeholderMetadata: {
+    values: [_selector],
+    rule: _rule
+  },
   rules: [rule],
-  getResult = toPlaceholderString(placeholderMetadata.values[0])
-}) => ({
-  values,
-  forceUpdate
-}) => rule.selectorText = getResult(values));
+  placeholderIds = toPlaceholdersNumber(_selector)
+}) => {
+  const {
+    ownerDocument
+  } = rule.parentStyleSheet.ownerNode;
+  const getResult = toPlaceholderString(placeholderMetadata.values[0]);
+
+  let _containerQueries;
+
+  const matchContainerQueriesNodes = _ => {
+    for (const containerQuery$$1 of _containerQueries) {
+      const matchedNodes = Array.from(ownerDocument.querySelectorAll(containerQuery$$1.nodeSelector));
+      const containerQueryNodes = Array.from(containerQuery$$1.nodes.keys());
+      containerQueryNodes.filter(node => !matchedNodes.includes(node)) // Removed nodes
+      .forEach(node => {
+        containerQuery$$1.nodes.get(node)(); // Unregister watcher
+
+        containerQuery$$1.nodes.delete(node);
+      });
+      matchedNodes.filter(node => !containerQueryNodes.includes(node)) // Added nodes
+      .forEach(node => containerQuery$$1.nodes.set(node, watchElement(node, containerQuery$$1)
+      /* Register watcher */
+      ));
+    }
+  };
+
+  const mutationObserver = new MutationObserver(matchContainerQueriesNodes);
+  let firstInit = false;
+
+  let _values;
+
+  return [({
+    values,
+    forceUpdate
+  }) => {
+    // Update
+    if (!placeholderIds.length
+    /* static container query */
+    && placeholderIds.map((id, i) => values[i]).some((val, i) => {
+      var _values2;
+
+      return ((_values2 = _values) === null || _values2 === void 0 ? void 0 : _values2[i]) !== val;
+    }) // used values changed
+    && firstInit) return;
+    const result = getResult(values);
+
+    if (containerQueryRegex.test(result)) {
+      mutationObserver.observe(ownerDocument, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+
+      if (_containerQueries) {
+        for (const containerQuery$$1 of _containerQueries) {
+          containerQuery$$1.unregister();
+        }
+
+        _containerQueries = undefined;
+      }
+
+      const containerQueries = result // TODO: replace this ',' split by a regex to make it work with attributes selector containing a ','
+      .split(',').filter(str => containerQueryRegex.test(str)).map((str, i) => {
+        let containerQueries = [];
+        let match;
+
+        while (match = globalContainerQueryRegex.exec(str)) {
+          const uniqueId = makeUniqueId();
+          uniqueId.match = match;
+          uniqueId.strId = containerQuery(uniqueId.id);
+          uniqueId.strAttrId = containerQueryAttribute(uniqueId.id);
+          containerQueries.push(uniqueId);
+        }
+
+        const selector = containerQueries.reduce((str, {
+          strAttrId,
+          match
+        }) => str.replace(match[0], strAttrId), result);
+
+        for (const containerQuery$$1 of containerQueries) {
+          containerQuery$$1.originalSelector = str;
+          containerQuery$$1.selector = selector;
+          containerQuery$$1.nodeSelector = selector.slice(0, selector.indexOf(containerQuery$$1.strAttrId)).replace(globalContainerQueryAttributeRegex, '');
+        }
+
+        return containerQueries;
+      }).flat(Infinity);
+      const selector = containerQueries.reduce((str, {
+        originalSelector,
+        selector
+      }) => str.replace(originalSelector, selector), result);
+      rule.selectorText = selector;
+      _containerQueries = containerQueries;
+      matchContainerQueriesNodes();
+    } else {
+
+      if (_containerQueries) {
+        for (const containerQuery$$1 of _containerQueries) {
+          containerQuery$$1.unregister();
+        }
+
+        _containerQueries = undefined;
+      }
+
+      rule.selectorText = result;
+    }
+
+    _values = values;
+    firstInit = true;
+  }, _ => {
+  }];
+});
 
 var makeStyleProperty = (({
   placeholderMetadata: {
@@ -754,6 +846,12 @@ const makeStylesheet = ({
   _value = value;
 };
 
+const containerQueryRegex = /:element\(((.*?)=(.*?))\)/;
+const globalContainerQueryRegex = new RegExp(containerQueryRegex, 'g');
+const containerQuery = i => `oz-container-query-${i}`;
+const containerQueryAttribute = i => `[oz-container-query-${i}]`;
+const containerQueryAttributeRegex = /\[oz-container-query-(\d)\]/;
+const globalContainerQueryAttributeRegex = new RegExp(containerQueryAttributeRegex, 'g');
 const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) => {
   const stylesheet$$1 = oldRules[0].parentStyleSheet;
   const stylesheetCssRules = stylesheet$$1.cssRules;
@@ -821,6 +919,93 @@ const placeholdersMetadataToPlaceholders$1 = ({
   };
 };
 
+const parser = new Parser(new class Factory extends NodeFactory {
+  ruleset(...args) {
+    return _objectSpread({}, super.ruleset(...args), singlePlaceholderRegex.test(args[0]) || args[0].includes(':element') ? {
+      type: `rulesetPlaceholder`
+    } : undefined);
+  }
+
+  expression(...args) {
+    return _objectSpread({}, super.expression(...args), singlePlaceholderRegex.test(args[0]) ? {
+      type: `expressionPlaceholder`
+    } : undefined);
+  }
+
+  atRule(...args) {
+    return _objectSpread({}, super.atRule(...args), args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) ? {
+      type: 'atRulePlaceholder'
+    } : undefined);
+  }
+
+  declaration(...args) {
+    return _objectSpread({}, super.declaration(...args), singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text) ? {
+      type: 'declarationPlaceholder'
+    } : undefined);
+  }
+
+}());
+const stringifier = new class extends Stringifier {
+  atRulePlaceholder(...args) {
+    return super.atRule(...args);
+  }
+
+  rulesetPlaceholder({
+    selector,
+    rulelist
+  }) {
+    return `${selector.replace(/:element\((.*?)\)/g, '')}${this.visit(rulelist)}`;
+  }
+
+  declarationPlaceholder({
+    name,
+    value
+  }) {
+    return `--${name}${value ? `:${this.visit(value)}` : ''}`;
+  }
+
+  expressionPlaceholder({
+    text
+  }) {
+    return text.replace(placeholderRegex, 'var(--$&)');
+  }
+
+}();
+
+const findPlaceholdersAndPaths = (rule, placeholders = [], _path = [], path = [..._path], {
+  type,
+  selector,
+  name,
+  value,
+  parameters,
+  text = type.startsWith('declaration') ? value.text : undefined
+} = rule, vals = [selector || name || value, text || parameters]) => {
+  var _rule$rulelist;
+
+  return (// match, create PlaceholderMetadata and push to placeholders
+    (void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
+      type: type.slice(0, -'Placeholder'.length),
+      values: vals,
+      ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
+      path,
+      rule
+    })) || // search for placeholders in childs
+    Array.isArray(rule) ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i])) : rule.type.startsWith('ruleset') ? rule.rulelist.rules.filter(({
+      type
+    }) => type === 'declarationPlaceholder').forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])) : rule.type.startsWith('atRule') ? (_rule$rulelist = rule.rulelist) === null || _rule$rulelist === void 0 ? void 0 : _rule$rulelist.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : rule.type.startsWith('stylesheet') ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : undefined) || placeholders
+  );
+};
+
+var parse$1 = (({
+  transform,
+  strings,
+  values
+}, ast = parser.parse(transform(strings.reduce((str, str2, i) => `${str}${typeof values[i - 1] === 'object' ? `@supports (${placeholder(i - 1)}) {}` : placeholder(i - 1)}${str2}`)))) => ast.rules.forEach(rule => rule.string = stringifier.stringify(rule)) || {
+  ast,
+  css: stringifier.stringify(ast),
+  placeholdersMetadata: findPlaceholdersAndPaths(ast)
+});
+
 class OzStyle$1 extends HTMLStyleElement {
   constructor({
     templateId,
@@ -854,12 +1039,10 @@ class OzStyle$1 extends HTMLStyleElement {
 
   update(...values) {
     if (!this.placeholders) return void (this.values = values);
-
-    for (const placeholder$$1 of this.placeholders) placeholder$$1({
+    this.placeholders.forEach(placeholder$$1 => (Array.isArray(placeholder$$1) ? placeholder$$1[0] : placeholder$$1)({
       values,
       forceUpdate: this.forceUpdate
-    });
-
+    }));
     this.values = values;
   }
 
@@ -878,6 +1061,10 @@ class OzStyle$1 extends HTMLStyleElement {
     this.update(...this.values);
     this.forceUpdate = false;
     return childRules;
+  }
+
+  disconnectedCallback() {
+    this.placeholders.filter(Array.isArray).forEach(([, unregister]) => unregister());
   }
 
 }
