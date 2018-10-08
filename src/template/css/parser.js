@@ -41,7 +41,7 @@ const stringifier = new class extends Stringifier {
   atRulePlaceholder (...args) { return super.atRule(...args) }
   rulesetPlaceholder ({ selector, rulelist }) { return `${selector.replace(/:element\((.*?)\)/g, '')}${this.visit(rulelist)}` }
   declarationPlaceholder ({ name, value }) { return `--${name}${value ? `:${this.visit(value)}` : ''}` }
-  expressionPlaceholder ({ text }) { return text.replace(placeholderRegex, 'var(--$&)') }
+  expressionPlaceholder ({ text }) { return `${text.replace(placeholderRegex, 'var(--$&)')}${text.endsWith(';') ? '' : ';'}` }
 }()
 
 const findPlaceholdersAndPaths = (
