@@ -1,4 +1,5 @@
 import { NodeFactory, Stringifier, Parser } from 'shady-css-parser'
+import { containerQueryRegex } from './utils.js'
 import { placeholderRegex, singlePlaceholderRegex, placeholder as toPlaceholder, charToN } from '../utils.js'
 
 const makeMethod = name => (_this, ...args) => ({
@@ -7,9 +8,18 @@ const makeMethod = name => (_this, ...args) => ({
 })
 
 const parser = new Parser(new class Factory extends NodeFactory {
-  constructor () {
-    super()
-    for (const name of ['ruleset', 'expression']) this[name] = makeMethod(name).bind(undefined, this)
+  ruleset (...args) {
+    return {
+      ...super.ruleset(...args),
+      ...singlePlaceholderRegex.test(args[0]) || args[0].includes(':element') ? { type: `rulesetPlaceholder` } : undefined
+    }
+  }
+
+  expression (...args) {
+    return {
+      ...super.expression(...args),
+      ...singlePlaceholderRegex.test(args[0]) ? { type: `expressionPlaceholder` } : undefined
+    }
   }
 
   atRule (...args) {
@@ -29,7 +39,7 @@ const parser = new Parser(new class Factory extends NodeFactory {
 
 const stringifier = new class extends Stringifier {
   atRulePlaceholder (...args) { return super.atRule(...args) }
-  rulesetPlaceholder ({ selector, rulelist }) { return `${selector}${this.visit(rulelist)}` }
+  rulesetPlaceholder ({ selector, rulelist }) { return `${selector.replace(/:element\((.*?)\)/g, '')}${this.visit(rulelist)}` }
   declarationPlaceholder ({ name, value }) { return `--${name}${value ? `:${this.visit(value)}` : ''}` }
   expressionPlaceholder ({ text }) { return text.replace(placeholderRegex, 'var(--$&)') }
 }()

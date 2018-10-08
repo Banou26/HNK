@@ -1,5 +1,13 @@
 import { styleProperty as makeStyleProperty, style as makeStyle, stylesheet as makeStylesheet } from './types/index.js'
 
+export const containerQueryRegex = /:element\(((.*?)=(.*?))\)/
+export const globalContainerQueryRegex = new RegExp(containerQueryRegex, 'g')
+
+export const containerQuery = i => `oz-container-query-${i}`
+export const containerQueryAttribute = i => `[oz-container-query-${i}]`
+export const containerQueryAttributeRegex = /\[oz-container-query-(\d)\]/
+export const globalContainerQueryAttributeRegex = new RegExp(containerQueryAttributeRegex, 'g')
+
 export const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) => {
   const stylesheet = oldRules[0].parentStyleSheet
   const stylesheetCssRules = stylesheet.cssRules
