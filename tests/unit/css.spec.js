@@ -64,8 +64,8 @@ describe('CSS Template', () => {
         expect(rule.selectorText).to.equal('.foobarbaz')
       })
       it('update', () => {
-        expect(_ => style.update('rab')).to.not.throw()
-        expect(rule.selectorText).to.equal('.foorabbaz')
+        expect(_ => style.update('qux')).to.not.throw()
+        expect(rule.selectorText).to.equal('.fooquxbaz')
       })
     })
     describe('style declaration', () => {
