@@ -27,7 +27,10 @@ export class OzStyle extends HTMLStyleElement {
 
   update (...values) {
     if (!this.placeholders) return void (this.values = values)
-    for (const placeholder of this.placeholders) placeholder({ values, forceUpdate: this.forceUpdate })
+    this.placeholders.forEach(placeholder =>
+      (Array.isArray(placeholder)
+        ? placeholder[0]
+        : placeholder)({ values, forceUpdate: this.forceUpdate }))
     this.values = values
   }
 
@@ -46,6 +49,12 @@ export class OzStyle extends HTMLStyleElement {
     this.update(...this.values)
     this.forceUpdate = false
     return childRules
+  }
+
+  disconnectedCallback () {
+    this.placeholders
+      .filter(Array.isArray)
+      .forEach(([, unregister]) => unregister())
   }
 }
 
