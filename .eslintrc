@@ -24,6 +24,8 @@
     "HTMLTemplateElement": true,
     "MouseEvent": true,
     "HTMLStyleElement": true,
-    "File": true
+    "File": true,
+    "ResizeObserver": true,
+    "MutationObserver": true
   }
 }
