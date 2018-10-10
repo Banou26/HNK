@@ -31,34 +31,60 @@ const watchedElements = new Map()
 let measuringElement = document.createElement('div')
 measuringElement.style.display = 'none'
 
-var resizeObserver = new ResizeObserver(entries => {
-  for (let entry of entries) {
-    const { target } = entry
-    const containerQueries = watchedElements.get(entry.target)
-    const cr = entry.contentRect
-    target.parentNode.insertBefore(measuringElement, target)
-    for (const containerQuery of containerQueries) {
-      measuringElement.style.height = containerQuery.match[3]
-      const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height)
-      const property =
-        containerQuery.match[2].endsWith('height')
-          ? 'height'
-          : containerQuery.match[2].endsWith('width')
-            ? 'width'
-            : undefined
-      if (
-        (containerQuery.match[2].startsWith('min') && cr[property] > containerQueryPxValue) ||
-        (containerQuery.match[2].startsWith('max') && cr[property] < containerQueryPxValue)
-      ) {
-        target.setAttribute(containerQuery.strId, '')
-      } else {
-        target.removeAttribute(containerQuery.strId)
+const updateElement = (target, contentRect = target.getClientRects()) => {
+  const containerQueries = watchedElements.get(target)
+  target.parentNode.insertBefore(measuringElement, target)
+  for (const containerQuery of containerQueries) {
+    measuringElement.style.height = containerQuery.match[3]
+    const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height)
+    const property =
+      containerQuery.match[2].endsWith('height')
+        ? 'height'
+        : containerQuery.match[2].endsWith('width')
+          ? 'width'
+          : undefined
+    if (
+      (containerQuery.match[2].startsWith('min') && contentRect[property] > containerQueryPxValue) ||
+      (containerQuery.match[2].startsWith('max') && contentRect[property] < containerQueryPxValue)
+    ) {
+      target.setAttribute(containerQuery.strId, '')
+    } else {
+      target.removeAttribute(containerQuery.strId)
+    }
+  }
+  measuringElement.remove()
+  measuringElement.style.height = ''
+}
+
+const observed = new Map()
+let resizeObserver = 
+  'ResizeObserver' in window
+    ? new ResizeObserver(entries => {
+        for (let { target, contentRect } of entries) {
+          updateElement(target, contentRect)
+        }
+      })
+    : {
+      observe: elem => observed.set(elem, elem.getClientRects()),
+      unobserve: elem => observed.delete(elem)
+    }
+
+if (!'ResizeObserver' in window) {
+  const test = _ => {
+    for (const [entry, { height: _height, width: _width }] of watchedElements) {
+      const bounds = entry.getClientRects()
+      const { height, width } = bounds
+      if (height !== _height || width !== _width) {
+        updateElement(entry, contentRect)
+        observed.set(elem, bounds)
       }
     }
-    measuringElement.remove()
-    measuringElement.style.height = ''
+    window.requestAnimationFrame(test)
   }
-})
+  window.requestAnimationFrame(test)
+}
+
+
 
 const watchElement = (elem, containerQuery) => {
   const _containerQueries = watchedElements.get(elem)
