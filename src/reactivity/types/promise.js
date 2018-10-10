@@ -3,25 +3,19 @@ import { setReactivity, notify, reactivity } from '../utils.js'
 
 export const type = Promise
 
-const promisify = promise => {
-  const func = _ => {}
-  Object.defineProperty(func, '$promise', { value: promise })
-  Object.defineProperty(func, '$resolved', { value: false })
-  const proxy = new Proxy(func, {
-    get (target, prop, receiver) {
-      if (prop in func) return func[prop]
-      if (prop in Promise.prototype) return typeof promise[prop] === 'function' ? promise[prop].bind(promise) : promise[prop]
-      else {
-        return promisify(new Promise(async (resolve, reject) => {
-          try {
-            resolve((await promise)[prop])
-          } catch (err) { reject(err) }
-        }))
-      }
-    },
-    async apply (target, thisArg, argumentsList) { return (await promise).apply(thisArg, argumentsList) }
+const promisify = _promise => {
+  const promise = _promise.then()
+  Object.defineProperty(promise, '$promise', { value: promise })
+  Object.defineProperty(promise, '$resolved', { value: false })
+  const proxy = new Proxy(promise, {
+    get: (target, prop, receiver) =>
+      prop in target
+        ? typeof target[prop] === 'function'
+          ? target[prop].bind(target)
+          : target[prop]
+        : promisify(target.then(val => val?.[prop]))
   })
-  setReactivity({ target: proxy, object: func, original: promise })
+  setReactivity({ target: proxy, object: promise, original: promise })
   promise.then(value => {
     if (value && typeof value === 'object') {
       const reactiveValue = r(value)
@@ -31,7 +25,7 @@ const promisify = promise => {
       Object.defineProperty(object, '$resolvedValue', { value })
     }
     notify({ target: proxy })
-  })
+  }).catch(err => err)
   return proxy
 }
 export default promisify

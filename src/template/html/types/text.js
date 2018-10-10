@@ -18,7 +18,24 @@ const makeText = ({
   }) => {
     const type = typeof value
     if (value && type === 'object') {
-      if (value && value[OzHTMLTemplate]) {
+      if (value.$promise) {
+        if (value.$resolved) {
+          makeText({
+            template,
+            placeholderMetadata,
+            arrayFragment
+          })({ value: value.$resolvedValue })
+        } else {
+          replace(arrayFragment, new Text())
+          value.then(resolvedValue =>
+            _value === value
+              ? template.update(...template.values.map((_, i) =>
+                i === placeholderMetadata.ids[0]
+                  ? resolvedValue
+                  : _))
+              : undefined)
+        }
+      } else if (value && value[OzHTMLTemplate]) {
         // if (_value.) todo: update the current template if its the same id
         replace(arrayFragment, value.childNodes)
       } else if (Array.isArray(value)) {
@@ -41,23 +58,6 @@ const makeText = ({
         const Constructor = value
         if (arrayFragment[0] instanceof Constructor) replace(arrayFragment, arrayFragment[0])
         else replace(arrayFragment, new Constructor())
-      } else if (value.$promise) {
-        if (value.$resolved) {
-          makeText({
-            template,
-            placeholderMetadata,
-            arrayFragment
-          })({ value: value.$resolvedValue })
-        } else {
-          replace(arrayFragment, new Text())
-          value.then(resolvedValue =>
-            _value === value
-              ? template.update(...template.values.map((_, i) =>
-                i === placeholderMetadata.ids[0]
-                  ? resolvedValue
-                  : _))
-              : undefined)
-        }
       } else {
         makeText({
           template,
