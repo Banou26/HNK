@@ -10,13 +10,15 @@ const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/
 const gIdentifierRegex = new RegExp(identifierRegex, 'g')
 const classRegex = /class="(.*)"/
 
-const makeHTML = ({tag, attributes, childs, textContent, id, classList}) => {
+const makeHTML = ({tag, attributes, childs, textContent, id, classList, i, forceText, match}) => {
+  if (forceText) return (i ? '\n' : '') + match.input.trim()
+  const childForceText = classList.includes('')
   const classStr = classList.join(' ')
   let attrStr = attributes ? ' ' + attributes : ''
   if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`)
   else if (classStr) attrStr += ` class="${classStr}"`
-  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map(line => makeHTML(line)).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`
-  else return '\n' + textContent
+  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map((line, i) => makeHTML({...line, forceText: childForceText, i})).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`
+  else return (i ? '\n' : '') + textContent
 }
 
 const pushLine = ({childs: currentChilds}, line) => {
@@ -40,7 +42,7 @@ const pozToHTML = str =>
       .match(gRegex)
       .map(str => str.match(regex))
       .filter(match => match[0].trim().length)
-      .map(match => {
+      .map((match, i) => {
         if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
           return { indentation: match[1].split('\n').pop().length, textContent: match[3], classList: [] }
         }
@@ -57,7 +59,9 @@ const pozToHTML = str =>
           id: id?.replace(/^#/, ''),
           classList,
           textContent: match[5],
-          childs: []
+          childs: [],
+          match,
+          i
         }
       })
   )
