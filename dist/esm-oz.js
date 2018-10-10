@@ -90,11 +90,12 @@ const makeElement = ({
 
         if (eventTest) {
           if (!_eventListeners) _eventListeners = [];
-          const listeners = placeholdersNumber.map(n => values[n]).filter(v => typeof v === 'function').filter(listener => !_eventListeners.includes(listener));
+          const listeners = placeholdersNumber.map(n => values[n]).filter(v => typeof v === 'function');
+          const newListeners = listeners.filter(listener => !_eventListeners.includes(listener));
           const eventName = attributeName.replace(eventTest, '');
           removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)));
 
-          for (const listener of listeners) element.addEventListener(eventName, listener);
+          for (const listener of newListeners) element.addEventListener(eventName, listener);
 
           _eventName = eventName;
           _eventListeners = listeners;
@@ -137,7 +138,20 @@ const makeText = ({
   const type = typeof value;
 
   if (value && type === 'object') {
-    if (value && value[OzHTMLTemplate]) {
+    if (value.$promise) {
+      if (value.$resolved) {
+        makeText({
+          template,
+          placeholderMetadata,
+          arrayFragment
+        })({
+          value: value.$resolvedValue
+        });
+      } else {
+        replace(arrayFragment, new Text());
+        value.then(resolvedValue => _value === value ? template.update(...template.values.map((_, i) => i === placeholderMetadata.ids[0] ? resolvedValue : _)) : undefined);
+      }
+    } else if (value && value[OzHTMLTemplate]) {
       // if (_value.) todo: update the current template if its the same id
       replace(arrayFragment, value.childNodes);
     } else if (Array.isArray(value)) {
@@ -160,19 +174,6 @@ const makeText = ({
     if (value.prototype instanceof Node) {
       const Constructor = value;
       if (arrayFragment[0] instanceof Constructor) replace(arrayFragment, arrayFragment[0]);else replace(arrayFragment, new Constructor());
-    } else if (value.$promise) {
-      if (value.$resolved) {
-        makeText({
-          template,
-          placeholderMetadata,
-          arrayFragment
-        })({
-          value: value.$resolvedValue
-        });
-      } else {
-        replace(arrayFragment, new Text());
-        value.then(resolvedValue => _value === value ? template.update(...template.values.map((_, i) => i === placeholderMetadata.ids[0] ? resolvedValue : _)) : undefined);
-      }
     } else {
       makeText({
         template,
@@ -640,31 +641,64 @@ const makeUniqueId = (n = globalRemovedIds.length ? globalRemovedIds.shift() : (
 const watchedElements = new Map();
 let measuringElement = document.createElement('div');
 measuringElement.style.display = 'none';
-var resizeObserver = new ResizeObserver(entries => {
-  for (let entry of entries) {
-    const {
-      target
-    } = entry;
-    const containerQueries = watchedElements.get(entry.target);
-    const cr = entry.contentRect;
-    target.parentNode.insertBefore(measuringElement, target);
 
-    for (const containerQuery$$1 of containerQueries) {
-      measuringElement.style.height = containerQuery$$1.match[3];
-      const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height);
-      const property = containerQuery$$1.match[2].endsWith('height') ? 'height' : containerQuery$$1.match[2].endsWith('width') ? 'width' : undefined;
+const updateElement = (target, contentRect = target.getClientRects()) => {
+  const containerQueries = watchedElements.get(target);
+  target.parentNode.insertBefore(measuringElement, target);
 
-      if (containerQuery$$1.match[2].startsWith('min') && cr[property] > containerQueryPxValue || containerQuery$$1.match[2].startsWith('max') && cr[property] < containerQueryPxValue) {
-        target.setAttribute(containerQuery$$1.strId, '');
-      } else {
-        target.removeAttribute(containerQuery$$1.strId);
+  for (const containerQuery$$1 of containerQueries) {
+    measuringElement.style.height = containerQuery$$1.match[3];
+    const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height);
+    const property = containerQuery$$1.match[2].endsWith('height') ? 'height' : containerQuery$$1.match[2].endsWith('width') ? 'width' : undefined;
+
+    if (containerQuery$$1.match[2].startsWith('min') && contentRect[property] > containerQueryPxValue || containerQuery$$1.match[2].startsWith('max') && contentRect[property] < containerQueryPxValue) {
+      target.setAttribute(containerQuery$$1.strId, '');
+    } else {
+      target.removeAttribute(containerQuery$$1.strId);
+    }
+  }
+
+  measuringElement.remove();
+  measuringElement.style.height = '';
+};
+
+const observed = new Map();
+let resizeObserver = 'ResizeObserver' in window ? new ResizeObserver(entries => {
+  for (let _ref of entries) {
+    let {
+      target,
+      contentRect
+    } = _ref;
+    updateElement(target, contentRect);
+  }
+}) : {
+  observe: elem => observed.set(elem, elem.getClientRects()),
+  unobserve: elem => observed.delete(elem)
+};
+
+if (!'ResizeObserver' in window) {
+  const test = _ => {
+    for (const [entry, {
+      height: _height,
+      width: _width
+    }] of watchedElements) {
+      const bounds = entry.getClientRects();
+      const {
+        height,
+        width
+      } = bounds;
+
+      if (height !== _height || width !== _width) {
+        updateElement(entry, contentRect);
+        observed.set(elem, bounds);
       }
     }
 
-    measuringElement.remove();
-    measuringElement.style.height = '';
-  }
-});
+    window.requestAnimationFrame(test);
+  };
+
+  window.requestAnimationFrame(test);
+}
 
 const watchElement = (elem, containerQuery$$1) => {
   const _containerQueries = watchedElements.get(elem);
@@ -1528,37 +1562,21 @@ var set$2 = /*#__PURE__*/Object.freeze({
 
 const type$4 = Promise;
 
-const promisify = promise => {
-  const func = _ => {};
+const promisify = _promise => {
+  const promise = _promise.then();
 
-  Object.defineProperty(func, '$promise', {
+  Object.defineProperty(promise, '$promise', {
     value: promise
   });
-  Object.defineProperty(func, '$resolved', {
+  Object.defineProperty(promise, '$resolved', {
     value: false
   });
-  const proxy = new Proxy(func, {
-    get(target, prop, receiver) {
-      if (prop in func) return func[prop];
-      if (prop in Promise.prototype) return typeof promise[prop] === 'function' ? promise[prop].bind(promise) : promise[prop];else {
-        return promisify(new Promise(async (resolve, reject) => {
-          try {
-            resolve((await promise)[prop]);
-          } catch (err) {
-            reject(err);
-          }
-        }));
-      }
-    },
-
-    async apply(target, thisArg, argumentsList) {
-      return (await promise).apply(thisArg, argumentsList);
-    }
-
+  const proxy = new Proxy(promise, {
+    get: (target, prop, receiver) => prop in target ? typeof target[prop] === 'function' ? target[prop].bind(target) : target[prop] : promisify(target.then(val => val === null || val === void 0 ? void 0 : val[prop]))
   });
   setReactivity({
     target: proxy,
-    object: func,
+    object: promise,
     original: promise
   });
   promise.then(value => {
@@ -1581,7 +1599,7 @@ const promisify = promise => {
     notify({
       target: proxy
     });
-  });
+  }).catch(err => err);
   return proxy;
 };
 
