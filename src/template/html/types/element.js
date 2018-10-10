@@ -59,10 +59,12 @@ const makeElement = ({
             placeholdersNumber
               .map(n => values[n])
               .filter(v => typeof v === 'function')
+          const newListeners =
+            listeners
               .filter(listener => !_eventListeners.includes(listener))
           const eventName = attributeName.replace(eventTest, '')
           removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)))
-          for (const listener of listeners) element.addEventListener(eventName, listener)
+          for (const listener of newListeners) element.addEventListener(eventName, listener)
           _eventName = eventName
           _eventListeners = listeners
         } else {
