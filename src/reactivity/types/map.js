@@ -1,50 +1,74 @@
 import { r } from '../index.js'
-import { notify, registerDependency, setReactivity, reactivity } from '../utils.js'
-import proxify from '../proxy.js'
+import { notify, registerDependency, setReactivity, reactivity, propertyReactivity } from '../utils.js'
 
 export const type = Map
 
 export const getProperty = (reactiveMap, prop) => reactiveMap.get(prop)
-
 export const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
     super()
-    const proxy = proxify(this)
-    setReactivity({target: proxy, original: iterator, object: this})
-    if (iterator) for (const [key, val] of iterator) proxy.set(key, val)
-    return proxy
+    setReactivity({target: this, original: iterator, object: this})
+    if (iterator) for (const [key, val] of iterator) this.set(key, val)
   }
+
+  get size () {
+    registerDependency({ target: this })
+    return super.size
+  }
+
   set (key, val) {
     const value = r(val)
+    registerDependency({ target: this, property: key, value })
     try {
-      return super.set.apply(this[reactivity].object, [key, value])
+      return super.set(key, value)
     } finally {
-      registerDependency({ target: this, property: key })
       notify({ target: this, property: key, value })
     }
   }
-  delete (key, val) {
-    const value = r(val)
+
+  delete (key) {
+    registerDependency({ target: this, property: key })
     try {
-      return super.delete.apply(this[reactivity].object, [key, value])
+      return super.delete(key)
     } finally {
-      registerDependency({ target: this, property: key })
-      notify({ target: this, property: key, value })
+      notify({ target: this, property: key })
+      const { properties } = this[reactivity]
+      if (!properties.get(key)?.watchers.length) properties.delete(key)
     }
   }
+
+  clear () {
+    registerDependency({ target: this })
+    try {
+      return super.clear()
+    } finally {
+      notify({ target: this })
+      const { properties } = this[reactivity]
+      for (const [ key ] of this) {
+        if (!properties.get(key)?.watchers.length) properties.delete(key)
+      }
+      for (const [ key ] of properties) {
+        if (!properties.get(key)?.watchers.length) properties.delete(key)
+      }
+    }
+  }
+
   get (key) {
-    try {
-      return super.get.apply(this[reactivity].object, [key])
-    } finally {
-      registerDependency({ target: this, property: key })
-    }
+    propertyReactivity(this, key)
+    registerDependency({ target: this, property: key })
+    return super.get(key)
   }
+
   has (key) {
-    try {
-      return super.has.apply(this[reactivity].object, [key])
-    } finally {
-      registerDependency({ target: this, property: key })
-    }
+    registerDependency({ target: this, property: key })
+    return super.has(key)
+  }
+}
+
+for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
+  ReactiveType.prototype[property] = function (...args) {
+    registerDependency({ target: this })
+    return type.prototype[property](...args)
   }
 }
 

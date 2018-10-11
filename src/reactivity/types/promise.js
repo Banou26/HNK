@@ -3,29 +3,33 @@ import { setReactivity, notify, reactivity } from '../utils.js'
 
 export const type = Promise
 
-const promisify = _promise => {
-  const promise = _promise.then()
-  Object.defineProperty(promise, '$promise', { value: promise })
-  Object.defineProperty(promise, '$resolved', { value: false })
-  const proxy = new Proxy(promise, {
-    get: (target, prop, receiver) =>
-      prop in target
-        ? typeof target[prop] === 'function'
-          ? target[prop].bind(target)
-          : target[prop]
-        : promisify(target.then(val => val?.[prop]))
-  })
-  setReactivity({ target: proxy, object: promise, original: promise })
-  promise.then(value => {
-    if (value && typeof value === 'object') {
-      const reactiveValue = r(value)
-      const { object } = reactiveValue[reactivity]
-      Object.defineProperty(object, '$promise', { value: promise })
-      Object.defineProperty(object, '$resolved', { value: true })
-      Object.defineProperty(object, '$resolvedValue', { value })
-    }
-    notify({ target: proxy })
-  }).catch(err => err)
-  return proxy
+export const ReactiveType = class ReactivePromise extends Promise {
+  constructor (executor, promise) {
+    super((resolve, reject) => {
+      executor(value => {
+        let reactiveValue
+        if (value && typeof value === 'object') {
+          reactiveValue = r(value)
+          const { object } = reactiveValue[reactivity]
+          object.$promise = promise
+          object.$resolved = true
+          object.$resolvedValue = value
+        }
+        this.$resolved = true
+        this.$resolvedValue = reactiveValue || value
+        notify({ target: this })
+        resolve(value)
+      }, error => {
+        this.$rejected = true
+        this.$rejectedValue = error
+        reject(error)
+      })
+    })
+    setReactivity({target: this, original: promise, object: this})
+    this.$promise = promise
+    this.$resolved = false
+    this.$rejected = false
+  }
 }
-export default promisify
+
+export default promise => new ReactiveType((resolve, reject) => promise.then(resolve).catch(reject), promise)
