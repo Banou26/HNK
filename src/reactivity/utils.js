@@ -38,11 +38,39 @@ export const notify = ({ target, property, value, deep }) => {
   callWatchers(watchers)
 }
 
+const makeReactivityObject = (object, watchersListeners = []) => ({
+  watchersListeners,
+  watchers: new Proxy([], {
+    set (target, property, value, receiver) {
+      try {
+        return Reflect.set(target, property, value, receiver)
+      } finally {
+        for (const watcher of watchersListeners) watcher(target, property, value, receiver)
+      }
+    }
+  }),
+  properties: new Map(),
+  object
+})
+
 export const setReactivity = ({ target, unreactive, original, object }) => {
-  if (unreactive) return (target[reactivity] = false)
+  if (unreactive) {
+    target[reactivity] = false
+    return target
+  }
   if (original) (rootObjects).set(original, target)
-  Object.defineProperty(target, reactivity, { value: { watchers: [], properties: new Map(), object }, configurable: true, writable: true })
+  const reactivityObject = makeReactivityObject(object)
+  Object.defineProperty(target, reactivity, { value: reactivityObject, configurable: true, writable: true })
   Object.defineProperty(target, '$watch', { value: watch(target), configurable: true, writable: true })
+  Object.defineProperty(target, '$watchWatchers', {
+    value: listener => {
+      reactivityObject.push(listener)
+      return _ => reactivityObject.splice(reactivityObject.indexOf(listener - 1), 1)
+    },
+    configurable: true,
+    writable: true
+  })
+  return target
 }
 
 export const registerWatcher = (getter, watcher, options = {}) => {
