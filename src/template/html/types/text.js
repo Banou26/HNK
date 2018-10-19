@@ -18,7 +18,7 @@ const makeText = ({
   }) => {
     const type = typeof value
     if (value && type === 'object') {
-      if (value.$promise) {
+      if (value instanceof Promise) {
         if (value.$resolved) {
           makeText({
             template,
