@@ -138,7 +138,7 @@ const makeText = ({
   const type = typeof value;
 
   if (value && type === 'object') {
-    if (value.$promise) {
+    if (value instanceof Promise) {
       if (value.$resolved) {
         makeText({
           template,
@@ -1144,12 +1144,20 @@ const makeHTML = ({
   childs,
   textContent,
   id,
-  classList
+  classList,
+  i,
+  forceText,
+  match
 }) => {
+  if (forceText) return (i ? '\n' : '') + match.input.trim();
+  const childForceText = classList.includes('');
   const classStr = classList.join(' ');
   let attrStr = attributes ? ' ' + attributes : '';
   if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`);else if (classStr) attrStr += ` class="${classStr}"`;
-  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map(line => makeHTML(line)).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`;else return '\n' + textContent;
+  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map((line, i) => makeHTML(_objectSpread({}, line, {
+    forceText: childForceText,
+    i
+  }))).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`;else return (i ? '\n' : '') + textContent;
 };
 
 const pushLine = ({
@@ -1168,7 +1176,7 @@ const hierarchise = arr => {
   return hierarchisedArr;
 };
 
-const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(regex)).filter(match => match[0].trim().length).map(match => {
+const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(regex)).filter(match => match[0].trim().length).map((match, i) => {
   if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
     return {
       indentation: match[1].split('\n').pop().length,
@@ -1188,7 +1196,9 @@ const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(rege
     id: id === null || id === void 0 ? void 0 : id.replace(/^#/, ''),
     classList,
     textContent: match[5],
-    childs: []
+    childs: [],
+    match,
+    i
   };
 })).map(line => makeHTML(line)).join('');
 
@@ -1388,16 +1398,16 @@ var object = (object => {
     original: object,
     object: obj
   });
-  Object.entries(Object.getOwnPropertyDescriptors(object)).forEach(([prop, _ref]) => {
-    let {
-      value
-    } = _ref,
-        rest = _objectWithoutProperties(_ref, ["value"]);
 
-    return Object.defineProperty(reactiveObject, prop, _objectSpread({}, value !== undefined && {
+  for (const [prop, {
+    value,
+    ...rest
+  }] of Object.entries(Object.getOwnPropertyDescriptors(object))) {
+    Object.defineProperty(reactiveObject, prop, _objectSpread({}, value !== undefined && {
       value: value
     }, rest));
-  });
+  }
+
   return reactiveObject;
 });
 
@@ -1407,48 +1417,69 @@ var object$1 = /*#__PURE__*/Object.freeze({
 });
 
 const type$1 = Array;
+let original;
+const ReactiveType = class ReactiveArray extends Array {
+  constructor(...values) {
+    super();
+    const proxy = proxify(this);
+    setReactivity({
+      target: proxy,
+      original,
+      object: this
+    });
+    if (original) original = undefined;
+
+    if (values) {
+      for (const val of values) proxy.push(val);
+    }
+
+    values.forEach((val, i) => proxy[i] = val);
+    return proxy;
+  }
+
+};
 var array = (array => {
-  const arr = [];
-  const reactiveArray = proxify(arr);
-  setReactivity({
-    target: reactiveArray,
-    original: array,
-    object: arr
-  });
-  array.forEach((val, i) => reactiveArray[i] = val);
-  return reactiveArray;
+  original = array;
+  return new ReactiveType(...array);
 });
 
 var array$1 = /*#__PURE__*/Object.freeze({
   type: type$1,
+  ReactiveType: ReactiveType,
   default: array
 });
 
 const type$2 = Map;
 const getProperty = (reactiveMap, prop) => reactiveMap.get(prop);
-const ReactiveType = class ReactiveMap extends Map {
+const ReactiveType$1 = class ReactiveMap extends Map {
   constructor(iterator) {
     super();
-    const proxy = proxify(this);
     setReactivity({
-      target: proxy,
+      target: this,
       original: iterator,
       object: this
     });
-    if (iterator) for (const [key, val] of iterator) proxy.set(key, val);
-    return proxy;
+    if (iterator) for (const [key, val] of iterator) this.set(key, val);
+  }
+
+  get size() {
+    registerDependency({
+      target: this
+    });
+    return super.size;
   }
 
   set(key, val) {
     const value = reactify(val);
+    registerDependency({
+      target: this,
+      property: key,
+      value
+    });
 
     try {
-      return super.set.apply(this[reactivity].object, [key, value]);
+      return super.set(key, value);
     } finally {
-      registerDependency({
-        target: this,
-        property: key
-      });
       notify({
         target: this,
         property: key,
@@ -1457,180 +1488,281 @@ const ReactiveType = class ReactiveMap extends Map {
     }
   }
 
-  delete(key, val) {
-    const value = reactify(val);
+  delete(key) {
+    registerDependency({
+      target: this,
+      property: key
+    });
 
     try {
-      return super.delete.apply(this[reactivity].object, [key, value]);
+      return super.delete(key);
     } finally {
-      registerDependency({
+      var _properties$get;
+
+      notify({
         target: this,
         property: key
       });
+      const {
+        properties
+      } = this[reactivity];
+      if (!((_properties$get = properties.get(key)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(key);
+    }
+  }
+
+  clear() {
+    registerDependency({
+      target: this
+    });
+
+    try {
+      return super.clear();
+    } finally {
       notify({
-        target: this,
-        property: key,
-        value
+        target: this
       });
+      const {
+        properties
+      } = this[reactivity];
+
+      for (const [key] of this) {
+        var _properties$get2;
+
+        if (!((_properties$get2 = properties.get(key)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(key);
+      }
+
+      for (const [key] of properties) {
+        var _properties$get3;
+
+        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
+      }
     }
   }
 
   get(key) {
-    try {
-      return super.get.apply(this[reactivity].object, [key]);
-    } finally {
-      registerDependency({
-        target: this,
-        property: key
-      });
-    }
+    propertyReactivity(this, key);
+    registerDependency({
+      target: this,
+      property: key
+    });
+    return super.get(key);
   }
 
   has(key) {
-    try {
-      return super.has.apply(this[reactivity].object, [key]);
-    } finally {
-      registerDependency({
-        target: this,
-        property: key
-      });
-    }
+    registerDependency({
+      target: this,
+      property: key
+    });
+    return super.has(key);
   }
 
 };
-var map = (map => new ReactiveType(map));
+
+for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
+  ReactiveType$1.prototype[property] = function (...args) {
+    registerDependency({
+      target: this
+    });
+    return type$2.prototype[property](...args);
+  };
+}
+
+var map = (map => new ReactiveType$1(map));
 
 var map$1 = /*#__PURE__*/Object.freeze({
   type: type$2,
   getProperty: getProperty,
-  ReactiveType: ReactiveType,
+  ReactiveType: ReactiveType$1,
   default: map
 });
 
 const type$3 = Set;
 const getProperty$1 = (reactiveSet, prop) => reactiveSet.has(prop);
-const ReactiveType$1 = class ReactiveSet extends Set {
+const ReactiveType$2 = class ReactiveSet extends Set {
   constructor(iterator) {
     super();
-    const proxy = proxify(this);
     setReactivity({
-      target: proxy,
+      target: this,
       original: iterator,
       object: this
     });
-    if (iterator) for (const val of iterator) proxy.add(val);
-    return proxy;
+    if (iterator) for (const val of iterator) this.add(val);
+  }
+
+  get size() {
+    registerDependency({
+      target: this
+    });
+    return super.size;
   }
 
   add(val) {
     const value = reactify(val);
+    registerDependency({
+      target: this,
+      property: value,
+      value
+    });
 
     try {
-      return super.add.apply(this[reactivity].object, [value]);
+      return super.add(value);
+    } finally {
+      notify({
+        target: this,
+        property: value,
+        value
+      });
+    }
+  }
+
+  delete(val) {
+    const value = reactify(val);
+    registerDependency({
+      target: this,
+      property: value,
+      value
+    });
+
+    try {
+      return super.delete(value);
+    } finally {
+      var _properties$get;
+
+      notify({
+        target: this,
+        property: value,
+        value
+      });
+      const {
+        properties
+      } = this[reactivity];
+      if (!((_properties$get = properties.get(value)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(value);
+    }
+  }
+
+  clear() {
+    try {
+      return super.clear();
     } finally {
       registerDependency({
         target: this
       });
       notify({
-        target: this,
-        property: val,
-        value
+        target: this
       });
+      const {
+        properties
+      } = this[reactivity];
+
+      for (const value of this) {
+        var _properties$get2;
+
+        if (!((_properties$get2 = properties.get(value)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(value);
+      }
+
+      for (const [key] of properties) {
+        var _properties$get3;
+
+        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
+      }
     }
   }
 
   has(val) {
-    try {
-      return super.has.apply(this[reactivity].object, [val]);
-    } finally {
-      registerDependency({
-        target: this,
-        property: val
-      });
-    }
+    const value = reactify(val);
+    propertyReactivity(this, value);
+    registerDependency({
+      target: this,
+      property: value,
+      value
+    });
+    return super.has(value);
   }
 
 };
-var set$1 = (set => new ReactiveType$1(set));
+
+for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
+  ReactiveType$2.prototype[property] = function (...args) {
+    registerDependency({
+      target: this
+    });
+    return type$3.prototype[property](...args);
+  };
+}
+
+var set$1 = (set => new ReactiveType$2(set));
 
 var set$2 = /*#__PURE__*/Object.freeze({
   type: type$3,
   getProperty: getProperty$1,
-  ReactiveType: ReactiveType$1,
+  ReactiveType: ReactiveType$2,
   default: set$1
 });
 
 const type$4 = Promise;
+const ReactiveType$3 = class ReactivePromise extends Promise {
+  constructor(executor, promise) {
+    super((resolve, reject) => {
+      executor(value => {
+        let reactiveValue;
 
-const promisify = _promise => {
-  const promise = _promise.then();
+        if (value && typeof value === 'object') {
+          reactiveValue = reactify(value);
+          const {
+            object
+          } = reactiveValue[reactivity];
+          object.$promise = promise;
+          object.$resolved = true;
+          object.$resolvedValue = value;
+        }
 
-  Object.defineProperty(promise, '$promise', {
-    value: promise
-  });
-  Object.defineProperty(promise, '$resolved', {
-    value: false
-  });
-  const proxy = new Proxy(promise, {
-    get: (target, prop, receiver) => prop in target ? typeof target[prop] === 'function' ? target[prop].bind(target) : target[prop] : promisify(target.then(val => val === null || val === void 0 ? void 0 : val[prop]))
-  });
-  setReactivity({
-    target: proxy,
-    object: promise,
-    original: promise
-  });
-  promise.then(value => {
-    if (value && typeof value === 'object') {
-      const reactiveValue = reactify(value);
-      const {
-        object
-      } = reactiveValue[reactivity];
-      Object.defineProperty(object, '$promise', {
-        value: promise
+        this.$resolved = true;
+        this.$resolvedValue = reactiveValue || value;
+        notify({
+          target: this
+        });
+        resolve(value);
+      }, error => {
+        this.$rejected = true;
+        this.$rejectedValue = error;
+        reject(error);
       });
-      Object.defineProperty(object, '$resolved', {
-        value: true
-      });
-      Object.defineProperty(object, '$resolvedValue', {
-        value
-      });
-    }
-
-    notify({
-      target: proxy
     });
-  }).catch(err => err);
-  return proxy;
+    setReactivity({
+      target: this,
+      original: promise,
+      object: this
+    });
+    this.$promise = promise;
+    this.$resolved = false;
+    this.$rejected = false;
+  }
+
 };
+var promise = (promise => new ReactiveType$3((resolve, reject) => promise.then(resolve).catch(reject), promise));
 
-var promise = /*#__PURE__*/Object.freeze({
+var promise$1 = /*#__PURE__*/Object.freeze({
   type: type$4,
-  default: promisify
+  ReactiveType: ReactiveType$3,
+  default: promise
 });
 
-const type$5 = Node;
-var node = (node => setReactivity({
-  target: node,
-  unreactive: true
-}) || node);
-
-var node$1 = /*#__PURE__*/Object.freeze({
-  type: type$5,
-  default: node
-});
-
-var unreactive = [RegExp, URL, window.Location].map(type => ({
+var unreactive = [Node, RegExp, URL, window.Location].map(type => ({
   type,
   default: obj => setReactivity({
     target: obj,
     unreactive: true
-  }) || obj
+  })
 }));
 
-const builtIn = [map$1, set$2, promise, node$1, ...unreactive];
-const isBuiltIn = reactiveObject => (builtIn.find(({
-  type: type$$1
-}) => reactiveObject instanceof type$$1) || {}).type; // Has to be from most specific(e.g: Map) to less specific(Object)
+const builtIn = [map$1, set$2, promise$1, ...unreactive];
+const isBuiltIn = reactiveObject => {
+  var _builtIn$find;
+
+  return (_builtIn$find = builtIn.find(({
+    type: type$$1
+  }) => reactiveObject instanceof type$$1)) === null || _builtIn$find === void 0 ? void 0 : _builtIn$find.type;
+}; // Has to be from most specific(e.g: Map) to less specific(Object)
 
 var types = new Map([...builtIn, array$1, object$1].map(({
   type: type$$1,
@@ -1642,28 +1774,8 @@ const propertyGetters = new Map([...builtIn, array$1, object$1].map(({
 }) => [type$$1, getProperty$$1]));
 const getProperty$2 = (reactiveObject, property) => (propertyGetters.get(isBuiltIn(reactiveObject)) || (_ => reactiveObject[property]))(reactiveObject, property);
 
-for (const _ref of builtIn) {
-  const {
-    type: type$$1,
-    ReactiveType: ReactiveType$$1
-  } = _ref;
-  if (!ReactiveType$$1) continue;
-  const mapDescriptors = Object.getOwnPropertyDescriptors(type$$1.prototype);
-
-  for (const prop of [...Object.getOwnPropertyNames(mapDescriptors), ...Object.getOwnPropertySymbols(mapDescriptors)]) {
-    if (!ReactiveType$$1.prototype.hasOwnProperty(prop)) {
-      const desc = mapDescriptors[prop];
-      Object.defineProperty(ReactiveType$$1.prototype, prop, _objectSpread({}, desc, 'value' in desc && typeof desc.value === 'function' && {
-        value: function (...args) {
-          return type$$1.prototype[prop].apply(this[reactivity].object, args);
-        }
-      }));
-    }
-  }
-}
-
 const reactivity = Symbol.for('OzReactivity');
-const reactivityProperties = ['$watch', reactivity];
+const reactivityProperties = ['$watch', '$watchDependencies', reactivity];
 let rootWatchers = [];
 let rootObjects = new WeakMap();
 const getReactivityRoot = _ => ({
@@ -1714,28 +1826,64 @@ const notify = ({
 
   if (property) {
     const watchers = propertyReactivity(target, property).watchers;
-    propertyReactivity(target, property).watchers = [];
-    callWatchers(watchers);
+
+    const _watchers = watchers.slice();
+
+    watchers.length = 0;
+    callWatchers(_watchers);
   }
 
   const watchers = react.watchers;
-  react.watchers = [];
-  callWatchers(watchers);
+
+  const _watchers = watchers.slice();
+
+  watchers.length = 0;
+  callWatchers(_watchers);
 };
+
+const makeReactivityWatcherArray = (target, property, dependencyListeners) => new Proxy([], {
+  defineProperty(_target, _property, desc, {
+    value
+  } = desc
+  /* desc */
+  ) {
+    const oldValue = _target[_property];
+
+    try {
+      return Reflect.defineProperty(_target, _property, desc);
+    } finally {
+      if (_property === 'length' && oldValue !== value) {
+        // console.log(oldValue, value, oldValue !== value)
+        for (const watcher of dependencyListeners) watcher(target, property, value);
+      }
+    }
+  }
+
+});
+
+const makeReactivityObject = (object, dependencyListeners = []) => ({
+  dependencyListeners,
+  watchers: makeReactivityWatcherArray(object, undefined, dependencyListeners),
+  properties: new Map(),
+  // new ReactivePropertyMap(dependencyListeners, object),
+  object
+});
+
 const setReactivity = ({
   target,
   unreactive,
   original,
   object
 }) => {
-  if (unreactive) return target[reactivity] = false;
+  if (unreactive) {
+    target[reactivity] = false;
+    return target;
+  }
+
   if (original) rootObjects.set(original, target);
+  const reactivityObject = makeReactivityObject(object);
   Object.defineProperty(target, reactivity, {
-    value: {
-      watchers: [],
-      properties: new Map(),
-      object
-    },
+    value: reactivityObject,
     configurable: true,
     writable: true
   });
@@ -1744,6 +1892,15 @@ const setReactivity = ({
     configurable: true,
     writable: true
   });
+  Object.defineProperty(target, '$watchDependencies', {
+    value: listener => {
+      reactivityObject.dependencyListeners.push(listener);
+      return _ => reactivityObject.dependencyListeners.splice(reactivityObject.dependencyListeners.indexOf(listener - 1), 1);
+    },
+    configurable: true,
+    writable: true
+  });
+  return target;
 };
 const registerWatcher = (getter, watcher, options = {}) => {
   Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options));
@@ -1754,24 +1911,38 @@ const registerWatcher = (getter, watcher, options = {}) => {
 };
 const propertyReactivity = (target, property) => {
   const {
-    properties
+    properties,
+    dependencyListeners
   } = target[reactivity];
   if (properties.has(property)) return properties.get(property);
   const propertyReactivity = {
-    watchers: [] // cache: undefined
+    watchers: makeReactivityWatcherArray(target, property, dependencyListeners) // cache: undefined
 
   };
   properties.set(property, propertyReactivity);
   return propertyReactivity;
 };
-const pushWatcher = (object, watcher, options = {}) => Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) && object && typeof object === 'object' && object[reactivity] && !object[reactivity].watchers.includes(watcher) && object[reactivity].watchers.push(watcher);
+const pushWatcher = (object, watcher, options = {}) => {
+  if (Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) && object && typeof object === 'object' && object[reactivity] && !object[reactivity].watchers.includes(watcher)) {
+    var _watcher$dependencies;
+
+    object[reactivity].watchers.push(watcher);
+    (_watcher$dependencies = watcher.dependenciesWatchers) === null || _watcher$dependencies === void 0 ? void 0 : _watcher$dependencies.push(object[reactivity].watchers);
+  }
+};
 const includeWatcher = (arr, watcher) => arr.includes(watcher) || arr.some(_watcher => watcher.object && watcher.property && watcher.object === _watcher.object && watcher.property === _watcher.property);
 
 const pushCurrentWatcher = ({
   watchers
 }) => {
   const currentWatcher = rootWatchers[rootWatchers.length - 1];
-  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) watchers.push(currentWatcher);
+
+  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) {
+    var _currentWatcher$depen;
+
+    (_currentWatcher$depen = currentWatcher.dependenciesWatchers) === null || _currentWatcher$depen === void 0 ? void 0 : _currentWatcher$depen.push(watchers);
+    watchers.push(currentWatcher);
+  }
 };
 
 const registerDependency = ({
@@ -1800,8 +1971,10 @@ const watch = target => (getter, handler) => {
   }
 
   let unwatch, oldValue;
+  const dependenciesWatchers = [];
 
   const watcher = _ => {
+    dependenciesWatchers.length = 0;
     if (unwatch) return;
 
     if (getter) {
@@ -1815,9 +1988,14 @@ const watch = target => (getter, handler) => {
     }
   };
 
+  watcher.dependenciesWatchers = dependenciesWatchers;
   if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options);
   pushWatcher(getter ? oldValue : target, watcher, options);
-  return _ => void (unwatch = true);
+  return _ => {
+    for (const watchers of dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1);
+
+    unwatch = true;
+  };
 };
 const isolate = func => registerWatcher(func, _ => {});
 
@@ -2033,7 +2211,8 @@ const RouterViewMixin = {
     get content() {
       var _this$route;
 
-      return (_this$route = this.route) === null || _this$route === void 0 ? void 0 : _this$route.content;
+      const content = (_this$route = this.route) === null || _this$route === void 0 ? void 0 : _this$route.content;
+      return typeof content === 'function' ? content().then(module => module.default) : content;
     },
 
     get childPathname() {
@@ -2079,12 +2258,17 @@ const registerRouterMixins = _ => mixins.includes(routerGlobalMixin) || mixin(ro
 const registerCustomElements = _ => registerRouterView();
 const compileRoutes = ({
   routes = []
-} = {}) => routes.map(route => _objectSpread({}, route, {
+} = {}) => routes.map(route => Array.isArray(route.path) ? route.path.map(path => _objectSpread({}, route, {
+  regex: pathToRegexp(path, [], {
+    end: false
+  }),
+  resolve: ((toPath, params) => toPath(params)).bind(undefined, compile(path))
+})) : _objectSpread({}, route, {
   regex: pathToRegexp(route.path, [], {
     end: false
   }),
   resolve: ((toPath, params) => toPath(params)).bind(undefined, compile(route.path))
-}));
+})).flat(Infinity);
 const matchRoutes = routes => url => routes.filter(({
   regex
 }) => regex.test(url.pathname));
@@ -2139,4 +2323,4 @@ const Router = ({
   return state;
 };
 
-export { poz, soz, OzHTMLTemplate, HTMLTag, html, OzStyle, CSSTag, css, OzElementContext, OzElement, mixin, registerElement, watch$1 as watch, getReactivityRoot, setReactivityRoot, isolate, reactify as r, reactify as react, reactivity, registerRouterMixins, Router, RouterViewMixin };
+export { poz, soz, OzHTMLTemplate, HTMLTag, html, OzStyle, CSSTag, css, OzElementContext, OzElement, mixin, registerElement, watch$1 as watch, getReactivityRoot, setReactivityRoot, isolate, reactify as r, reactify as react, reactivity, reactivityProperties, registerRouterMixins, Router, RouterViewMixin };
