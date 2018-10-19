@@ -22,7 +22,12 @@ export const RouterViewMixin = {
     get pathname () { return this.url?.pathname },
     get matches () { return this.url && ctx.router?.matchRoutes(this.url) },
     get route () { return this.matches?.[0] },
-    get content () { return this.route?.content },
+    get content () {
+      const content = this.route?.content
+      return typeof content === 'function'
+        ? content().then(module => module.default)
+        : content
+    },
     get childPathname () { return this.pathname?.replace?.(this.route?.regex, '') }
   }),
   template: ({ state: { content } }) => html`${content}`,
