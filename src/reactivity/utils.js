@@ -2,7 +2,7 @@ import { isBuiltIn, getProperty } from './types/index.js'
 
 export const reactivity = Symbol.for('OzReactivity')
 
-export const reactivityProperties = ['$watch', reactivity]
+export const reactivityProperties = ['$watch', '$watchDependencies', reactivity]
 
 export let rootWatchers = []
 export let rootObjects = new WeakMap()
@@ -30,26 +30,57 @@ export const notify = ({ target, property, value, deep }) => {
   }
   if (property) {
     const watchers = propertyReactivity(target, property).watchers
-    propertyReactivity(target, property).watchers = []
-    callWatchers(watchers)
+    const _watchers = watchers.slice()
+    watchers.length = 0
+    callWatchers(_watchers)
   }
   const watchers = react.watchers
-  react.watchers = []
-  callWatchers(watchers)
+  const _watchers = watchers.slice()
+  watchers.length = 0
+  callWatchers(_watchers)
 }
 
-const makeReactivityObject = (object, watchersListeners = []) => ({
-  watchersListeners,
-  watchers: new Proxy([], {
-    set (target, property, value, receiver) {
-      try {
-        return Reflect.set(target, property, value, receiver)
-      } finally {
-        for (const watcher of watchersListeners) watcher(target, property, value, receiver)
+const makeReactivityWatcherArray = (target, property, dependencyListeners) => new Proxy([], {
+  defineProperty (_target, _property, desc, { value } = desc/* desc */) {
+    const oldValue = _target[_property]
+    try {
+      return Reflect.defineProperty(_target, _property, desc)
+    } finally {
+      if (_property === 'length' && oldValue !== value) {
+        // console.log(oldValue, value, oldValue !== value)
+        for (const watcher of dependencyListeners) watcher(target, property, value)
       }
     }
-  }),
-  properties: new Map(),
+  }
+})
+class ReactivePropertyMap extends Map {
+  constructor (dependencyListeners, object) {
+    super()
+    this.object = object
+    this.dependencyListeners = dependencyListeners
+  }
+
+  set (key, val) {
+    try {
+      return super.set(key, val)
+    } finally {
+      for (const watcher of this.dependencyListeners) watcher(this.object, undefined, this, key, val)
+    }
+  }
+
+  delete (key) {
+    try {
+      return super.delete(key)
+    } finally {
+      for (const watcher of this.dependencyListeners) watcher(this.object, undefined, this, key)
+    }
+  }
+}
+
+const makeReactivityObject = (object, dependencyListeners = []) => ({
+  dependencyListeners,
+  watchers: makeReactivityWatcherArray(object, undefined, dependencyListeners),
+  properties: new Map(), // new ReactivePropertyMap(dependencyListeners, object),
   object
 })
 
@@ -62,10 +93,10 @@ export const setReactivity = ({ target, unreactive, original, object }) => {
   const reactivityObject = makeReactivityObject(object)
   Object.defineProperty(target, reactivity, { value: reactivityObject, configurable: true, writable: true })
   Object.defineProperty(target, '$watch', { value: watch(target), configurable: true, writable: true })
-  Object.defineProperty(target, '$watchWatchers', {
-    value: listener => {
-      reactivityObject.push(listener)
-      return _ => reactivityObject.splice(reactivityObject.indexOf(listener - 1), 1)
+  Object.defineProperty(target, '$watchDependencies', {
+    value: (listener) => {
+      reactivityObject.dependencyListeners.push(listener)
+      return _ => reactivityObject.dependencyListeners.splice(reactivityObject.dependencyListeners.indexOf(listener - 1), 1)
     },
     configurable: true,
     writable: true
@@ -82,23 +113,28 @@ export const registerWatcher = (getter, watcher, options = {}) => {
 }
 
 export const propertyReactivity = (target, property) => {
-  const { properties } = target[reactivity]
+  const { properties, dependencyListeners } = target[reactivity]
   if (properties.has(property)) return properties.get(property)
   const propertyReactivity = {
-    watchers: []
+    watchers: makeReactivityWatcherArray(target, property, dependencyListeners)
     // cache: undefined
   }
   properties.set(property, propertyReactivity)
   return propertyReactivity
 }
 
-export const pushWatcher = (object, watcher, options = {}) =>
-  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) &&
-  object &&
-  typeof object === 'object' &&
-  object[reactivity] &&
-  !object[reactivity].watchers.includes(watcher) &&
-  object[reactivity].watchers.push(watcher)
+export const pushWatcher = (object, watcher, options = {}) => {
+  if (
+    Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) &&
+    object &&
+    typeof object === 'object' &&
+    object[reactivity] &&
+    !object[reactivity].watchers.includes(watcher)
+  ) {
+    object[reactivity].watchers.push(watcher)
+    watcher.dependenciesWatchers?.push(object[reactivity].watchers)
+  }
+}
 
 export const includeWatcher = (arr, watcher) =>
   arr.includes(watcher) ||
@@ -110,7 +146,10 @@ export const includeWatcher = (arr, watcher) =>
 
 const pushCurrentWatcher = ({ watchers }) => {
   const currentWatcher = rootWatchers[rootWatchers.length - 1]
-  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) watchers.push(currentWatcher)
+  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) {
+    currentWatcher.dependenciesWatchers?.push(watchers)
+    watchers.push(currentWatcher)
+  }
 }
 
 export const registerDependency = ({ target, property }) => {
@@ -133,7 +172,9 @@ export const watch = target => (getter, handler) => {
     }
   }
   let unwatch, oldValue
+  const dependenciesWatchers = []
   const watcher = _ => {
+    dependenciesWatchers.length = 0
     if (unwatch) return
     if (getter) {
       let newValue = registerWatcher(getter, watcher, options)
@@ -145,9 +186,13 @@ export const watch = target => (getter, handler) => {
       pushWatcher(target, watcher, options)
     }
   }
+  watcher.dependenciesWatchers = dependenciesWatchers
   if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options)
   pushWatcher(getter ? oldValue : target, watcher, options)
-  return _ => void (unwatch = true)
+  return _ => {
+    for (const watchers of dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1)
+    unwatch = true
+  }
 }
 
 export const isolate = func => registerWatcher(func, _ => {})
