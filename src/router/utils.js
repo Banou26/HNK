@@ -16,11 +16,19 @@ export const registerCustomElements = _ =>
 
 export const compileRoutes = ({routes = []} = {}) =>
   routes
-    .map(route => ({
-      ...route,
-      regex: pathToRegexp(route.path, [], { end: false }),
-      resolve: ((toPath, params) => toPath(params)).bind(undefined, compile(route.path))
-    }))
+    .map(route =>
+      Array.isArray(route.path)
+        ? route.path.map(path => ({
+          ...route,
+          regex: pathToRegexp(path, [], { end: false }),
+          resolve: ((toPath, params) => toPath(params)).bind(undefined, compile(path))
+        }))
+        : ({
+          ...route,
+          regex: pathToRegexp(route.path, [], { end: false }),
+          resolve: ((toPath, params) => toPath(params)).bind(undefined, compile(route.path))
+        })
+    ).flat(Infinity)
 
 export const matchRoutes = routes => url =>
   routes.filter(({regex}) => regex.test(url.pathname))
