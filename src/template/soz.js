@@ -39,6 +39,8 @@ const makeCSS = ({ indent, str, childs }, { selector: selectorPrefix = '' } = {}
           .map(node => makeCSS(node, { selector }))
           .join('')
     }`
+  } else if (isAtRule) {
+    return str
   } else {
     const propertyName = str.match(propertyNameRegex)[0]
     const rest = str.slice(propertyName.length + 1).trim()
