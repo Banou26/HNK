@@ -80,6 +80,7 @@ export const registerElement = element => {
         element: this,
         host,
         props: {},
+        dataset: {},
         template: undefined,
         style: undefined
       })
@@ -145,6 +146,7 @@ export const registerElement = element => {
     static get observedAttributes () { return props }
 
     attributeChangedCallback (attr, oldValue, newValue) {
+      if (attr.match(/-\w/)) this[OzElementContext].dataset[attr.slice(5).replace(/-\w/g, (m) => m[1].toUpperCase())] = newValue
       if (props.includes(attr)) this[attr] = newValue
     }
 
