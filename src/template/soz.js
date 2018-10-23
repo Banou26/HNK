@@ -1,5 +1,5 @@
 import { CSSTag } from './css/index.js'
-import { placeholderRegex } from './utils.js'
+import { placeholderRegex, matchSelectorRulesets } from './utils.js'
 
 const regex = /^([^\S\r\n]*)(?:(?:([@()#\-.a-zA-Z0-9 ]*)[^\S\r\n]*\n)|(.*))/
 const gRegex = new RegExp(regex, 'gm')
@@ -17,13 +17,12 @@ const makeCSS = ({ indent, str, childs }, { selector: selectorPrefix = '' } = {}
     const selector =
       isAtRule
         ? str
-        : str
-          .split(',')
-          .map(str =>
-            str.includes('&')
-              ? str.replace('&', selectorPrefix)
-              : `${selectorPrefix} ${str}`, '')
-          .join(',').trim()
+        : matchSelectorRulesets(str)
+            .map(str =>
+              str.includes('&')
+                ? str.replace('&', selectorPrefix)
+                : `${selectorPrefix} ${str}`, '')
+            .join(',').trim()
     return `${
       selector
     }{${

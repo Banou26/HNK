@@ -1,6 +1,6 @@
 import { NodeFactory, Stringifier, Parser } from 'shady-css-parser'
 import { containerQueryRegex } from './utils.js'
-import { placeholderRegex, singlePlaceholderRegex, placeholder as toPlaceholder, charToN } from '../utils.js'
+import { placeholderRegex, singlePlaceholderRegex, placeholder as toPlaceholder, charToN, matchSelectorRulesets } from '../utils.js'
 
 const makeMethod = name => (_this, ...args) => ({
   ...NodeFactory.prototype[name].apply(_this, args),
@@ -8,31 +8,41 @@ const makeMethod = name => (_this, ...args) => ({
 })
 
 const parser = new Parser(new class Factory extends NodeFactory {
-  ruleset (...args) {
+  ruleset (_selector, ...args) {
+    const selector =
+      !_selector.startsWith('@') &&
+      matchSelectorRulesets(_selector)
+        .map(ruleset =>
+        ruleset.startsWith(':scope')
+          ? ruleset
+          : `:scope ${ruleset}`).join('')
     return {
-      ...super.ruleset(...args),
-      ...singlePlaceholderRegex.test(args[0]) || args[0].includes(':element') ? { type: `rulesetPlaceholder` } : undefined
+      ...super.ruleset(_selector, ...args),
+      _selector,
+      selector/*: _selector*/,
+      ...!_selector.startsWith('@') && { type: 'rulesetPlaceholder' }
+      // ...(singlePlaceholderRegex.test(_selector) || _selector.includes(':element')) && { type: `rulesetPlaceholder` }
     }
   }
 
   expression (...args) {
     return {
       ...super.expression(...args),
-      ...singlePlaceholderRegex.test(args[0]) ? { type: `expressionPlaceholder` } : undefined
+      ...singlePlaceholderRegex.test(args[0]) && { type: `expressionPlaceholder` }
     }
   }
 
   atRule (...args) {
     return {
       ...super.atRule(...args),
-      ...args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) ? { type: 'atRulePlaceholder' } : undefined
+      ...args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) && { type: 'atRulePlaceholder' }
     }
   }
 
   declaration (...args) {
     return {
       ...super.declaration(...args),
-      ...singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text) ? { type: 'declarationPlaceholder' } : undefined
+      ...(singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text)) && { type: 'declarationPlaceholder' }
     }
   }
 }())
@@ -51,33 +61,46 @@ const findPlaceholdersAndPaths = (
   path = [..._path],
   { type, selector, name, value, parameters, text = type.startsWith('declaration') ? value.text : undefined } = rule,
   vals = [selector || name || value, text || parameters]
-) =>
+) => {
   // match, create PlaceholderMetadata and push to placeholders
-  (void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
-    type: type.slice(0, -'Placeholder'.length),
-    values: vals,
-    ids:
-      vals
-        .filter(_ => _)
-        .map(val => (val.match(placeholderRegex) || [])
-          .map(char => charToN(char)))
-        .flat(Infinity),
-    path,
-    rule
-  })) ||
+  if (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder') {
+    placeholders.push({
+      type: type.slice(0, -'Placeholder'.length),
+      values: vals,
+      ids:
+        vals
+          .filter(_ => _)
+          .map(val => (val.match(placeholderRegex) || [])
+            .map(char => charToN(char)))
+          .flat(Infinity),
+      path,
+      rule
+    })
+  }
   // search for placeholders in childs
-  Array.isArray(rule)
-    ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i]))
-    : rule.type.startsWith('ruleset')
-      ? rule.rulelist.rules
-        .filter(({type}) => type === 'declarationPlaceholder')
-        .forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name]))
-      : rule.type.startsWith('atRule')
-        ? rule.rulelist?.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]))
-        : rule.type.startsWith('stylesheet')
-          ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]))
-          : undefined) ||
-  placeholders
+  if (Array.isArray(rule)) {
+    for (const i in rule) findPlaceholdersAndPaths(rule[i], placeholders, [...path, i])
+  } else if (rule.type.startsWith('ruleset')) {
+    const rules = rule.rulelist.rules.filter(({type}) => type === 'declarationPlaceholder')
+    for (const i in rules) {
+      const rule = rules[i]
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])
+    }
+  } else if (rule.type.startsWith('atRule')) {
+    const rules = rule.rulelist?.rules
+    for (const i in rules) {
+      const rule = rules[i]
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])
+    }
+  } else if (rule.type.startsWith('stylesheet')) {
+    const rules = rule.rules
+    for (const i in rules) {
+      const rule = rules[i]
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])
+    }
+  }
+  return placeholders
+}
 
 export default (
   { transform, strings, values },
@@ -87,10 +110,11 @@ export default (
         ? `@supports (${toPlaceholder(i - 1)}) {}`
         : toPlaceholder(i - 1)
     }${str2}`)))
-) =>
-  ast.rules.forEach(rule => (rule.string = stringifier.stringify(rule))) ||
-  ({
+) => {
+  ast.rules.forEach(rule => (rule.string = stringifier.stringify(rule)))
+  return {
     ast,
     css: stringifier.stringify(ast),
     placeholdersMetadata: findPlaceholdersAndPaths(ast)
-  })
+  }
+}

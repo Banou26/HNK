@@ -36,7 +36,7 @@ export const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) 
   return newRules
 }
 
-export const placeholdersMetadataToPlaceholders = ({ element: { sheet }, placeholdersMetadata, childRules = Array.from(sheet.cssRules) }) => {
+export const placeholdersMetadataToPlaceholders = ({ element, element: { sheet }, placeholdersMetadata, childRules = Array.from(sheet.cssRules) }) => {
   const placeholders = []
   for (const i in placeholdersMetadata) {
     const placeholderMetadata = placeholdersMetadata[i]
@@ -48,7 +48,7 @@ export const placeholdersMetadataToPlaceholders = ({ element: { sheet }, placeho
       : path)
       .reduce((rule, attrName) => rule[attrName], childRules)
     const rules = [rule]
-    if (childRules.includes(rule)) childRules.splice(childRules.indexOf(rule), 1, rules)
+    if (childRules.includes(rule) && type === 'atRule') childRules.splice(childRules.indexOf(rule), 1, rules)
     let placeholder =
       (type === 'declaration'
         ? makeStyleProperty
