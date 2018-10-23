@@ -15,7 +15,8 @@ const parser = new Parser(new class Factory extends NodeFactory {
         .map(ruleset =>
         ruleset.startsWith(':scope')
           ? ruleset
-          : `:scope ${ruleset}`).join('')
+          : `:scope ${ruleset}`)
+        .join(',')
     return {
       ...super.ruleset(_selector, ...args),
       _selector,
