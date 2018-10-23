@@ -159,7 +159,10 @@ export default ({
             for (const containerQuery of containerQueries) {
               containerQuery.originalSelector = str
               containerQuery.selector = selector
-              containerQuery.nodeSelector = selector.slice(0, selector.indexOf(containerQuery.strAttrId)).replace(globalContainerQueryAttributeRegex, '')
+              containerQuery.nodeSelector =
+                selector
+                  .slice(0, selector.indexOf(containerQuery.strAttrId))
+                  .replace(globalContainerQueryAttributeRegex, '')
             }
             return containerQueries
           })
@@ -169,7 +172,7 @@ export default ({
           .reduce((str, { originalSelector, selector }) =>
             str.replace(originalSelector, selector)
             , result)
-      rule.selectorText = selector.replace(':scope', scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
+      rule.selectorText = selector.replace(/:scope/g, scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
       _containerQueries = containerQueries
       matchContainerQueriesNodes()
     } else {
@@ -180,7 +183,7 @@ export default ({
         }
         _containerQueries = undefined
       }
-      rule.selectorText = result.replace(':scope', scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
+      rule.selectorText = result.replace(/:scope/g, scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
     }
   }, _ => { // Unregister
     if (observingMutations) mutationObserver.disconnect()
