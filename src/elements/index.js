@@ -19,6 +19,24 @@ export {
   mixin
 }
 
+const globalRemovedIds = []
+const globalIds = []
+
+const makeUniqueId = (
+  n = globalRemovedIds.length
+    ? globalRemovedIds.shift()
+    : (globalIds[globalIds.length - 1] === undefined ? 0 : globalIds.length)
+) => {
+  globalIds.splice(n, 0, n)
+  return {
+    id: n,
+    unregister: _ => {
+      globalRemovedIds.push(n)
+      globalIds.splice(globalIds.indexOf(n), 1)
+    }
+  }
+}
+
 export const registerElement = element => {
   const {
     name,
@@ -134,6 +152,13 @@ export const registerElement = element => {
       const { [OzElementContext]: context, [OzElementContext]: { host, style, template } } = this
       if (template) host.appendChild(template.content)
       if (style) {
+        if (style.scoped) {
+          const uniqueId = makeUniqueId()
+          style.scope = uniqueId.id
+          context.scope = uniqueId.id
+          context._scope = uniqueId
+          this.dataset.ozScope = uniqueId.id
+        }
         if (shadowDom) host.appendChild(style)
         else {
           const root = host.getRootNode()
@@ -150,6 +175,13 @@ export const registerElement = element => {
     disconnectedCallback () {
       const { [OzElementContext]: context, [OzElementContext]: { style } } = this
       if (style && !shadowDom) style.remove()
+      if (context.scope) {
+        style.scope = ''
+        context._scope.unregister()
+        context.scope = undefined
+        context._scope = undefined
+        this.dataset.ozScope = undefined
+      }
       // Disconnected mixins & disconnected
       disconnectedMixins.forEach(mixin => mixin(context))
       if (disconnected) disconnected(context)

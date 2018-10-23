@@ -1,5 +1,5 @@
 import { toPlaceholderString, toPlaceholdersNumber } from '../../utils.js'
-import { containerQueryRegex, globalContainerQueryRegex, containerQuery as toContainerQuery, containerQueryAttribute, globalContainerQueryAttributeRegex } from '../utils.js'
+import { containerQueryRegex, globalContainerQueryRegex, matchSelectorRulesets, containerQuery as toContainerQuery, containerQueryAttribute, globalContainerQueryAttributeRegex } from '../utils.js'
 
 const globalRemovedIds = []
 const globalIds = []
@@ -7,7 +7,7 @@ const globalIds = []
 const makeUniqueId = (
   n = globalRemovedIds.length
     ? globalRemovedIds.shift()
-    : (globalIds[globalIds.length - 1] === undefined ? -1 : 0) + 1
+    : (globalIds[globalIds.length - 1] === undefined ? 0 : globalIds.length)
 ) => {
   globalIds.splice(n, 0, n)
   return {
@@ -57,34 +57,32 @@ const updateElement = (target, contentRect = target.getClientRects()) => {
 }
 
 const observed = new Map()
-let resizeObserver = 
+let resizeObserver =
   'ResizeObserver' in window
     ? new ResizeObserver(entries => {
-        for (let { target, contentRect } of entries) {
-          updateElement(target, contentRect)
-        }
-      })
+      for (let { target, contentRect } of entries) {
+        updateElement(target, contentRect)
+      }
+    })
     : {
       observe: elem => observed.set(elem, elem.getClientRects()),
       unobserve: elem => observed.delete(elem)
     }
 
-if (!'ResizeObserver' in window) {
+if (!('ResizeObserver' in window)) {
   const test = _ => {
     for (const [entry, { height: _height, width: _width }] of watchedElements) {
       const bounds = entry.getClientRects()
       const { height, width } = bounds
       if (height !== _height || width !== _width) {
-        updateElement(entry, contentRect)
-        observed.set(elem, bounds)
+        updateElement(entry, bounds)
+        observed.set(entry, bounds)
       }
     }
     window.requestAnimationFrame(test)
   }
   window.requestAnimationFrame(test)
 }
-
-
 
 const watchElement = (elem, containerQuery) => {
   const _containerQueries = watchedElements.get(elem)
@@ -129,19 +127,8 @@ export default ({
     }
   }
   const mutationObserver = new MutationObserver(matchContainerQueriesNodes)
-  let firstInit = false
   let observingMutations = false
-  let _values
-  return [({ values, forceUpdate }) => { // Update
-    if (
-      (!placeholderIds.length/* static container query */ &&
-        placeholderIds
-          .map((id, i) =>
-            values[i])
-          .some((val, i) =>
-            _values?.[i] !== val) // used values changed
-      ) &&
-      firstInit) return
+  return [({ values, forceUpdate, scope }) => { // Update
     const result = getResult(values)
     if (containerQueryRegex.test(result)) {
       if (!observingMutations) mutationObserver.observe(ownerDocument, { subtree: true, childList: true, attributes: true })
@@ -152,9 +139,7 @@ export default ({
         _containerQueries = undefined
       }
       const containerQueries =
-        result
-          // TODO: replace this ',' split by a regex to make it work with attributes selector containing a ','
-          .split(',')
+        matchSelectorRulesets(result)
           .filter(str => containerQueryRegex.test(str))
           .map((str, i) => {
             let containerQueries = []
@@ -184,7 +169,7 @@ export default ({
           .reduce((str, { originalSelector, selector }) =>
             str.replace(originalSelector, selector)
             , result)
-      rule.selectorText = selector
+      rule.selectorText = selector.replace(':scope', scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
       _containerQueries = containerQueries
       matchContainerQueriesNodes()
     } else {
@@ -195,10 +180,8 @@ export default ({
         }
         _containerQueries = undefined
       }
-      rule.selectorText = result
+      rule.selectorText = result.replace(':scope', scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope'
     }
-    _values = values
-    firstInit = true
   }, _ => { // Unregister
     if (observingMutations) mutationObserver.disconnect()
   }]

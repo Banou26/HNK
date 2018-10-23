@@ -10,20 +10,30 @@ export const makeStylesheet = ({
   getIndexOf = rule => Array.from(rules[0].parentStyleSheet.cssRules).indexOf(rule),
   getFirstIndex = _ => getIndexOf(rules[0]),
   getLastIndex = _ => getIndexOf(rules[rules.length - 1]),
-  _value
+  _style
 }) =>
   ({
     values,
     value = values[ids[0]],
-    forceUpdate
+    forceUpdate,
+    scope
   }) => {
     if (value && typeof value === 'object' && OzStyle in value) {
-      if (_value && typeof _value === 'object' && OzStyle in _value && _value.templateId === value.templateId) {
-        _value.update(...value.values)
-        replace(rules, ..._value.childRules)
-      } else replace(rules, ...value.connectedCallback([ast], rules))
+      value.scope = scope
+      if (
+        _style &&
+        typeof _style === 'object' &&
+        OzStyle in _style &&
+        _style.templateId === value.templateId &&
+        _style.values.some((val, i) => val !== value[i])
+      ) {
+        _style.update(...value.values)
+        replace(rules, ..._style.childRules)
+      } else {
+        _style = value
+        replace(rules, ...value.connectedCallback([ast], rules))
+      }
     }
-    _value = value
   }
 
 export default makeStylesheet

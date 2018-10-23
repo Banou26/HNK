@@ -3,7 +3,7 @@ import { replace } from '../../utils.js'
 import { OzStyle as OzStyleSymbol } from './utils.js'
 
 export class OzStyle extends HTMLStyleElement {
-  constructor ({ templateId, css, values, ast, placeholdersMetadata }) {
+  constructor ({ templateId, css, values, ast, placeholdersMetadata, scoped }) {
     super()
     this.ast = ast
     this.templateId = templateId
@@ -11,9 +11,20 @@ export class OzStyle extends HTMLStyleElement {
     this.placeholdersMetadata = placeholdersMetadata
     this.css = css
     this.setAttribute('is', 'oz-style')
+    this.scoped = scoped
+    this.scope = ''
   }
 
   get [OzStyleSymbol] () { return true }
+
+  set scope (scope) {
+    this._scope = scope
+    this.update(...this.values)
+  }
+
+  get scope () {
+    return this._scope
+  }
 
   clone (values = this.values) {
     return new OzStyle({
@@ -21,7 +32,8 @@ export class OzStyle extends HTMLStyleElement {
       css: this.css,
       values,
       placeholdersMetadata: this.placeholdersMetadata,
-      templateId: this.templateId
+      templateId: this.templateId,
+      scoped: this.scoped
     })
   }
 
@@ -30,10 +42,10 @@ export class OzStyle extends HTMLStyleElement {
     this.placeholders.forEach(placeholder =>
       (Array.isArray(placeholder)
         ? placeholder[0]
-        : placeholder)({ values, forceUpdate: this.forceUpdate }))
+        : placeholder)({ values, forceUpdate: this.forceUpdate, scope: this.scope }))
     this.values = values
   }
-
+  // TODO @banou26: check if childRules array are necessary for the style templates
   connectedCallback (ast, childRules) {
     if (childRules) replace(childRules, ...replaceRules(ast, childRules, this.ast.rules))
     else if (this.innerHTML !== this.css) this.innerHTML = this.css
