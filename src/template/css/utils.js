@@ -33,6 +33,7 @@ export const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) 
     const rulesArray = Array.from(stylesheetCssRules)
     if (rulesArray.includes(node)) stylesheet.deleteRule(rulesArray.indexOf(node))
   }
+  if (!newRules.length) newRules.push(stylesheet.cssRules[stylesheet.insertRule('@supports (oz-node-placeholder){}', 0)])
   return newRules
 }
 
