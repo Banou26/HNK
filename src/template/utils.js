@@ -1,9 +1,9 @@
 // placeholders first range U+E000..U+F8FF
 export const placeholderMinRangeChar = ''
-export const placeholderMinRangeCode = placeholderMinRangeChar.charCodeAt()
+export const placeholderMinRangeCode = placeholderMinRangeChar.codePointAt()
 
 export const placeholderMaxRangeChar = ''
-export const placeholderMaxRangeCode = placeholderMaxRangeChar.charCodeAt()
+export const placeholderMaxRangeCode = placeholderMaxRangeChar.codePointAt()
 
 export const placeholderRegex = new RegExp(`[${placeholderMinRangeChar}-${placeholderMaxRangeChar}]`, 'umg') // /[-]/umg
 export const singlePlaceholderRegex = new RegExp(placeholderRegex, 'um')
@@ -26,10 +26,10 @@ export const replace = (arrayFragment, ...vals) =>
 
 // placeholders second range U+F0000..U+FFFFD
 export const placeholder2MinRangeChar = '󰀀'
-export const placeholder2MinRangeCode = placeholder2MinRangeChar.charCodeAt()
+export const placeholder2MinRangeCode = placeholder2MinRangeChar.codePointAt()
 
 export const placeholder2MaxRangeChar = '󿿽'
-export const placeholder2MaxRangeCode = placeholder2MaxRangeChar.charCodeAt()
+export const placeholder2MaxRangeCode = placeholder2MaxRangeChar.codePointAt()
 
 export const placeholder2Regex = new RegExp(`[${placeholder2MinRangeChar}-${placeholder2MaxRangeChar}]`, 'umg') // /[󰀀-󿿽]/umg
 export const singlePlaceholder2Regex = new RegExp(placeholder2Regex, 'um')
@@ -40,7 +40,7 @@ export const charToN2 = str => str.codePointAt() - placeholder2MinRangeCode
 
 export const matchSelectorRulesets = (str, matchedStrRuleset = []) =>
   str
-    .replace(/(".*?"|'.*?')/g, (_, str) =>
+    .replace(/(".*?"|'.*?'|:-webkit-any\(.*?\))/g, (_, str) =>
       placeholder2(matchedStrRuleset.push(str)))
     .split(',')
     .map(str =>

@@ -20,9 +20,11 @@ const makeCSS = ({ indent, str, childs }, { selector: selectorPrefix = '' } = {}
         : matchSelectorRulesets(str)
             .map(str =>
               str.includes('&')
-                ? str.replace('&', selectorPrefix)
-                : `${selectorPrefix} ${str}`, '')
-            .join(',').trim()
+              // todo @banou26: make `any` and `matches` work on any browsers
+                ? str.replace('&', `:-webkit-any(${selectorPrefix})`)
+                : `${selectorPrefix ? `:-webkit-any(${selectorPrefix})})` : selectorPrefix} ${str}`)
+            .join(',')
+            .trim()
     return `${
       selector
     }{${
