@@ -22,7 +22,7 @@ const makeCSS = ({ indent, str, childs }, { selector: selectorPrefix = '' } = {}
               str.includes('&')
               // todo @banou26: make `any` and `matches` work on any browsers
                 ? str.replace('&', `:-webkit-any(${selectorPrefix})`)
-                : `${selectorPrefix ? `:-webkit-any(${selectorPrefix})})` : selectorPrefix} ${str}`)
+                : `${selectorPrefix ? `:-webkit-any(${selectorPrefix})` : selectorPrefix} ${str}`)
             .join(',')
             .trim()
     return `${
