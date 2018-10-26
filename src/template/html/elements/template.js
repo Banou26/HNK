@@ -1,9 +1,10 @@
-import { placeholdersMetadataToPlaceholders, replaceNodes } from '../utils.js'
+import { r } from '../../../reactivity/index.js'
+import { placeholdersMetadataToPlaceholders, replaceNodes, OzHTMLReference } from '../utils.js'
 import { OzHTMLTemplate as OzHTMLTemplateSymbol } from './utils.js'
 class OzHTMLTemplate extends HTMLTemplateElement {
   constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
     super()
-
+    this.refs = this.references = r(new Map())
     this.templateId = templateId
     this.values = values
     this.placeholdersMetadata = placeholdersMetadata
@@ -43,7 +44,15 @@ class OzHTMLTemplate extends HTMLTemplateElement {
   update (...values) {
     this.init(true)
     const oldArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
-    for (const placeholder of this.placeholders) placeholder({ values, forceUpdate: this.forceUpdate })
+    const referencesPlaceholders =
+      this.placeholders
+        .filter(placeholder => placeholder.metadata.ids.length === 1)
+        .filter(({metadata: {values}}) => !values[1] && !values[2] && !values[3])
+        .filter(placeholder => values[placeholder.metadata.ids[0]]?.[OzHTMLReference])
+    const otherPlaceholders =
+      this.placeholders.filter(placeholder => !referencesPlaceholders.includes(placeholder))
+    for (const placeholder of referencesPlaceholders) placeholder({ values, forceUpdate: this.forceUpdate })
+    for (const placeholder of otherPlaceholders) placeholder({ values, forceUpdate: this.forceUpdate })
     const newArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
     for (const i in this.placeholders) replaceNodes(oldArrayFragments[i], newArrayFragments[i])
     this.values = values
