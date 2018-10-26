@@ -1,6 +1,6 @@
 import { registerElement } from '../../elements/index.js'
 import { html } from '../../template/html/index.js'
-import { getClosestOzElementParent } from '../utils.js'
+import { getClosestOzElementParent } from '../../utils.js'
 
 const RouterView = Symbol.for('RouterView')
 

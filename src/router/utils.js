@@ -1,9 +1,10 @@
 import pathToRegexp, { compile } from 'path-to-regexp'
-import { mixin, mixins, OzElement, OzElementContext } from '../elements/utils.js'
+import { getClosestOzElementParent } from '../utils.js'
+import { mixin, mixins, OzElementContext } from '../elements/utils.js'
 import { registerRouterView } from './elements/index.js'
 
 const routerGlobalMixin = {
-  created: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) =>
+  beforeConnected: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) =>
     (ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router)
 }
 
@@ -32,12 +33,3 @@ export const compileRoutes = ({routes = []} = {}) =>
 
 export const matchRoutes = routes => url =>
   routes.filter(({regex}) => regex.test(url.pathname))
-
-export const getClosestOzElementParent = (
-  node,
-  parentNode = node.parentNode || node.host,
-  isOzElement = parentNode && parentNode[OzElement]
-) =>
-  isOzElement
-    ? parentNode
-    : parentNode && getClosestOzElementParent(parentNode)
