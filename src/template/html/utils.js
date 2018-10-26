@@ -1,6 +1,8 @@
 import { comment as makeComment, element as makeElement, text as makeText } from './types/index.js'
 import { placeholderRegex, placeholder as toPlaceholder } from '../utils.js'
 
+export const OzHTMLReference = Symbol.for('OzHTMLReference')
+
 export const replaceNodes = (oldNodes, newNodes) => {
   for (const i in newNodes) {
     // `oldNode` can be undefined if the number of

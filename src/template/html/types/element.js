@@ -1,4 +1,5 @@
 import { placeholder, toPlaceholderString, toPlaceholdersNumber, replace } from '../../utils.js'
+import { OzHTMLReference } from '../utils.js'
 
 const getDependentsPlaceholders = ({ template, placeholdersMetadata, ids, self }) =>
   placeholdersMetadata
@@ -19,7 +20,8 @@ const removeEventListeners = (element, event, listeners) =>
 const makeElement = ({
   template,
   template: {
-    placeholdersMetadata
+    placeholdersMetadata,
+    references
   },
   placeholderMetadata,
   placeholderMetadata: {
@@ -39,46 +41,63 @@ const makeElement = ({
   _attributeName = toAttributeName(template.values),
   _value,
   _eventName,
-  _eventListeners
+  _eventListeners,
+  _ref
 }) => {
   for (const id of ids) arrayFragment[0].removeAttribute(placeholder(id))
   const self = ({ values, forceUpdate, element = arrayFragment[0] }) => {
+    if (_ref) {
+      references.delete(_ref.value)
+      _ref = undefined
+    }
     if (!dependents) dependents = getDependentsPlaceholders({ template, placeholdersMetadata, ids, self })
     if (type === 'startTag') {
       const newElement = document.createElement(tagName(values))
       for (const placeholder of dependents) placeholder({ values, forceUpdate: true })
       replace(arrayFragment, newElement)
     } else if (type === 'attribute') {
-      const attributeName = toAttributeName(values)
-      if (unquotedValue) {
-        const placeholdersNumber = toPlaceholdersNumber(unquotedValue)
-        const eventTest = eventRegexes.find(regex => attributeName.match(regex))
-        if (eventTest) {
-          if (!_eventListeners) _eventListeners = []
-          const listeners =
-            placeholdersNumber
-              .map(n => values[n])
-              .filter(v => typeof v === 'function')
-          const newListeners =
-            listeners
-              .filter(listener => !_eventListeners.includes(listener))
-          const eventName = attributeName.replace(eventTest, '')
-          removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)))
-          for (const listener of newListeners) element.addEventListener(eventName, listener)
-          _eventName = eventName
-          _eventListeners = listeners
-        } else {
-          if (_eventListeners) removeEventListeners(element, _attributeName, _eventListeners)
-          _eventListeners = undefined
-          element[attributeName] = values[placeholdersNumber[0]]
-        }
+      const value = values[ids[0]]
+      if (!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && value?.[OzHTMLReference]) {
+        references.set(value.value, element)
+        _ref = value
       } else {
-        if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName)
-        const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values)
-        if (attributeName) element.setAttribute(attributeName, value.trim() || '')
-        _value = value
+        values =
+          values
+            .map(val =>
+              val?.[OzHTMLReference]
+                ? references.get(val.value)
+                : val)
+        const attributeName = toAttributeName(values)
+        if (unquotedValue) {
+          const placeholdersNumber = toPlaceholdersNumber(unquotedValue)
+          const eventTest = eventRegexes.find(regex => attributeName.match(regex))
+          if (eventTest) {
+            if (!_eventListeners) _eventListeners = []
+            const listeners =
+              placeholdersNumber
+                .map(n => values[n])
+                .filter(v => typeof v === 'function')
+            const newListeners =
+              listeners
+                .filter(listener => !_eventListeners.includes(listener))
+            const eventName = attributeName.replace(eventTest, '')
+            removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)))
+            for (const listener of newListeners) element.addEventListener(eventName, listener)
+            _eventName = eventName
+            _eventListeners = listeners
+          } else {
+            if (_eventListeners) removeEventListeners(element, _attributeName, _eventListeners)
+            _eventListeners = undefined
+            element[attributeName] = values[placeholdersNumber[0]]
+          }
+        } else {
+          if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName)
+          const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values)
+          if (attributeName) element.setAttribute(attributeName, value.trim() || '')
+          _value = value
+        }
+        _attributeName = attributeName
       }
-      _attributeName = attributeName
     }
   }
   return self
