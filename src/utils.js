@@ -15,10 +15,10 @@ export const getPropertyDescriptorPair = (prototype, property) => {
 export const hasProperty = (object, property) => !!getPropertyDescriptorPair(object, property)
 
 export const getPropertyDescriptor = (object, property) =>
-  (getPropertyDescriptorPair(object, property) || {}).descriptor
+  getPropertyDescriptorPair(object, property)?.descriptor
 
 export const getPropertyDescriptorPrototype = (object, property) =>
-  (getPropertyDescriptorPair(object, property) || {}).prototype
+  getPropertyDescriptorPair(object, property)?.prototype
 
 export const getClosestOzElementParent = (
   node,

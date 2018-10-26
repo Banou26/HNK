@@ -12,6 +12,7 @@ import {
   OzElement as OzElementSymbol,
   mixin
 } from './utils.js'
+import { getPropertyDescriptor } from '../utils.js'
 
 export {
   OzElementContext,
@@ -98,13 +99,31 @@ export const registerElement = element => {
         .filter(([, value]) => typeof value === 'function')
         .forEach(([k, v]) => void (context[k] = v.bind(context, context)))
       // Props mixins & props
-      props.forEach((prop) => (context.props[prop] = this[prop]))
-      Object.defineProperties(this, props.reduce((props, prop) => (props[prop] = {
+      let ignoreContextProps = false
+      let ignoreElementProps = false
+      const propsValues = r({})
+      props.forEach((prop) => (propsValues[prop] = this[prop]))
+      const oldDescriptors = new Map(props.map(prop => [prop, getPropertyDescriptor(this, prop)]))
+      const propsDescriptors = props.reduce((props, prop) => ((props[prop] = {
         enumerable: true,
         configurable: true,
-        get: _ => context.props[prop],
-        set: val => (context.props[prop] = val)
-      }) && props, {}))
+        get: _ => propsValues[prop],
+        set: val => {
+          if (!ignoreContextProps) {
+            ignoreContextProps = true
+            propsValues[prop] = val
+            ignoreContextProps = false
+          }
+          if (!ignoreElementProps) {
+            ignoreElementProps = true
+            this[prop] = val
+            oldDescriptors.get(prop)?.set.call(this, val)
+            ignoreElementProps = false
+          }
+        }
+      }), props), {})
+      Object.defineProperties(context.props, propsDescriptors)
+      Object.defineProperties(this, propsDescriptors)
       // State mixins & state
       const state = context.state = r((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {})
       states
@@ -164,9 +183,6 @@ export const registerElement = element => {
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
         })
-        // Connected mixins & connected
-        connectedMixins.forEach(mixin => mixin(context))
-        if (connected) connected(context)
       }
 
       const { host, style, template } = context
@@ -187,6 +203,9 @@ export const registerElement = element => {
         }
         // style.update(...style.values)
       }
+      // Connected mixins & connected
+      connectedMixins.forEach(mixin => mixin(context))
+      if (connected) connected(context)
       if (template) host.appendChild(template.content)
     }
 
