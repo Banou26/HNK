@@ -3,12 +3,12 @@ import { placeholderRegex } from './utils.js'
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr']
 
-const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: ?(.*))?/
-const gRegex = new RegExp(regex, 'gm')
+const regex = /^(\s*)(?:(\|)|(?:([.#\w--]*)(?:\(([\s\S]*?)\))?))(?: ?(.*))?/u
+const gRegex = new RegExp(regex, 'gmu')
 
-const identifierRegex = /(?:(\.)|(#))([a-zA-Z0-9-]*)/
-const gIdentifierRegex = new RegExp(identifierRegex, 'g')
-const classRegex = /class="(.*)"/
+const identifierRegex = /(?:(\.)|(#))([a-zA-Z0-9--]*)/u
+const gIdentifierRegex = new RegExp(identifierRegex, 'gu')
+const classRegex = /class="(.*?)"/
 
 const makeHTML = ({tag, attributes, childs, textContent, id, classList, i, forceText, match}) => {
   if (forceText) return (i ? '\n' : '') + match.input.trim()
