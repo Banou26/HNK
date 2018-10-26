@@ -1,5 +1,5 @@
-import { toPlaceholderString, toPlaceholdersNumber } from '../../utils.js'
-import { containerQueryRegex, globalContainerQueryRegex, matchSelectorRulesets, containerQuery as toContainerQuery, containerQueryAttribute, globalContainerQueryAttributeRegex } from '../utils.js'
+import { toPlaceholderString, toPlaceholdersNumber, matchSelectorRulesets } from '../../utils.js'
+import { containerQueryRegex, globalContainerQueryRegex, containerQuery as toContainerQuery, containerQueryAttribute, globalContainerQueryAttributeRegex } from '../utils.js'
 
 const globalRemovedIds = []
 const globalIds = []
