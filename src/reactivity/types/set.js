@@ -65,7 +65,7 @@ export const ReactiveType = class ReactiveSet extends Set {
 for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
   ReactiveType.prototype[property] = function (...args) {
     registerDependency({ target: this })
-    return type.prototype[property](...args)
+    return type.prototype[property].apply(this, args)
   }
 }
 
