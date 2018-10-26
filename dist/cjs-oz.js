@@ -8,8 +8,9 @@ var shadyCssParser = require('shady-css-parser');
 var pathToRegexp = require('path-to-regexp');
 var pathToRegexp__default = _interopDefault(pathToRegexp);
 
+// placeholders first range U+E000..U+F8FF
 const placeholderMinRangeChar = '';
-const placeholderMinRangeCode = placeholderMinRangeChar.charCodeAt();
+const placeholderMinRangeCode = placeholderMinRangeChar.codePointAt();
 const placeholderMaxRangeChar = '';
 const placeholderRegex = new RegExp(`[${placeholderMinRangeChar}-${placeholderMaxRangeChar}]`, 'umg'); // /[-]/umg
 
@@ -18,7 +19,16 @@ const placeholder = (n = 0) => String.fromCodePoint(placeholderMinRangeCode + n)
 const charToN = str => str.codePointAt() - placeholderMinRangeCode;
 const toPlaceholdersNumber = str => (str.match(placeholderRegex) || []).map(i => charToN(i));
 const toPlaceholderString = (str, placeholders = toPlaceholdersNumber(str)) => values => placeholders.reduce((str, i) => str.replace(placeholder(i), values[i]), str);
-const replace = (arrayFragment, ...vals) => arrayFragment.splice(0, arrayFragment.length, ...vals);
+const replace = (arrayFragment, ...vals) => arrayFragment.splice(0, arrayFragment.length, ...vals); // placeholders first range U+E000..U+F8FF //
+// placeholders second range U+F0000..U+FFFFD
+
+const placeholder2MinRangeChar = '󰀀';
+const placeholder2MinRangeCode = placeholder2MinRangeChar.codePointAt();
+const placeholder2MaxRangeChar = '󿿽';
+const placeholder2Regex = new RegExp(`[${placeholder2MinRangeChar}-${placeholder2MaxRangeChar}]`, 'umg'); // /[󰀀-󿿽]/umg
+const placeholder2 = (n = 0) => String.fromCodePoint(placeholder2MinRangeCode + n);
+const charToN2 = str => str.codePointAt() - placeholder2MinRangeCode;
+const matchSelectorRulesets = (str, matchedStrRuleset = []) => str.replace(/(".*?"|'.*?'|:-webkit-any\(.*?\))/g, (_, str) => placeholder2(matchedStrRuleset.push(str))).split(',').map(str => str.replace(placeholder2Regex, char => matchedStrRuleset[charToN2(char) - 1]).trim()); // placeholders second range U+F0000..U+FFFFD //
 
 var makeComment = (({
   placeholderMetadata,
@@ -45,7 +55,8 @@ const removeEventListeners = (element, event, listeners) => listeners.forEach(li
 const makeElement = ({
   template,
   template: {
-    placeholdersMetadata
+    placeholdersMetadata,
+    references
   },
   placeholderMetadata,
   placeholderMetadata: {
@@ -63,7 +74,8 @@ const makeElement = ({
   _attributeName = toAttributeName(template.values),
   _value,
   _eventName,
-  _eventListeners
+  _eventListeners,
+  _ref
 }) => {
   for (const id of ids) arrayFragment[0].removeAttribute(placeholder(id));
 
@@ -72,6 +84,11 @@ const makeElement = ({
     forceUpdate,
     element = arrayFragment[0]
   }) => {
+    if (_ref) {
+      references.delete(_ref.value);
+      _ref = undefined;
+    }
+
     if (!dependents) dependents = getDependentsPlaceholders({
       template,
       placeholdersMetadata,
@@ -89,38 +106,46 @@ const makeElement = ({
 
       replace(arrayFragment, newElement);
     } else if (type === 'attribute') {
-      const attributeName = toAttributeName(values);
+      const value = values[ids[0]];
 
-      if (unquotedValue) {
-        const placeholdersNumber = toPlaceholdersNumber(unquotedValue);
-        const eventTest = eventRegexes.find(regex => attributeName.match(regex));
-
-        if (eventTest) {
-          if (!_eventListeners) _eventListeners = [];
-          const listeners = placeholdersNumber.map(n => values[n]).filter(v => typeof v === 'function');
-          const newListeners = listeners.filter(listener => !_eventListeners.includes(listener));
-          const eventName = attributeName.replace(eventTest, '');
-          removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)));
-
-          for (const listener of newListeners) element.addEventListener(eventName, listener);
-
-          _eventName = eventName;
-          _eventListeners = listeners;
-        } else {
-          if (_eventListeners) removeEventListeners(element, _attributeName, _eventListeners);
-          _eventListeners = undefined;
-          element[attributeName] = values[placeholdersNumber[0]];
-        }
+      if (!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && (value === null || value === void 0 ? void 0 : value[OzHTMLReference])) {
+        references.set(value.value, element);
+        _ref = value;
       } else {
-        if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName);
+        values = values.map(val => (val === null || val === void 0 ? void 0 : val[OzHTMLReference]) ? references.get(val.value) : val);
+        const attributeName = toAttributeName(values);
 
-        const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values);
+        if (unquotedValue) {
+          const placeholdersNumber = toPlaceholdersNumber(unquotedValue);
+          const eventTest = eventRegexes.find(regex => attributeName.match(regex));
 
-        if (attributeName) element.setAttribute(attributeName, value.trim() || '');
-        _value = value;
+          if (eventTest) {
+            if (!_eventListeners) _eventListeners = [];
+            const listeners = placeholdersNumber.map(n => values[n]).filter(v => typeof v === 'function');
+            const newListeners = listeners.filter(listener => !_eventListeners.includes(listener));
+            const eventName = attributeName.replace(eventTest, '');
+            removeEventListeners(element, _eventName, _eventListeners.filter(listener => !listeners.includes(listener)));
+
+            for (const listener of newListeners) element.addEventListener(eventName, listener);
+
+            _eventName = eventName;
+            _eventListeners = listeners;
+          } else {
+            if (_eventListeners) removeEventListeners(element, _attributeName, _eventListeners);
+            _eventListeners = undefined;
+            element[attributeName] = values[placeholdersNumber[0]];
+          }
+        } else {
+          if (attributeName !== _attributeName && element.hasAttribute(_attributeName)) element.removeAttribute(_attributeName);
+
+          const value = (toDoubleQuoteValue || toSingleQuoteValue || (_ => undefined))(values);
+
+          if (attributeName) element.setAttribute(attributeName, value.trim() || '');
+          _value = value;
+        }
+
+        _attributeName = attributeName;
       }
-
-      _attributeName = attributeName;
     }
   };
 
@@ -199,6 +224,7 @@ const makeText = ({
   _arrayFragment = arrayFragment.flat(Infinity);
 };
 
+const OzHTMLReference = Symbol.for('OzHTMLReference');
 const replaceNodes = (oldNodes, newNodes) => {
   for (const i in newNodes) {
     // `oldNode` can be undefined if the number of
@@ -424,136 +450,6 @@ var parse = (({
   };
 });
 
-class OzHTMLTemplate$1 extends HTMLTemplateElement {
-  constructor({
-    templateId,
-    originalFragment,
-    values,
-    placeholdersMetadata
-  }) {
-    super();
-    this.templateId = templateId;
-    this.values = values;
-    this.placeholdersMetadata = placeholdersMetadata;
-    this.originalFragment = originalFragment;
-    this.setAttribute('is', 'oz-html-template');
-  }
-
-  get [OzHTMLTemplate]() {
-    return true;
-  }
-
-  init(isUpdate) {
-    if (this.placeholders) return;
-    const fragment = this.originalFragment.cloneNode(true);
-    const {
-      placeholders,
-      childNodes
-    } = placeholdersMetadataToPlaceholders({
-      template: this,
-      placeholdersMetadata: this.placeholdersMetadata,
-      fragment
-    });
-    this.placeholders = placeholders;
-    this.content.appendChild(fragment);
-    this._childNodes = childNodes;
-    if (isUpdate) this.forceUpdate = true;else this.update(...this.values);
-  }
-
-  clone(values = this.values) {
-    return new OzHTMLTemplate$1({
-      originalFragment: this.originalFragment,
-      values,
-      placeholdersMetadata: this.placeholdersMetadata,
-      templateId: this.templateId
-    });
-  }
-
-  update(...values) {
-    this.init(true);
-    const oldArrayFragments = this.placeholders.map(({
-      arrayFragment
-    }) => arrayFragment.flat(Infinity));
-
-    for (const placeholder of this.placeholders) placeholder({
-      values,
-      forceUpdate: this.forceUpdate
-    });
-
-    const newArrayFragments = this.placeholders.map(({
-      arrayFragment
-    }) => arrayFragment.flat(Infinity));
-
-    for (const i in this.placeholders) replaceNodes(oldArrayFragments[i], newArrayFragments[i]);
-
-    this.values = values;
-    this.forceUpdate = false;
-  }
-
-  get childNodes() {
-    this.init();
-    return this._childNodes;
-  }
-
-  get content() {
-    this.init();
-    return super.content;
-  }
-
-  connectedCallback() {
-    this.insertAfter();
-  }
-
-  insertNodesAfter() {
-    this.init();
-
-    for (const node of this.childNodes.flat(Infinity)) this.parentNode.insertBefore(node, this.nextSibling);
-  }
-
-  insertNodesToFragment() {
-    this.init();
-
-    for (const node of this.childNodes.flat(Infinity)) this.content.appendChild(node);
-  }
-
-  insertAfter() {
-    this.init();
-    this.parentNode.insertBefore(this.content, this.nextSibling);
-  }
-
-  disconnectedCallback() {
-    this.insertNodesToFragment();
-  }
-
-}
-
-customElements.get('oz-html-template') || customElements.define('oz-html-template', OzHTMLTemplate$1, {
-  extends: 'template'
-});
-var createTemplate = (options => new OzHTMLTemplate$1(options));
-
-const elements = new Map();
-const HTMLTag = (transform = str => str) => (strings, ...values) => {
-  const templateId = 'html' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
-  if (elements.has(templateId)) return elements.get(templateId).clone(values);
-  const {
-    fragment,
-    placeholdersMetadata
-  } = parse({
-    transform,
-    strings,
-    values
-  });
-  elements.set(templateId, createTemplate({
-    templateId,
-    originalFragment: fragment,
-    values,
-    placeholdersMetadata
-  }));
-  return elements.get(templateId).clone(values);
-};
-const html = HTMLTag();
-
 function _defineProperty(obj, key, value) {
   if (key in obj) {
     Object.defineProperty(obj, key, {
@@ -624,641 +520,15 @@ function _objectWithoutProperties(source, excluded) {
   return target;
 }
 
-const globalRemovedIds = [];
-const globalIds = [];
-
-const makeUniqueId = (n = globalRemovedIds.length ? globalRemovedIds.shift() : (globalIds[globalIds.length - 1] === undefined ? -1 : 0) + 1) => {
-  globalIds.splice(n, 0, n);
-  return {
-    id: n,
-    match: undefined,
-    strId: undefined,
-    strAttrId: undefined,
-    originalSelector: undefined,
-    selector: undefined,
-    nodeSelector: undefined,
-    nodes: new Map(),
-    unregister: _ => {
-      globalRemovedIds.push(n);
-      globalIds.splice(globalIds.indexOf(n), 1);
-    }
-  };
-};
-
-const watchedElements = new Map();
-let measuringElement = document.createElement('div');
-measuringElement.style.display = 'none';
-
-const updateElement = (target, contentRect = target.getClientRects()) => {
-  const containerQueries = watchedElements.get(target);
-  target.parentNode.insertBefore(measuringElement, target);
-
-  for (const containerQuery$$1 of containerQueries) {
-    measuringElement.style.height = containerQuery$$1.match[3];
-    const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height);
-    const property = containerQuery$$1.match[2].endsWith('height') ? 'height' : containerQuery$$1.match[2].endsWith('width') ? 'width' : undefined;
-
-    if (containerQuery$$1.match[2].startsWith('min') && contentRect[property] > containerQueryPxValue || containerQuery$$1.match[2].startsWith('max') && contentRect[property] < containerQueryPxValue) {
-      target.setAttribute(containerQuery$$1.strId, '');
-    } else {
-      target.removeAttribute(containerQuery$$1.strId);
-    }
-  }
-
-  measuringElement.remove();
-  measuringElement.style.height = '';
-};
-
-const observed = new Map();
-let resizeObserver = 'ResizeObserver' in window ? new ResizeObserver(entries => {
-  for (let _ref of entries) {
-    let {
-      target,
-      contentRect
-    } = _ref;
-    updateElement(target, contentRect);
-  }
-}) : {
-  observe: elem => observed.set(elem, elem.getClientRects()),
-  unobserve: elem => observed.delete(elem)
-};
-
-if (!'ResizeObserver' in window) {
-  const test = _ => {
-    for (const [entry, {
-      height: _height,
-      width: _width
-    }] of watchedElements) {
-      const bounds = entry.getClientRects();
-      const {
-        height,
-        width
-      } = bounds;
-
-      if (height !== _height || width !== _width) {
-        updateElement(entry, contentRect);
-        observed.set(elem, bounds);
-      }
-    }
-
-    window.requestAnimationFrame(test);
-  };
-
-  window.requestAnimationFrame(test);
-}
-
-const watchElement = (elem, containerQuery$$1) => {
-  const _containerQueries = watchedElements.get(elem);
-
-  const containerQueries = _containerQueries || [];
-  containerQueries.push(containerQuery$$1);
-  if (!_containerQueries) watchedElements.set(elem, containerQueries);
-  resizeObserver.observe(elem);
-  return _ => {
-    containerQueries.splice(containerQueries.indexOf(containerQuery$$1), 1);
-    if (!containerQueries.length) watchedElements.delete(elem);
-    resizeObserver.unobserve(elem);
-
-    for (const [node] of containerQuery$$1.nodes) node.removeAttribute(containerQuery$$1.strId);
-  };
-};
-
-var makeStyle = (({
-  placeholderMetadata,
-  placeholderMetadata: {
-    values: [_selector],
-    rule: _rule
-  },
-  rules: [rule],
-  placeholderIds = toPlaceholdersNumber(_selector)
-}) => {
-  const {
-    ownerDocument
-  } = rule.parentStyleSheet.ownerNode;
-  const getResult = toPlaceholderString(placeholderMetadata.values[0]);
-
-  let _containerQueries;
-
-  const matchContainerQueriesNodes = _ => {
-    for (const containerQuery$$1 of _containerQueries) {
-      const matchedNodes = Array.from(ownerDocument.querySelectorAll(containerQuery$$1.nodeSelector));
-      const containerQueryNodes = Array.from(containerQuery$$1.nodes.keys());
-      containerQueryNodes.filter(node => !matchedNodes.includes(node)) // Removed nodes
-      .forEach(node => {
-        containerQuery$$1.nodes.get(node)(); // Unregister watcher
-
-        containerQuery$$1.nodes.delete(node);
-      });
-      matchedNodes.filter(node => !containerQueryNodes.includes(node)) // Added nodes
-      .forEach(node => containerQuery$$1.nodes.set(node, watchElement(node, containerQuery$$1)
-      /* Register watcher */
-      ));
-    }
-  };
-
-  const mutationObserver = new MutationObserver(matchContainerQueriesNodes);
-  let firstInit = false;
-
-  let _values;
-
-  return [({
-    values,
-    forceUpdate
-  }) => {
-    // Update
-    if (!placeholderIds.length
-    /* static container query */
-    && placeholderIds.map((id, i) => values[i]).some((val, i) => {
-      var _values2;
-
-      return ((_values2 = _values) === null || _values2 === void 0 ? void 0 : _values2[i]) !== val;
-    }) // used values changed
-    && firstInit) return;
-    const result = getResult(values);
-
-    if (containerQueryRegex.test(result)) {
-      mutationObserver.observe(ownerDocument, {
-        subtree: true,
-        childList: true,
-        attributes: true
-      });
-
-      if (_containerQueries) {
-        for (const containerQuery$$1 of _containerQueries) {
-          containerQuery$$1.unregister();
-        }
-
-        _containerQueries = undefined;
-      }
-
-      const containerQueries = result // TODO: replace this ',' split by a regex to make it work with attributes selector containing a ','
-      .split(',').filter(str => containerQueryRegex.test(str)).map((str, i) => {
-        let containerQueries = [];
-        let match;
-
-        while (match = globalContainerQueryRegex.exec(str)) {
-          const uniqueId = makeUniqueId();
-          uniqueId.match = match;
-          uniqueId.strId = containerQuery(uniqueId.id);
-          uniqueId.strAttrId = containerQueryAttribute(uniqueId.id);
-          containerQueries.push(uniqueId);
-        }
-
-        const selector = containerQueries.reduce((str, {
-          strAttrId,
-          match
-        }) => str.replace(match[0], strAttrId), result);
-
-        for (const containerQuery$$1 of containerQueries) {
-          containerQuery$$1.originalSelector = str;
-          containerQuery$$1.selector = selector;
-          containerQuery$$1.nodeSelector = selector.slice(0, selector.indexOf(containerQuery$$1.strAttrId)).replace(globalContainerQueryAttributeRegex, '');
-        }
-
-        return containerQueries;
-      }).flat(Infinity);
-      const selector = containerQueries.reduce((str, {
-        originalSelector,
-        selector
-      }) => str.replace(originalSelector, selector), result);
-      rule.selectorText = selector;
-      _containerQueries = containerQueries;
-      matchContainerQueriesNodes();
-    } else {
-
-      if (_containerQueries) {
-        for (const containerQuery$$1 of _containerQueries) {
-          containerQuery$$1.unregister();
-        }
-
-        _containerQueries = undefined;
-      }
-
-      rule.selectorText = result;
-    }
-
-    _values = values;
-    firstInit = true;
-  }, _ => {
-  }];
-});
-
-var makeStyleProperty = (({
-  placeholderMetadata: {
-    values,
-    path
-  },
-  rules: [style],
-  getNameResult = toPlaceholderString(values[0]),
-  getValueResult = toPlaceholderString(values[1]),
-  _name = `--${path[path.length - 1]}`
-}) => ({
-  values
-}) => {
-  style.removeProperty(_name);
-  style.setProperty(_name = getNameResult(values), getValueResult(values));
-});
-
-const OzStyle = Symbol.for('OzStyle');
-
-const makeStylesheet = ({
-  placeholderMetadata: {
-    rule: ast,
-    ids
-  },
-  rules,
-  getIndexOf = rule => Array.from(rules[0].parentStyleSheet.cssRules).indexOf(rule),
-  getFirstIndex = _ => getIndexOf(rules[0]),
-  getLastIndex = _ => getIndexOf(rules[rules.length - 1]),
-  _value
-}) => ({
-  values,
-  value = values[ids[0]],
-  forceUpdate
-}) => {
-  if (value && typeof value === 'object' && OzStyle in value) {
-    if (_value && typeof _value === 'object' && OzStyle in _value && _value.templateId === value.templateId) {
-      _value.update(...value.values);
-
-      replace(rules, ..._value.childRules);
-    } else replace(rules, ...value.connectedCallback([ast], rules));
-  }
-
-  _value = value;
-};
-
-const containerQueryRegex = /:element\(((.*?)=(.*?))\)/;
-const globalContainerQueryRegex = new RegExp(containerQueryRegex, 'g');
-const containerQuery = i => `oz-container-query-${i}`;
-const containerQueryAttribute = i => `[oz-container-query-${i}]`;
-const containerQueryAttributeRegex = /\[oz-container-query-(\d)\]/;
-const globalContainerQueryAttributeRegex = new RegExp(containerQueryAttributeRegex, 'g');
-const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) => {
-  const stylesheet$$1 = oldRules[0].parentStyleSheet;
-  const stylesheetCssRules = stylesheet$$1.cssRules;
-
-  for (const i in newASTRules) {
-    const oldASTRule = oldASTRules[i];
-    const newASTRule = newASTRules[i];
-
-    if (oldASTRule !== newASTRule) {
-      const rulesArray = Array.from(stylesheetCssRules);
-      const oldRule = oldRules[i];
-      const oldRuleIndex = rulesArray.indexOf(oldRule);
-
-      if (oldRule) {
-        newRules.push(stylesheet$$1.cssRules[stylesheet$$1.insertRule(newASTRule.string, oldRuleIndex)]);
-        if (newASTRules[i + 1] !== oldASTRule) stylesheet$$1.deleteRule(oldRuleIndex + 1);
-      } else {
-        // Will place the new node after the previous newly placed new node
-        const previousNewRule = newRules[i - 1];
-        const previousNewRuleIndex = rulesArray.indexOf(previousNewRule);
-        newRules.push(stylesheet$$1.cssRules[stylesheet$$1.insertRule(newASTRule.string, previousNewRuleIndex)]);
-        if (oldRule) stylesheet$$1.deleteRule(oldRuleIndex);
-      }
-    }
-  }
-
-  for (const node of oldRules.filter(node => !newRules.includes(node))) {
-    const rulesArray = Array.from(stylesheetCssRules);
-    if (rulesArray.includes(node)) stylesheet$$1.deleteRule(rulesArray.indexOf(node));
-  }
-
-  return newRules;
-};
-const placeholdersMetadataToPlaceholders$1 = ({
-  element: {
-    sheet
-  },
-  placeholdersMetadata,
-  childRules = Array.from(sheet.cssRules)
-}) => {
-  const placeholders = [];
-
-  for (const i in placeholdersMetadata) {
-    const placeholderMetadata = placeholdersMetadata[i];
-    const {
-      type,
-      path
-    } = placeholderMetadata;
-    if (path[0] === 'cssRules') path.shift();
-    const rule = (type === 'declaration' ? path.slice(0, -1) : path).reduce((rule, attrName) => rule[attrName], childRules);
-    const rules = [rule];
-    if (childRules.includes(rule)) childRules.splice(childRules.indexOf(rule), 1, rules);
-    let placeholder = (type === 'declaration' ? makeStyleProperty : type === 'ruleset' ? makeStyle : type === 'atRule' ? makeStylesheet : undefined)({
-      placeholderMetadata,
-      rules
-    });
-    placeholder.metadata = placeholderMetadata;
-    placeholder.rules = rules;
-    placeholders.push(placeholder);
-  }
-
-  return {
-    childRules,
-    placeholders
-  };
-};
-
-const parser = new shadyCssParser.Parser(new class Factory extends shadyCssParser.NodeFactory {
-  ruleset(...args) {
-    return _objectSpread({}, super.ruleset(...args), singlePlaceholderRegex.test(args[0]) || args[0].includes(':element') ? {
-      type: `rulesetPlaceholder`
-    } : undefined);
-  }
-
-  expression(...args) {
-    return _objectSpread({}, super.expression(...args), singlePlaceholderRegex.test(args[0]) ? {
-      type: `expressionPlaceholder`
-    } : undefined);
-  }
-
-  atRule(...args) {
-    return _objectSpread({}, super.atRule(...args), args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) ? {
-      type: 'atRulePlaceholder'
-    } : undefined);
-  }
-
-  declaration(...args) {
-    return _objectSpread({}, super.declaration(...args), singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text) ? {
-      type: 'declarationPlaceholder'
-    } : undefined);
-  }
-
-}());
-const stringifier = new class extends shadyCssParser.Stringifier {
-  atRulePlaceholder(...args) {
-    return super.atRule(...args);
-  }
-
-  rulesetPlaceholder({
-    selector,
-    rulelist
-  }) {
-    return `${selector.replace(/:element\((.*?)\)/g, '')}${this.visit(rulelist)}`;
-  }
-
-  declarationPlaceholder({
-    name,
-    value
-  }) {
-    return `--${name}${value ? `:${this.visit(value)}` : ''}`;
-  }
-
-  expressionPlaceholder({
-    text
-  }) {
-    return `${text.replace(placeholderRegex, 'var(--$&)')}${text.endsWith(';') ? '' : ';'}`;
-  }
-
-}();
-
-const findPlaceholdersAndPaths = (rule, placeholders = [], _path = [], path = [..._path], {
-  type,
-  selector,
-  name,
-  value,
-  parameters,
-  text = type.startsWith('declaration') ? value.text : undefined
-} = rule, vals = [selector || name || value, text || parameters]) => {
-  var _rule$rulelist;
-
-  return (// match, create PlaceholderMetadata and push to placeholders
-    (void (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder' && placeholders.push({
-      type: type.slice(0, -'Placeholder'.length),
-      values: vals,
-      ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
-      path,
-      rule
-    })) || // search for placeholders in childs
-    Array.isArray(rule) ? rule.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, i])) : rule.type.startsWith('ruleset') ? rule.rulelist.rules.filter(({
-      type
-    }) => type === 'declarationPlaceholder').forEach(rule => findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name])) : rule.type.startsWith('atRule') ? (_rule$rulelist = rule.rulelist) === null || _rule$rulelist === void 0 ? void 0 : _rule$rulelist.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : rule.type.startsWith('stylesheet') ? rule.rules.forEach((rule, i) => findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i])) : undefined) || placeholders
-  );
-};
-
-var parse$1 = (({
-  transform,
-  strings,
-  values
-}, ast = parser.parse(transform(strings.reduce((str, str2, i) => `${str}${typeof values[i - 1] === 'object' ? `@supports (${placeholder(i - 1)}) {}` : placeholder(i - 1)}${str2}`)))) => ast.rules.forEach(rule => rule.string = stringifier.stringify(rule)) || {
-  ast,
-  css: stringifier.stringify(ast),
-  placeholdersMetadata: findPlaceholdersAndPaths(ast)
-});
-
-class OzStyle$1 extends HTMLStyleElement {
-  constructor({
-    templateId,
-    css,
-    values,
-    ast,
-    placeholdersMetadata
-  }) {
-    super();
-    this.ast = ast;
-    this.templateId = templateId;
-    this.values = values;
-    this.placeholdersMetadata = placeholdersMetadata;
-    this.css = css;
-    this.setAttribute('is', 'oz-style');
-  }
-
-  get [OzStyle]() {
-    return true;
-  }
-
-  clone(values = this.values) {
-    return new OzStyle$1({
-      ast: this.ast,
-      css: this.css,
-      values,
-      placeholdersMetadata: this.placeholdersMetadata,
-      templateId: this.templateId
-    });
-  }
-
-  update(...values) {
-    if (!this.placeholders) return void (this.values = values);
-    this.placeholders.forEach(placeholder$$1 => (Array.isArray(placeholder$$1) ? placeholder$$1[0] : placeholder$$1)({
-      values,
-      forceUpdate: this.forceUpdate
-    }));
-    this.values = values;
-  }
-
-  connectedCallback(ast, childRules) {
-    if (childRules) replace(childRules, ...replaceRules(ast, childRules, this.ast.rules));else if (this.innerHTML !== this.css) this.innerHTML = this.css;
-    const {
-      placeholders
-    } = placeholdersMetadataToPlaceholders$1({
-      element: this,
-      placeholdersMetadata: this.placeholdersMetadata,
-      childRules
-    });
-    this.childRules = childRules;
-    this.placeholders = placeholders;
-    this.forceUpdate = true;
-    this.update(...this.values);
-    this.forceUpdate = false;
-    return childRules;
-  }
-
-  disconnectedCallback() {
-    this.placeholders.filter(Array.isArray).forEach(([, unregister]) => unregister());
-  }
-
-}
-customElements.get('oz-style') || customElements.define('oz-style', OzStyle$1, {
-  extends: 'style'
-});
-var createStyle = (options => new OzStyle$1(options));
-
-const styles = new Map();
-const CSSTag = (transform = str => str) => (strings, ...values) => {
-  const templateId = 'css' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
-  if (styles.has(templateId)) return styles.get(templateId).clone(values);
-  const {
-    ast,
-    css,
-    placeholdersMetadata
-  } = parse$1({
-    transform,
-    strings,
-    values
-  });
-  styles.set(templateId, createStyle({
-    templateId,
-    css,
-    values,
-    ast,
-    placeholdersMetadata
-  }));
-  return styles.get(templateId).clone(values);
-};
-const css = CSSTag();
-
-const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
-const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?:(.*))?/;
-const gRegex = new RegExp(regex, 'gm');
-const identifierRegex = /(?:(\.)|(#))([a-z0-9-]*)/;
-const gIdentifierRegex = new RegExp(identifierRegex, 'g');
-const classRegex = /class="(.*)"/;
-
-const makeHTML = ({
-  tag,
-  attributes,
-  childs,
-  textContent,
-  id,
-  classList,
-  i,
-  forceText,
-  match
-}) => {
-  if (forceText) return (i ? '\n' : '') + match.input.trim();
-  const childForceText = classList.includes('');
-  const classStr = classList.join(' ');
-  let attrStr = attributes ? ' ' + attributes : '';
-  if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`);else if (classStr) attrStr += ` class="${classStr}"`;
-  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map((line, i) => makeHTML(_objectSpread({}, line, {
-    forceText: childForceText,
-    i
-  }))).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`;else return (i ? '\n' : '') + textContent;
-};
-
-const pushLine = ({
-  childs: currentChilds
-}, line) => {
-  if (currentChilds.length && currentChilds[currentChilds.length - 1].indentation < line.indentation) pushLine(currentChilds[currentChilds.length - 1], line);else currentChilds.push(line);
-};
-
-const hierarchise = arr => {
-  const hierarchisedArr = [];
-
-  for (let line of arr) {
-    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line);else hierarchisedArr.push(line);
-  }
-
-  return hierarchisedArr;
-};
-
-const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(regex)).filter(match => match[0].trim().length).map((match, i) => {
-  if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
-    return {
-      indentation: match[1].split('\n').pop().length,
-      textContent: match[3],
-      classList: []
-    };
-  }
-
-  const tag = match[3] ? match[3].match(/^([a-z0-9-]*)/)[1] : undefined;
-  const identifiers = match[3] ? match[3].slice(tag.length).match(gIdentifierRegex) || [] : [];
-  const id = identifiers.find(identifier => identifier.match(identifierRegex)[2]);
-  const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1));
-  return {
-    indentation: match[1].split('\n').pop().length,
-    tag: match[2] ? undefined : tag || 'div',
-    attributes: match[4],
-    id: id === null || id === void 0 ? void 0 : id.replace(/^#/, ''),
-    classList,
-    textContent: match[5],
-    childs: [],
-    match,
-    i
-  };
-})).map(line => makeHTML(line)).join('');
-
-const poz = HTMLTag(pozToHTML);
-
-const strictWhitespaceRegex = /[^\S\r\n]*/;
-const propertyNameRegex = /[a-zA-Z0-9-]*/;
-const unnestedAtRule = ['@charset', '@import', '@namespace'];
-
-const makeCSS = ({
-  indent,
-  str,
-  childs
-}, {
-  selector: selectorPrefix = ''
-} = {}) => {
-  str = str.trim();
-  const isAtRule = str.startsWith('@');
-
-  if (unnestedAtRule.some(atRule => str.startsWith(atRule))) {
-    return `${str};`;
-  } else if (childs.length) {
-    const selector = isAtRule ? str : str.split(',').map(str => str.includes('&') ? str.replace('&', selectorPrefix) : `${selectorPrefix} ${str}`, '').join(',').trim();
-    return `${selector}{${childs.filter(({
-      childs
-    }) => !childs.length || isAtRule).map(node => makeCSS(node)).join('')}}${isAtRule ? '' : childs.filter(({
-      childs
-    }) => childs.length).map(node => makeCSS(node, {
-      selector
-    })).join('')}`;
-  } else {
-    const propertyName = str.match(propertyNameRegex)[0];
-    const rest = str.slice(propertyName.length + 1).trim();
-    const propertyValue = rest.startsWith(':') ? rest.slice(1) : rest;
-    return `${propertyName}:${propertyValue.trim()};`;
-  }
-};
-
-const hierarchise$1 = (childs, item, lastChild = childs === null || childs === void 0 ? void 0 : childs[(childs === null || childs === void 0 ? void 0 : childs.length) - 1]) => (lastChild === null || lastChild === void 0 ? void 0 : lastChild.multiline) || item.indent > (lastChild === null || lastChild === void 0 ? void 0 : lastChild.indent) || 0 ? hierarchise$1(lastChild.childs, item) : childs.push(item);
-
-const sozToCSS = str => str.split('\n').filter(str => str.trim().length).map(_str => {
-  const indent = _str.match(strictWhitespaceRegex)[0].length;
-
-  const str = _str.slice(indent);
-
-  return {
-    indent,
-    str,
-    childs: []
-  };
-}).reduce((arr, item) => (hierarchise$1(arr, item), arr), []).map(item => makeCSS(item)).join('');
-
-const soz = CSSTag(sozToCSS);
+const OzElement = Symbol.for('OzElement');
+const OzElementContext = Symbol.for('OzElementContext');
+const mixins = [];
+const mixin = obj => mixins.push(obj);
+const getMixinProp = (mixins, prop) => mixins.filter(mixin => prop in mixin).map(mixin => mixin[prop]);
+const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed');
+const noHTMLTemplateError = new Error('No HTML template returned in the template method');
+const ozStyleChangedError = new Error('The OzStyle element returned in the style changed');
+const noOzStyleError = new Error('No OzStyle element returned in the style method');
 
 const getPropertyDescriptorPair = (prototype, property) => {
   let descriptor = Object.getOwnPropertyDescriptor(prototype, property);
@@ -1275,6 +545,7 @@ const getPropertyDescriptorPair = (prototype, property) => {
   };
 };
 const getPropertyDescriptor = (object, property) => (getPropertyDescriptorPair(object, property) || {}).descriptor;
+const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) => isOzElement ? parentNode : parentNode && getClosestOzElementParent(parentNode);
 
 var proxify = (object => {
   const proxy = new Proxy(object, {
@@ -1570,7 +841,7 @@ for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]
     registerDependency({
       target: this
     });
-    return type$2.prototype[property](...args);
+    return type$2.prototype[property].apply(this, args);
   };
 }
 
@@ -1693,7 +964,7 @@ for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]
     registerDependency({
       target: this
     });
-    return type$3.prototype[property](...args);
+    return type$3.prototype[property].apply(this, args);
   };
 }
 
@@ -2014,15 +1285,870 @@ const reactify = obj => {
 
 const watch$1 = watch();
 
-const OzElement = Symbol.for('OzElement');
-const OzElementContext = Symbol.for('OzElementContext');
-const mixins = [];
-const mixin = obj => mixins.push(obj);
-const getMixinProp = (mixins, prop) => mixins.filter(mixin => prop in mixin).map(mixin => mixin[prop]);
-const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed');
-const noHTMLTemplateError = new Error('No HTML template returned in the template method');
-const ozStyleChangedError = new Error('The OzStyle element returned in the style changed');
-const noOzStyleError = new Error('No OzStyle element returned in the style method');
+class OzHTMLTemplate$1 extends HTMLTemplateElement {
+  constructor({
+    templateId,
+    originalFragment,
+    values,
+    placeholdersMetadata
+  }) {
+    super();
+    this.refs = this.references = reactify(new Map());
+    this.templateId = templateId;
+    this.values = values;
+    this.placeholdersMetadata = placeholdersMetadata;
+    this.originalFragment = originalFragment;
+    this.setAttribute('is', 'oz-html-template');
+  }
+
+  get [OzHTMLTemplate]() {
+    return true;
+  }
+
+  init(isUpdate) {
+    if (this.placeholders) return;
+    const fragment = this.originalFragment.cloneNode(true);
+    const {
+      placeholders,
+      childNodes
+    } = placeholdersMetadataToPlaceholders({
+      template: this,
+      placeholdersMetadata: this.placeholdersMetadata,
+      fragment
+    });
+    this.placeholders = placeholders;
+    this.content.appendChild(fragment);
+    this._childNodes = childNodes;
+    if (isUpdate) this.forceUpdate = true;else this.update(...this.values);
+  }
+
+  clone(values = this.values) {
+    return new OzHTMLTemplate$1({
+      originalFragment: this.originalFragment,
+      values,
+      placeholdersMetadata: this.placeholdersMetadata,
+      templateId: this.templateId
+    });
+  }
+
+  update(...values) {
+    this.init(true);
+    const oldArrayFragments = this.placeholders.map(({
+      arrayFragment
+    }) => arrayFragment.flat(Infinity));
+    const referencesPlaceholders = this.placeholders.filter(placeholder => placeholder.metadata.ids.length === 1).filter(({
+      metadata: {
+        values
+      }
+    }) => !values[1] && !values[2] && !values[3]).filter(placeholder => {
+      var _values$placeholder$m;
+
+      return (_values$placeholder$m = values[placeholder.metadata.ids[0]]) === null || _values$placeholder$m === void 0 ? void 0 : _values$placeholder$m[OzHTMLReference];
+    });
+    const otherPlaceholders = this.placeholders.filter(placeholder => !referencesPlaceholders.includes(placeholder));
+
+    for (const placeholder of referencesPlaceholders) placeholder({
+      values,
+      forceUpdate: this.forceUpdate
+    });
+
+    for (const placeholder of otherPlaceholders) placeholder({
+      values,
+      forceUpdate: this.forceUpdate
+    });
+
+    const newArrayFragments = this.placeholders.map(({
+      arrayFragment
+    }) => arrayFragment.flat(Infinity));
+
+    for (const i in this.placeholders) replaceNodes(oldArrayFragments[i], newArrayFragments[i]);
+
+    this.values = values;
+    this.forceUpdate = false;
+  }
+
+  get childNodes() {
+    this.init();
+    return this._childNodes;
+  }
+
+  get content() {
+    this.init();
+    return super.content;
+  }
+
+  connectedCallback() {
+    this.insertAfter();
+  }
+
+  insertNodesAfter() {
+    this.init();
+
+    for (const node of this.childNodes.flat(Infinity)) this.parentNode.insertBefore(node, this.nextSibling);
+  }
+
+  insertNodesToFragment() {
+    this.init();
+
+    for (const node of this.childNodes.flat(Infinity)) this.content.appendChild(node);
+  }
+
+  insertAfter() {
+    this.init();
+    this.parentNode.insertBefore(this.content, this.nextSibling);
+  }
+
+  disconnectedCallback() {
+    this.insertNodesToFragment();
+  }
+
+}
+
+customElements.get('oz-html-template') || customElements.define('oz-html-template', OzHTMLTemplate$1, {
+  extends: 'template'
+});
+var createTemplate = (options => new OzHTMLTemplate$1(options));
+
+const elements = new Map();
+const HTMLTag = (transform = str => str) => {
+  const tag = (strings, ...values) => {
+    const templateId = 'html' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
+    if (elements.has(templateId)) return elements.get(templateId).clone(values);
+    const {
+      fragment,
+      placeholdersMetadata
+    } = parse({
+      transform,
+      strings,
+      values
+    });
+    elements.set(templateId, createTemplate({
+      templateId,
+      originalFragment: fragment,
+      values,
+      placeholdersMetadata
+    }));
+    return elements.get(templateId).clone(values);
+  };
+
+  tag.ref = val => ({
+    [OzHTMLReference]: true,
+    value: val
+  });
+
+  return tag;
+};
+const html = HTMLTag();
+
+const globalRemovedIds = [];
+const globalIds = [];
+
+const makeUniqueId = (n = globalRemovedIds.length ? globalRemovedIds.shift() : globalIds[globalIds.length - 1] === undefined ? 0 : globalIds.length) => {
+  globalIds.splice(n, 0, n);
+  return {
+    id: n,
+    match: undefined,
+    strId: undefined,
+    strAttrId: undefined,
+    originalSelector: undefined,
+    selector: undefined,
+    nodeSelector: undefined,
+    nodes: new Map(),
+    unregister: _ => {
+      globalRemovedIds.push(n);
+      globalIds.splice(globalIds.indexOf(n), 1);
+    }
+  };
+};
+
+const watchedElements = new Map();
+let measuringElement = document.createElement('div');
+measuringElement.style.display = 'none';
+
+const updateElement = (target, contentRect = target.getClientRects()) => {
+  const containerQueries = watchedElements.get(target);
+  target.parentNode.insertBefore(measuringElement, target);
+
+  for (const containerQuery$$1 of containerQueries) {
+    measuringElement.style.height = containerQuery$$1.match[3];
+    const containerQueryPxValue = parseInt(window.getComputedStyle(measuringElement).height);
+    const property = containerQuery$$1.match[2].endsWith('height') ? 'height' : containerQuery$$1.match[2].endsWith('width') ? 'width' : undefined;
+
+    if (containerQuery$$1.match[2].startsWith('min') && contentRect[property] > containerQueryPxValue || containerQuery$$1.match[2].startsWith('max') && contentRect[property] < containerQueryPxValue) {
+      target.setAttribute(containerQuery$$1.strId, '');
+    } else {
+      target.removeAttribute(containerQuery$$1.strId);
+    }
+  }
+
+  measuringElement.remove();
+  measuringElement.style.height = '';
+};
+
+const observed = new Map();
+let resizeObserver = 'ResizeObserver' in window ? new ResizeObserver(entries => {
+  for (let _ref of entries) {
+    let {
+      target,
+      contentRect
+    } = _ref;
+    updateElement(target, contentRect);
+  }
+}) : {
+  observe: elem => observed.set(elem, elem.getClientRects()),
+  unobserve: elem => observed.delete(elem)
+};
+
+if (!('ResizeObserver' in window)) {
+  const test = _ => {
+    for (const [entry, {
+      height: _height,
+      width: _width
+    }] of watchedElements) {
+      const bounds = entry.getClientRects();
+      const {
+        height,
+        width
+      } = bounds;
+
+      if (height !== _height || width !== _width) {
+        updateElement(entry, bounds);
+        observed.set(entry, bounds);
+      }
+    }
+
+    window.requestAnimationFrame(test);
+  };
+
+  window.requestAnimationFrame(test);
+}
+
+const watchElement = (elem, containerQuery$$1) => {
+  const _containerQueries = watchedElements.get(elem);
+
+  const containerQueries = _containerQueries || [];
+  containerQueries.push(containerQuery$$1);
+  if (!_containerQueries) watchedElements.set(elem, containerQueries);
+  resizeObserver.observe(elem);
+  return _ => {
+    containerQueries.splice(containerQueries.indexOf(containerQuery$$1), 1);
+    if (!containerQueries.length) watchedElements.delete(elem);
+    resizeObserver.unobserve(elem);
+
+    for (const [node] of containerQuery$$1.nodes) node.removeAttribute(containerQuery$$1.strId);
+  };
+};
+
+var makeStyle = (({
+  placeholderMetadata,
+  placeholderMetadata: {
+    values: [_selector],
+    rule: _rule
+  },
+  rules: [rule],
+  placeholderIds = toPlaceholdersNumber(_selector)
+}) => {
+  const {
+    ownerDocument
+  } = rule.parentStyleSheet.ownerNode;
+  const getResult = toPlaceholderString(placeholderMetadata.values[0]);
+
+  let _containerQueries;
+
+  const matchContainerQueriesNodes = _ => {
+    for (const containerQuery$$1 of _containerQueries) {
+      const matchedNodes = Array.from(ownerDocument.querySelectorAll(containerQuery$$1.nodeSelector));
+      const containerQueryNodes = Array.from(containerQuery$$1.nodes.keys());
+      containerQueryNodes.filter(node => !matchedNodes.includes(node)) // Removed nodes
+      .forEach(node => {
+        containerQuery$$1.nodes.get(node)(); // Unregister watcher
+
+        containerQuery$$1.nodes.delete(node);
+      });
+      matchedNodes.filter(node => !containerQueryNodes.includes(node)) // Added nodes
+      .forEach(node => containerQuery$$1.nodes.set(node, watchElement(node, containerQuery$$1)
+      /* Register watcher */
+      ));
+    }
+  };
+
+  const mutationObserver = new MutationObserver(matchContainerQueriesNodes);
+  return [({
+    values,
+    forceUpdate,
+    scope
+  }) => {
+    // Update
+    const result = getResult(values);
+
+    if (containerQueryRegex.test(result)) {
+      mutationObserver.observe(ownerDocument, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+
+      if (_containerQueries) {
+        for (const containerQuery$$1 of _containerQueries) {
+          containerQuery$$1.unregister();
+        }
+
+        _containerQueries = undefined;
+      }
+
+      const containerQueries = matchSelectorRulesets(result).filter(str => containerQueryRegex.test(str)).map((str, i) => {
+        let containerQueries = [];
+        let match;
+
+        while (match = globalContainerQueryRegex.exec(str)) {
+          const uniqueId = makeUniqueId();
+          uniqueId.match = match;
+          uniqueId.strId = containerQuery(uniqueId.id);
+          uniqueId.strAttrId = containerQueryAttribute(uniqueId.id);
+          containerQueries.push(uniqueId);
+        }
+
+        const selector = containerQueries.reduce((str, {
+          strAttrId,
+          match
+        }) => str.replace(match[0], strAttrId), result);
+
+        for (const containerQuery$$1 of containerQueries) {
+          containerQuery$$1.originalSelector = str;
+          containerQuery$$1.selector = selector;
+          containerQuery$$1.nodeSelector = selector.slice(0, selector.indexOf(containerQuery$$1.strAttrId)).replace(globalContainerQueryAttributeRegex, '');
+        }
+
+        return containerQueries;
+      }).flat(Infinity);
+      const selector = containerQueries.reduce((str, {
+        originalSelector,
+        selector
+      }) => str.replace(originalSelector, selector), result);
+      rule.selectorText = selector.replace(/:scope/g, scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope';
+      _containerQueries = containerQueries;
+      matchContainerQueriesNodes();
+    } else {
+
+      if (_containerQueries) {
+        for (const containerQuery$$1 of _containerQueries) {
+          containerQuery$$1.unregister();
+        }
+
+        _containerQueries = undefined;
+      }
+
+      rule.selectorText = result.replace(/:scope/g, scope !== '' ? `[data-oz-scope="${scope}"]` : '') || '-oz-no-scope';
+    }
+  }, _ => {
+  }];
+});
+
+var makeStyleProperty = (({
+  placeholderMetadata: {
+    values,
+    path
+  },
+  rules: [style],
+  getNameResult = toPlaceholderString(values[0]),
+  getValueResult = toPlaceholderString(values[1]),
+  _name = `--${path[path.length - 1]}`
+}) => ({
+  values
+}) => {
+  style.removeProperty(_name);
+  style.setProperty(_name = getNameResult(values), getValueResult(values));
+});
+
+const OzStyle = Symbol.for('OzStyle');
+
+const makeStylesheet = ({
+  placeholderMetadata: {
+    rule: ast,
+    ids
+  },
+  rules,
+  getIndexOf = rule => Array.from(rules[0].parentStyleSheet.cssRules).indexOf(rule),
+  getFirstIndex = _ => getIndexOf(rules[0]),
+  getLastIndex = _ => getIndexOf(rules[rules.length - 1]),
+  _style
+}) => ({
+  values,
+  value = values[ids[0]],
+  forceUpdate,
+  scope
+}) => {
+  if (value && typeof value === 'object' && OzStyle in value) {
+    value.scope = scope;
+
+    if (_style && typeof _style === 'object' && OzStyle in _style && _style.templateId === value.templateId && _style.values.some((val, i) => val !== value[i])) {
+      _style.update(...value.values);
+
+      replace(rules, ..._style.childRules);
+    } else {
+      _style = value;
+      replace(rules, ...value.connectedCallback([ast], rules));
+    }
+  }
+};
+
+const containerQueryRegex = /:element\(((.*?)=(.*?))\)/;
+const globalContainerQueryRegex = new RegExp(containerQueryRegex, 'g');
+const containerQuery = i => `oz-container-query-${i}`;
+const containerQueryAttribute = i => `[oz-container-query-${i}]`;
+const containerQueryAttributeRegex = /\[oz-container-query-(\d)\]/;
+const globalContainerQueryAttributeRegex = new RegExp(containerQueryAttributeRegex, 'g'); // todo @banou26 rework the style templates to get rid of the CSSOM AST and only update the CSSOM based on the root stylesheet & the parser ASTRules
+
+const replaceRules = (oldASTRules, oldRules, newASTRules, newRules = []) => {
+  const stylesheet$$1 = oldRules[0].parentStyleSheet;
+  const stylesheetCssRules = stylesheet$$1.cssRules;
+
+  for (const i in newASTRules) {
+    const oldASTRule = oldASTRules[i];
+    const newASTRule = newASTRules[i];
+
+    if (oldASTRule !== newASTRule) {
+      const rulesArray = Array.from(stylesheetCssRules);
+      const oldRule = oldRules[i];
+      const oldRuleIndex = rulesArray.indexOf(oldRule);
+
+      if (oldRule) {
+        newRules.push(stylesheet$$1.cssRules[stylesheet$$1.insertRule(newASTRule.string, oldRuleIndex)]);
+        if (newASTRules[i + 1] !== oldASTRule) stylesheet$$1.deleteRule(oldRuleIndex + 1);
+      } else {
+        // Will place the new node after the previous newly placed new node
+        const previousNewRule = newRules[i - 1];
+        const previousNewRuleIndex = rulesArray.indexOf(previousNewRule);
+        newRules.push(stylesheet$$1.cssRules[stylesheet$$1.insertRule(newASTRule.string, previousNewRuleIndex)]);
+        if (oldRule) stylesheet$$1.deleteRule(oldRuleIndex);
+      }
+    }
+  }
+
+  for (const node of oldRules.filter(node => !newRules.includes(node))) {
+    const rulesArray = Array.from(stylesheetCssRules);
+    if (rulesArray.includes(node)) stylesheet$$1.deleteRule(rulesArray.indexOf(node));
+  }
+
+  if (!newRules.length) newRules.push(stylesheet$$1.cssRules[stylesheet$$1.insertRule('@supports (oz-node-placeholder){}', 0)]);
+  return newRules;
+};
+const placeholdersMetadataToPlaceholders$1 = ({
+  element,
+  element: {
+    sheet
+  },
+  placeholdersMetadata,
+  childRules = Array.from(sheet.cssRules)
+}) => {
+  const placeholders = [];
+
+  for (const i in placeholdersMetadata) {
+    const placeholderMetadata = placeholdersMetadata[i];
+    const {
+      type,
+      path
+    } = placeholderMetadata;
+    if (path[0] === 'cssRules') path.shift();
+    const rule = (type === 'declaration' ? path.slice(0, -1) : path).reduce((rule, attrName) => rule[attrName], childRules);
+    const rules = [rule];
+    if (childRules.includes(rule) && type === 'atRule') childRules.splice(childRules.indexOf(rule), 1, rules);
+    let placeholder = (type === 'declaration' ? makeStyleProperty : type === 'ruleset' ? makeStyle : type === 'atRule' ? makeStylesheet : undefined)({
+      placeholderMetadata,
+      rules
+    });
+    placeholder.metadata = placeholderMetadata;
+    placeholder.rules = rules;
+    placeholders.push(placeholder);
+  }
+
+  return {
+    childRules,
+    placeholders
+  };
+};
+
+const parser = new shadyCssParser.Parser(new class Factory extends shadyCssParser.NodeFactory {
+  ruleset(_selector, ...args) {
+    const selector = !_selector.startsWith('@') && matchSelectorRulesets(_selector).map(ruleset => ruleset.startsWith(':scope') ? ruleset : `:scope ${ruleset}`).join(',');
+    return _objectSpread({}, super.ruleset(_selector, ...args), {
+      _selector,
+      selector
+      /*: _selector*/
+
+    }, !_selector.startsWith('@') && {
+      type: 'rulesetPlaceholder' // ...(singlePlaceholderRegex.test(_selector) || _selector.includes(':element')) && { type: `rulesetPlaceholder` }
+
+    });
+  }
+
+  expression(...args) {
+    return _objectSpread({}, super.expression(...args), singlePlaceholderRegex.test(args[0]) && {
+      type: `expressionPlaceholder`
+    });
+  }
+
+  atRule(...args) {
+    return _objectSpread({}, super.atRule(...args), args[0] === 'supports' && singlePlaceholderRegex.test(args[1]) && {
+      type: 'atRulePlaceholder'
+    });
+  }
+
+  declaration(...args) {
+    return _objectSpread({}, super.declaration(...args), (singlePlaceholderRegex.test(args[0]) || singlePlaceholderRegex.test(args[1].text)) && {
+      type: 'declarationPlaceholder'
+    });
+  }
+
+}());
+const stringifier = new class extends shadyCssParser.Stringifier {
+  atRulePlaceholder(...args) {
+    return super.atRule(...args);
+  }
+
+  rulesetPlaceholder({
+    selector,
+    rulelist
+  }) {
+    return `${selector.replace(/:element\((.*?)\)/g, '')}${this.visit(rulelist)}`;
+  }
+
+  declarationPlaceholder({
+    name,
+    value
+  }) {
+    return `--${name}${value ? `:${this.visit(value)}` : ''}`;
+  }
+
+  expressionPlaceholder({
+    text
+  }) {
+    return `${text.replace(placeholderRegex, 'var(--$&)')}${text.endsWith(';') ? '' : ';'}`;
+  }
+
+}();
+
+const findPlaceholdersAndPaths = (rule, placeholders = [], _path = [], path = [..._path], {
+  type,
+  selector,
+  name,
+  value,
+  parameters,
+  text = type.startsWith('declaration') ? value.text : undefined
+} = rule, vals = [selector || name || value, text || parameters]) => {
+  // match, create PlaceholderMetadata and push to placeholders
+  if (type && type.endsWith('Placeholder') && type !== 'expressionPlaceholder') {
+    placeholders.push({
+      type: type.slice(0, -'Placeholder'.length),
+      values: vals,
+      ids: vals.filter(_ => _).map(val => (val.match(placeholderRegex) || []).map(char => charToN(char))).flat(Infinity),
+      path,
+      rule
+    });
+  } // search for placeholders in childs
+
+
+  if (Array.isArray(rule)) {
+    for (const i in rule) findPlaceholdersAndPaths(rule[i], placeholders, [...path, i]);
+  } else if (rule.type.startsWith('ruleset')) {
+    const rules = rule.rulelist.rules.filter(({
+      type
+    }) => type === 'declarationPlaceholder');
+
+    for (const i in rules) {
+      const rule = rules[i];
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'style', rule.name]);
+    }
+  } else if (rule.type.startsWith('atRule')) {
+    var _rule$rulelist;
+
+    const rules = (_rule$rulelist = rule.rulelist) === null || _rule$rulelist === void 0 ? void 0 : _rule$rulelist.rules;
+
+    for (const i in rules) {
+      const rule = rules[i];
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]);
+    }
+  } else if (rule.type.startsWith('stylesheet')) {
+    const rules = rule.rules;
+
+    for (const i in rules) {
+      const rule = rules[i];
+      findPlaceholdersAndPaths(rule, placeholders, [...path, 'cssRules', i]);
+    }
+  }
+
+  return placeholders;
+};
+
+var parse$1 = (({
+  transform,
+  strings,
+  values
+}, ast = parser.parse(transform(strings.reduce((str, str2, i) => `${str}${typeof values[i - 1] === 'object' ? `@supports (${placeholder(i - 1)}) {}` : placeholder(i - 1)}${str2}`)))) => {
+  ast.rules.forEach(rule => rule.string = stringifier.stringify(rule));
+  return {
+    ast,
+    css: stringifier.stringify(ast),
+    placeholdersMetadata: findPlaceholdersAndPaths(ast)
+  };
+});
+
+class OzStyle$1 extends HTMLStyleElement {
+  constructor({
+    templateId,
+    css,
+    values,
+    ast,
+    placeholdersMetadata,
+    scoped
+  }) {
+    super();
+    this.ast = ast;
+    this.templateId = templateId;
+    this.values = values;
+    this.placeholdersMetadata = placeholdersMetadata;
+    this.css = css;
+    this.setAttribute('is', 'oz-style');
+    this.scoped = scoped;
+    this.scope = '';
+  }
+
+  get [OzStyle]() {
+    return true;
+  }
+
+  set scope(scope) {
+    this._scope = scope;
+    this.update(...this.values);
+  }
+
+  get scope() {
+    return this._scope;
+  }
+
+  clone(values = this.values) {
+    return new OzStyle$1({
+      ast: this.ast,
+      css: this.css,
+      values,
+      placeholdersMetadata: this.placeholdersMetadata,
+      templateId: this.templateId,
+      scoped: this.scoped
+    });
+  }
+
+  update(...values) {
+    if (!this.placeholders) return void (this.values = values);
+    this.placeholders.forEach(placeholder$$1 => (Array.isArray(placeholder$$1) ? placeholder$$1[0] : placeholder$$1)({
+      values,
+      forceUpdate: this.forceUpdate,
+      scope: this.scope
+    }));
+    this.values = values;
+  } // TODO @banou26: check if childRules array are necessary for the style templates
+
+
+  connectedCallback(ast, childRules) {
+    if (childRules) replace(childRules, ...replaceRules(ast, childRules, this.ast.rules));else if (this.innerHTML !== this.css) this.innerHTML = this.css;
+    const {
+      placeholders
+    } = placeholdersMetadataToPlaceholders$1({
+      element: this,
+      placeholdersMetadata: this.placeholdersMetadata,
+      childRules
+    });
+    this.childRules = childRules;
+    this.placeholders = placeholders;
+    this.forceUpdate = true;
+    this.update(...this.values);
+    this.forceUpdate = false;
+    return childRules;
+  }
+
+  disconnectedCallback() {
+    this.placeholders.filter(Array.isArray).forEach(([, unregister]) => unregister());
+  }
+
+}
+customElements.get('oz-style') || customElements.define('oz-style', OzStyle$1, {
+  extends: 'style'
+});
+var createStyle = (options => new OzStyle$1(options));
+
+const styles = new Map();
+const CSSTag = (transform = str => str) => {
+  const tag = ({
+    scoped
+  }, strings, ...values) => {
+    const templateId = 'css' + strings.reduce((str, str2, i) => str + placeholder(i - 1) + str2);
+    if (styles.has(templateId)) return styles.get(templateId).clone(values);
+    const {
+      ast,
+      css,
+      placeholdersMetadata
+    } = parse$1({
+      transform,
+      strings,
+      values
+    });
+    styles.set(templateId, createStyle({
+      templateId,
+      css,
+      values,
+      ast,
+      placeholdersMetadata,
+      scoped
+    }));
+    return styles.get(templateId).clone(values);
+  };
+
+  const returnedTag = tag.bind(undefined, {});
+  returnedTag.scoped = tag.bind(undefined, {
+    scoped: true
+  });
+  return returnedTag;
+};
+const css = CSSTag();
+
+const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
+const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: ?(.*))?/;
+const gRegex = new RegExp(regex, 'gm');
+const identifierRegex = /(?:(\.)|(#))([a-zA-Z0-9-]*)/;
+const gIdentifierRegex = new RegExp(identifierRegex, 'g');
+const classRegex = /class="(.*)"/;
+
+const makeHTML = ({
+  tag,
+  attributes,
+  childs,
+  textContent,
+  id,
+  classList,
+  i,
+  forceText,
+  match
+}) => {
+  if (forceText) return (i ? '\n' : '') + match.input.trim();
+  const childForceText = classList.includes('');
+  const classStr = classList.join(' ');
+  let attrStr = attributes ? ' ' + attributes : '';
+  if (attrStr.match(classRegex)) attrStr = attrStr.replace(classRegex, (match, classes) => `class="${classes} ${classStr}"`);else if (classStr) attrStr += ` class="${classStr}"`;
+  if (tag) return `<${tag}${id ? ` id="${id}"` : ''}${attrStr}>${textContent || ''}${childs.map((line, i) => makeHTML(_objectSpread({}, line, {
+    forceText: childForceText,
+    i
+  }))).join('')}${voidTags.includes(tag) ? '' : `</${tag}>`}`;else return (i ? '\n' : '') + textContent;
+};
+
+const pushLine = ({
+  childs: currentChilds
+}, line) => {
+  if (currentChilds.length && currentChilds[currentChilds.length - 1].indentation < line.indentation) pushLine(currentChilds[currentChilds.length - 1], line);else currentChilds.push(line);
+};
+
+const hierarchise = arr => {
+  const hierarchisedArr = [];
+
+  for (let line of arr) {
+    if (hierarchisedArr.length && hierarchisedArr[hierarchisedArr.length - 1].indentation < line.indentation && hierarchisedArr[hierarchisedArr.length - 1].childs) pushLine(hierarchisedArr[hierarchisedArr.length - 1], line);else hierarchisedArr.push(line);
+  }
+
+  return hierarchisedArr;
+};
+
+const pozToHTML = str => hierarchise(str.match(gRegex).map(str => str.match(regex)).filter(match => match[0].trim().length).map((match, i) => {
+  if (match[3] && !match[3].replace(placeholderRegex, '').trim().length) {
+    return {
+      indentation: match[1].split('\n').pop().length,
+      textContent: match[3],
+      classList: []
+    };
+  }
+
+  const tag = match[3] ? match[3].match(/^([a-z0-9-]*)/)[1] : undefined;
+  const identifiers = match[3] ? match[3].slice(tag.length).match(gIdentifierRegex) || [] : [];
+  const id = identifiers.find(identifier => identifier.match(identifierRegex)[2]);
+  const classList = identifiers.filter(identifier => identifier.match(identifierRegex)[1]).map(str => str.slice(1));
+  return {
+    indentation: match[1].split('\n').pop().length,
+    tag: match[2] ? undefined : tag || 'div',
+    attributes: match[4],
+    id: id === null || id === void 0 ? void 0 : id.replace(/^#/, ''),
+    classList,
+    textContent: match[5],
+    childs: [],
+    match,
+    i
+  };
+})).map(line => makeHTML(line)).join('');
+
+const poz = HTMLTag(pozToHTML);
+
+const strictWhitespaceRegex = /[^\S\r\n]*/;
+const propertyNameRegex = /[a-zA-Z0-9-]*/;
+const unnestedAtRule = ['@charset', '@import', '@namespace'];
+
+const makeCSS = ({
+  indent,
+  str,
+  childs
+}, {
+  selector: selectorPrefix = ''
+} = {}) => {
+  str = str.trim();
+  const isAtRule = str.startsWith('@');
+
+  if (unnestedAtRule.some(atRule => str.startsWith(atRule))) {
+    return `${str};`;
+  } else if (childs.length) {
+    const selectorRulesets = matchSelectorRulesets(str);
+    const selector = isAtRule ? str : selectorRulesets.length > 1 ? selectorRulesets.map(str => str.includes('&') // todo @banou26: make `any` and `matches` work on any browsers
+    ? str.replace('&', `:-webkit-any(${selectorPrefix})`) : `${selectorPrefix ? `:-webkit-any(${selectorPrefix})` : selectorPrefix} ${str}`).join(',').trim() : selectorRulesets[0].includes('&') ? selectorRulesets[0].replace('&', `${selectorPrefix}`) : `${selectorPrefix ? `${selectorPrefix}` : selectorPrefix} ${selectorRulesets[0]}`;
+    return `${selector}{${childs.filter(({
+      childs
+    }) => !childs.length || isAtRule).map(node => makeCSS(node)).join('')}}${isAtRule ? '' : childs.filter(({
+      childs
+    }) => childs.length).map(node => makeCSS(node, {
+      selector
+    })).join('')}`;
+  } else if (isAtRule) {
+    return str;
+  } else {
+    const propertyName = str.match(propertyNameRegex)[0];
+    const rest = str.slice(propertyName.length + 1).trim();
+    const propertyValue = rest.startsWith(':') ? rest.slice(1) : rest;
+    return `${propertyName}:${propertyValue.trim()};`;
+  }
+};
+
+const hierarchise$1 = (childs, item, lastChild = childs === null || childs === void 0 ? void 0 : childs[(childs === null || childs === void 0 ? void 0 : childs.length) - 1]) => (lastChild === null || lastChild === void 0 ? void 0 : lastChild.multiline) || item.indent > (lastChild === null || lastChild === void 0 ? void 0 : lastChild.indent) || 0 ? hierarchise$1(lastChild.childs, item) : childs.push(item);
+
+const sozToCSS = str => str.split('\n').filter(str => str.trim().length).map(_str => {
+  const indent = _str.match(strictWhitespaceRegex)[0].length;
+
+  const str = _str.slice(indent);
+
+  return {
+    indent,
+    str,
+    childs: []
+  };
+}).reduce((arr, item) => (hierarchise$1(arr, item), arr), []).map(item => makeCSS(item)).join('');
+
+const soz = CSSTag(sozToCSS);
+
+const globalRemovedIds$1 = [];
+const globalIds$1 = [];
+
+const makeUniqueId$1 = (n = globalRemovedIds$1.length ? globalRemovedIds$1.shift() : globalIds$1[globalIds$1.length - 1] === undefined ? 0 : globalIds$1.length) => {
+  globalIds$1.splice(n, 0, n);
+  return {
+    id: n,
+    unregister: _ => {
+      globalRemovedIds$1.push(n);
+      globalIds$1.splice(globalIds$1.indexOf(n), 1);
+    }
+  };
+};
 
 const registerElement = element => {
   const {
@@ -2035,11 +2161,12 @@ const registerElement = element => {
     watchers: elementWatchers = [],
     template: buildHTMLTemplate,
     style: buildCSSTemplate,
+    beforeConnected,
     created,
     connected,
     disconnected
   } = element,
-        rest = _objectWithoutProperties(element, ["name", "mixins", "extends", "shadowDom", "state", "props", "watchers", "template", "style", "created", "connected", "disconnected"]);
+        rest = _objectWithoutProperties(element, ["name", "mixins", "extends", "shadowDom", "state", "props", "watchers", "template", "style", "beforeConnected", "created", "connected", "disconnected"]);
 
   const mixins$$1 = mixins.concat(elementMixins || []);
   const props = elementProps.concat(getMixinProp(mixins$$1, 'props')).flat(1);
@@ -2047,6 +2174,7 @@ const registerElement = element => {
   const watchers = elementWatchers.concat(getMixinProp(mixins$$1, 'watchers').flat(1));
   const shadowDom = 'shadowDom' in element ? elementShadowDom : getMixinProp(mixins$$1, 'shadowDom').pop();
   const createdMixins = getMixinProp(mixins$$1, 'created');
+  const beforeConnectedMixins = getMixinProp(mixins$$1, 'beforeConnected');
   const connectedMixins = getMixinProp(mixins$$1, 'connected');
   const disconnectedMixins = getMixinProp(mixins$$1, 'disconnected');
   const templateMixins = getMixinProp(mixins$$1, 'template');
@@ -2068,9 +2196,41 @@ const registerElement = element => {
         element: this,
         host,
         props: {},
+        dataset: {},
         template: undefined,
-        style: undefined
+        style: undefined,
+
+        get refs() {
+          var _this$template, _this$template2;
+
+          return ((_this$template = this.template) === null || _this$template === void 0 ? void 0 : _this$template.refs) && Array.from((_this$template2 = this.template) === null || _this$template2 === void 0 ? void 0 : _this$template2.refs).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
+        },
+
+        get references() {
+          var _this$template3;
+
+          return (_this$template3 = this.template) === null || _this$template3 === void 0 ? void 0 : _this$template3.refs;
+        }
+
       }));
+      /* FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL */
+
+      Object.defineProperties(context, Object.getOwnPropertyDescriptors({
+        get refs() {
+          var _this$template4, _this$template5;
+
+          return ((_this$template4 = this.template) === null || _this$template4 === void 0 ? void 0 : _this$template4.refs) && Array.from((_this$template5 = this.template) === null || _this$template5 === void 0 ? void 0 : _this$template5.refs).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
+        },
+
+        get references() {
+          var _this$template6;
+
+          return (_this$template6 = this.template) === null || _this$template6 === void 0 ? void 0 : _this$template6.refs;
+        }
+
+      }));
+      /*/ FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL /*/
+
       Object.entries(rest) // binding functions with the context
       .filter(([, value]) => typeof value === 'function').forEach(([k, v]) => void (context[k] = v.bind(context, context))); // Props mixins & props
 
@@ -2083,33 +2243,7 @@ const registerElement = element => {
       }) && props, {})); // State mixins & state
 
       const state = context.state = reactify((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {});
-      states.reverse().forEach(stateMixin => Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context)))); // HTML Template
-
-      if (buildHTMLTemplate || templateMixins.length) {
-        const _template = buildHTMLTemplate || templateMixins[0];
-
-        let template; // eslint-disable-next-line no-return-assign
-
-        watch$1(_ => template ? _template.call(context, context) : template = context.template = _template.call(context, context), updatedTemplate => {
-          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError;
-          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
-          template.update(...updatedTemplate.values);
-        });
-      } // CSS Template
-
-
-      if (buildCSSTemplate || styleMixins.length) {
-        const _style = buildCSSTemplate || styleMixins[0];
-
-        let template; // eslint-disable-next-line no-return-assign
-
-        watch$1(_ => template ? _style.call(context, context) : template = context.style = _style.call(context, context), updatedTemplate => {
-          if (!updatedTemplate[OzStyle]) throw noOzStyleError;
-          if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError;
-          template.update(...updatedTemplate.values);
-        });
-      } // Watchers mixins & watchers
-
+      states.reverse().forEach(stateMixin => Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context)))); // Watchers mixins & watchers
 
       for (const item of watchers) {
         if (Array.isArray(item)) watch$1(item[0].bind(context, context), item[1].bind(context, context));else watch$1(item.bind(context, context));
@@ -2133,6 +2267,7 @@ const registerElement = element => {
     }
 
     attributeChangedCallback(attr, oldValue, newValue) {
+      if (attr.match(/-\w/)) this[OzElementContext].dataset[attr.slice(5).replace(/-\w/g, m => m[1].toUpperCase())] = newValue;
       if (props.includes(attr)) this[attr] = newValue;
     }
 
@@ -2140,25 +2275,66 @@ const registerElement = element => {
       const {
         [OzElementContext]: context,
         [OzElementContext]: {
-          host,
-          style,
-          template
+          _templateWatcher,
+          _styleWatcher
         }
-      } = this;
-      if (template) host.appendChild(template.content);
+      } = this; // Connected mixins & connected
+
+      beforeConnectedMixins.forEach(mixin$$1 => mixin$$1(context));
+      if (beforeConnected) beforeConnected(context); // HTML Template
+
+      if (!_templateWatcher && (buildHTMLTemplate || templateMixins.length)) {
+        const _template = buildHTMLTemplate || templateMixins[0];
+
+        let template; // eslint-disable-next-line no-return-assign
+
+        context._templateWatcher = watch$1(_ => template ? _template.call(context, context) : template = context.template = _template.call(context, context), updatedTemplate => {
+          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError;
+          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
+          template.update(...updatedTemplate.values);
+        });
+      } // CSS Template
+
+
+      if (!_styleWatcher && (buildCSSTemplate || styleMixins.length)) {
+        const _style = buildCSSTemplate || styleMixins[0];
+
+        let template; // eslint-disable-next-line no-return-assign
+
+        context._styleWatcher = watch$1(_ => template ? _style.call(context, context) : template = context.style = _style.call(context, context), updatedTemplate => {
+          if (!updatedTemplate[OzStyle]) throw noOzStyleError;
+          if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError;
+          template.update(...updatedTemplate.values);
+        }); // Connected mixins & connected
+
+        connectedMixins.forEach(mixin$$1 => mixin$$1(context));
+        if (connected) connected(context);
+      }
+
+      const {
+        host,
+        style,
+        template
+      } = context;
 
       if (style) {
+        if (style.scoped) {
+          const uniqueId = makeUniqueId$1();
+          style.scope = uniqueId.id;
+          context.scope = uniqueId.id;
+          context._scope = uniqueId;
+          this.dataset.ozScope = uniqueId.id;
+        }
+
         if (shadowDom) host.appendChild(style);else {
           const root = host.getRootNode();
           if (root === document) host.getRootNode({
             composed: true
           }).head.appendChild(style);else root.appendChild(style);
         } // style.update(...style.values)
-      } // Connected mixins & connected
+      }
 
-
-      connectedMixins.forEach(mixin$$1 => mixin$$1(context));
-      if (connected) connected(context);
+      if (template) host.appendChild(template.content);
     }
 
     disconnectedCallback() {
@@ -2168,7 +2344,18 @@ const registerElement = element => {
           style
         }
       } = this;
-      if (style && !shadowDom) style.remove(); // Disconnected mixins & disconnected
+      if (style && !shadowDom) style.remove();
+
+      if (context.scope) {
+        style.scope = '';
+
+        context._scope.unregister();
+
+        context.scope = undefined;
+        context._scope = undefined;
+        this.dataset.ozScope = undefined;
+      } // Disconnected mixins & disconnected
+
 
       disconnectedMixins.forEach(mixin$$1 => mixin$$1(context));
       if (disconnected) disconnected(context);
@@ -2259,7 +2446,7 @@ var registerRouterView = (_ => customElements.get('router-view') || registerElem
 }));
 
 const routerGlobalMixin = {
-  created: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router
+  beforeConnected: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router
 };
 const registerRouterMixins = _ => mixins.includes(routerGlobalMixin) || mixin(routerGlobalMixin);
 const registerCustomElements = _ => registerRouterView();
@@ -2279,7 +2466,6 @@ const compileRoutes = ({
 const matchRoutes = routes => url => routes.filter(({
   regex
 }) => regex.test(url.pathname));
-const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) => isOzElement ? parentNode : parentNode && getClosestOzElementParent(parentNode);
 
 const history = window.history;
 const Router = ({
@@ -2330,6 +2516,11 @@ const Router = ({
   return state;
 };
 
+const storeGlobalMixin = {
+  beforeConnected: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.store = closestOzElementParent && closestOzElementParent[OzElementContext].store
+};
+const registerStoreMixins = _ => mixins.includes(storeGlobalMixin) || mixin(storeGlobalMixin);
+
 exports.poz = poz;
 exports.soz = soz;
 exports.OzHTMLTemplate = OzHTMLTemplate;
@@ -2353,3 +2544,4 @@ exports.reactivityProperties = reactivityProperties;
 exports.registerRouterMixins = registerRouterMixins;
 exports.Router = Router;
 exports.RouterViewMixin = RouterViewMixin;
+exports.registerStoreMixins = registerStoreMixins;
