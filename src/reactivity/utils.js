@@ -13,9 +13,9 @@ export const setReactivityRoot = ({watchers: w, objects: o}) => (rootWatchers = 
 const callWatcher = (watcher, deep, obj) =>
   deep
     ? watcher.deep
-      ? watcher(obj)
+      ? watcher(obj, true)
       : undefined
-    : watcher(obj)
+    : watcher(obj, false)
 
 export const notify = ({ target, property, value, deep }) => {
   const react = target[reactivity] // eslint-disable-line no-use-before-define
@@ -173,16 +173,16 @@ export const watch = target => (getter, handler) => {
   }
   let unwatch, oldValue
   const dependenciesWatchers = []
-  const watcher = _ => {
+  const watcher = (event, deep) => {
     dependenciesWatchers.length = 0
     if (unwatch) return
     if (getter) {
       let newValue = registerWatcher(getter, watcher, options)
       pushWatcher(newValue, watcher, options)
-      if (handler) handler(newValue, oldValue)
+      if (handler) handler({ newValue, oldValue, event, deep })
       oldValue = newValue
     } else {
-      handler(target, target)
+      handler({ newValue: target, oldValue: target, event, deep })
       pushWatcher(target, watcher, options)
     }
   }

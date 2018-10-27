@@ -18,7 +18,7 @@ export default object => {
         } else {
           value = registerWatcher(
             _ => (propertyReactivity.cache = Reflect.get(target, property, receiver)),
-            _ => notify({ target, property }),
+            _ => notify({ target: proxy, property }),
             { object, property, propertyReactivity, cache: true })
         }
       }
@@ -30,7 +30,7 @@ export default object => {
       try {
         return Reflect.deleteProperty(target, property)
       } finally {
-        notify({ target, property })
+        notify({ target: proxy, property })
         const { properties } = target[reactivity]
         if (!properties.get(property).watchers.length) properties.delete(property)
       }
@@ -46,7 +46,7 @@ export default object => {
             ...rest
           })
         } finally {
-          notify({ target, property, value: _value })
+          notify({ target: proxy, property, value: _value })
         }
       }
       let value = r(_value)
@@ -66,11 +66,11 @@ export default object => {
         if (value && typeof value === 'object' && value[reactivity]) {
           let unwatch = value.$watch(_ =>
             target[property] === value
-              ? notify({ target, property, value, deep: true })
+              ? notify({ target: proxy, property, value, deep: true })
               : unwatch()
             , { deep: true })
         }
-        notify({ target, property, value })
+        notify({ target: proxy, property, value })
       }
     }
   })

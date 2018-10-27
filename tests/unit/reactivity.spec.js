@@ -42,7 +42,7 @@ describe('watch', () => {
   describe('watcher + handler', () => {
     it('re-evaluate watcher for each watcher dependency change and call handler with watcher return', () => {
       let value, value2
-      expect(_ => watch(_ => (value = react.a), val => (value2 = val))).to.not.throw()
+      expect(_ => watch(_ => (value = react.a), ({newValue}) => (value2 = newValue))).to.not.throw()
       expect(_ => (react.a = 2)).to.not.throw()
       expect(value).to.equal(2)
       expect(value2).to.equal(2)
