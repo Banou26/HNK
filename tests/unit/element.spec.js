@@ -54,14 +54,12 @@ describe('OzElement', () => {
     })
     describe('#props', () => {
       it('set the property values to the instance itself', () => {
-        setElement({ props: ['foo'] })
-        expect(instance.constructor.observedAttributes).to.eql(['foo'])
+        setElement({})
         expect(_ => (instance.foo = 'bar')).to.not.throw()
         expect(instance.foo).to.equal('bar')
       })
       it('set the property values to the props in the context', () => {
-        setElement({ props: ['foo'] })
-        expect(instance.constructor.observedAttributes).to.eql(['foo'])
+        setElement({})
         expect(_ => (instance.foo = 'bar')).to.not.throw()
         expect(instance[OzElementContext].props.foo).to.equal('bar')
       })
@@ -71,7 +69,6 @@ describe('OzElement', () => {
         it('re-evaluate watcher for each watcher dependency change', () => {
           let value, ctx
           setElement({
-            props: ['foo'],
             watchers: [(_ctx) => (ctx = _ctx) && (value = _ctx.props.foo)]
           })
           expect(_ => (instance.foo = 'bar')).to.not.throw()
@@ -83,8 +80,7 @@ describe('OzElement', () => {
         it('re-evaluate watcher for each watcher dependency change and call handler with watcher return', () => {
           let value, value2, ctx, ctx2
           setElement({
-            props: ['foo'],
-            watchers: [[(_ctx) => (ctx = _ctx) && (value = _ctx.props.foo), (ctx, val) => (ctx2 = ctx) && (value2 = val)]]
+            watchers: [[(_ctx) => (ctx = _ctx) && (value = _ctx.props.foo), (ctx, {newValue: val}) => (ctx2 = ctx) && (value2 = val)]]
           })
           expect(_ => (instance.foo = 'bar')).to.not.throw()
           expect(ctx).to.equal(instance[OzElementContext])

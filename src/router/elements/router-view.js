@@ -16,7 +16,9 @@ const getClosestRouterView = (
 // TODO(reactivity optimisation): find why there's 3 first renders instead of just 1, it has to do with the reactivity & the dependency chain:
 // matches -> route -> content, maybe calling the template everytime, it should only be called 1 time at the first render
 export const RouterViewMixin = {
-  props: ['name'],
+  props: {
+    [RouterView]: true
+  },
   state: ctx => ({
     get url () { return (getClosestRouterView(ctx.element)?.childPathname || ctx.router?.url) },
     get pathname () { return this.url?.pathname },
@@ -31,7 +33,7 @@ export const RouterViewMixin = {
     get childPathname () { return this.pathname?.replace?.(this.route?.regex, '') }
   }),
   template: ({ state: { content } }) => html`${content}`,
-  created ({element}) { element[RouterView] = true },
+  // created ({element}) { element[RouterView] = true },
   watchers: [
     ({ element, state: { route }}) => (element.route = route),
     ({ element, state: { childPathname }}) => (element.childPathname = childPathname)
