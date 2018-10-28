@@ -38,6 +38,12 @@ const makeUniqueId = (
   }
 }
 
+const getPropsObject = obj =>
+  (Array.isArray(obj)
+    ? obj.reduce((obj, prop) => ((obj[prop] = undefined), obj), {})
+    : obj) ||
+  {}
+
 export const registerElement = element => {
   const {
     name,
@@ -45,7 +51,7 @@ export const registerElement = element => {
     extends: extend,
     shadowDom: elementShadowDom,
     state: _state,
-    props: elementProps = [],
+    props: _props,
     watchers: elementWatchers = [],
     template: buildHTMLTemplate,
     style: buildCSSTemplate,
@@ -56,7 +62,7 @@ export const registerElement = element => {
     ...rest
   } = element
   const mixins = globalMixins.concat(elementMixins || [])
-  const props = elementProps.concat(getMixinProp(mixins, 'props')).flat(1)
+  const propsMixins = getMixinProp(mixins, 'props').flat(1)
   const states = getMixinProp(mixins, 'state').flat(1)
   const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat(1))
   const shadowDom = 'shadowDom' in element ? elementShadowDom : getMixinProp(mixins, 'shadowDom').pop()
@@ -82,7 +88,6 @@ export const registerElement = element => {
         ...rest,
         element: this,
         host,
-        props: {},
         dataset: {},
         template: undefined,
         style: undefined,
@@ -98,32 +103,54 @@ export const registerElement = element => {
       Object.entries(rest) // binding functions with the context
         .filter(([, value]) => typeof value === 'function')
         .forEach(([k, v]) => void (context[k] = v.bind(context, context)))
+      // Attrs mixins & attrs
+      const attrs = context.attrs = r({})
+      let ignoreAttrsObserver = false
+      const attributeObserver = context._attributeObserver = new MutationObserver(records =>
+        records
+          .forEach(({attributeName}) => {
+            if (!ignoreAttrsObserver) {
+              ignoreAttrsObserver = true
+              attrs[attributeName] = this.getAttribute(attributeName)
+              ignoreAttrsObserver = false
+            }
+          }))
+      attributeObserver.observe(this, { attributes:true })
+      attrs.$watch(({event: { property, value }}) => {
+        this.setAttribute(property, value)
+        attributeObserver.takeRecords()
+      })
       // Props mixins & props
-      let ignoreContextProps = false
-      let ignoreElementProps = false
-      const propsValues = r({})
-      props.forEach((prop) => (propsValues[prop] = this[prop]))
-      const oldDescriptors = new Map(props.map(prop => [prop, getPropertyDescriptor(this, prop)]))
-      const propsDescriptors = props.reduce((props, prop) => ((props[prop] = {
-        enumerable: true,
-        configurable: true,
-        get: _ => propsValues[prop],
-        set: val => {
-          if (!ignoreContextProps) {
-            ignoreContextProps = true
-            propsValues[prop] = val
-            ignoreContextProps = false
+      const setProps = []
+      const setProp = prop => {
+        if (setProps.includes(prop)) return
+        setProps.push(prop)
+        Object.defineProperty(this, prop, {
+          enumerable: true,
+          configurable: true,
+          get: _ => context.props[prop],
+          set: val => (context.props[prop] = val)
+        })
+      }
+      const props = context.props = new Proxy(r({}), {
+        get: (target, property, receiver) => {
+          if (property in target) return Reflect.get(target, property, receiver)
+          else {
+            target[property] = this[property]
+            setProp(property)
+            return Reflect.get(target, property, receiver)
           }
-          if (!ignoreElementProps) {
-            ignoreElementProps = true
-            this[prop] = val
-            oldDescriptors.get(prop)?.set.call(this, val)
-            ignoreElementProps = false
-          }
+        },
+        defineProperty (target, property, desc) {
+          setProp(property)
+          return Reflect.defineProperty(target, property, desc)
         }
-      }), props), {})
-      Object.defineProperties(context.props, propsDescriptors)
-      Object.defineProperties(this, propsDescriptors)
+      })
+      propsMixins
+        .reverse()
+        .forEach(propsMixin =>
+          Object.defineProperties(props, Object.getOwnPropertyDescriptors(getPropsObject(typeof propsMixin === 'function' ? propsMixin(context) : propsMixin))))
+      Object.defineProperties(props, Object.getOwnPropertyDescriptors(getPropsObject(typeof _props === 'function' ? _props.bind(context)(context) : _props)))
       // State mixins & state
       const state = context.state = r((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {})
       states
@@ -142,12 +169,6 @@ export const registerElement = element => {
 
     get [OzElementSymbol] () { return true }
     static get name () { return name }
-    static get observedAttributes () { return props }
-
-    attributeChangedCallback (attr, oldValue, newValue) {
-      if (attr.match(/-\w/)) this[OzElementContext].dataset[attr.slice(5).replace(/-\w/g, (m) => m[1].toUpperCase())] = newValue
-      if (props.includes(attr)) this[attr] = newValue
-    }
 
     connectedCallback () {
       const { [OzElementContext]: context, [OzElementContext]: { _templateWatcher, _styleWatcher } } = this
@@ -163,7 +184,7 @@ export const registerElement = element => {
           template
             ? _template.call(context, context)
             : (template = context.template = _template.call(context, context)),
-        updatedTemplate => {
+        ({newValue: updatedTemplate}) => {
           if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
@@ -178,7 +199,7 @@ export const registerElement = element => {
           template
             ? _style.call(context, context)
             : (template = context.style = _style.call(context, context)),
-        updatedTemplate => {
+        ({newValue: updatedTemplate}) => {
           if (!updatedTemplate[OzStyle]) throw noOzStyleError
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
