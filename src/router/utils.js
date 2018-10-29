@@ -1,7 +1,7 @@
 import pathToRegexp, { compile } from 'path-to-regexp'
 import { getClosestOzElementParent } from '../utils.js'
 import { mixin, mixins, OzElementContext } from '../elements/utils.js'
-import { registerRouterView } from './elements/index.js'
+import { registerRouterView, registerRouterLink } from './elements/index.js'
 
 const routerGlobalMixin = {
   beforeConnected: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) =>
@@ -12,8 +12,10 @@ export const registerRouterMixins = _ =>
   mixins.includes(routerGlobalMixin) ||
   mixin(routerGlobalMixin)
 
-export const registerCustomElements = _ =>
+export const registerCustomElements = _ => {
   registerRouterView()
+  registerRouterLink()
+}
 
 export const compileRoutes = ({routes = []} = {}) =>
   routes
