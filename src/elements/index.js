@@ -48,7 +48,6 @@ export const registerElement = element => {
   const {
     name,
     mixins: elementMixins,
-    extends: extend,
     shadowDom: elementShadowDom,
     state: _state,
     props: _props,
@@ -61,7 +60,11 @@ export const registerElement = element => {
     disconnected,
     ...rest
   } = element
+  let {
+    extends: extend,
+  } = element
   const mixins = globalMixins.concat(elementMixins || [])
+  const extendsMixins = getMixinProp(mixins, 'extends').flat(1)
   const propsMixins = getMixinProp(mixins, 'props').flat(1)
   const states = getMixinProp(mixins, 'state').flat(1)
   const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat(1))
@@ -72,6 +75,7 @@ export const registerElement = element => {
   const disconnectedMixins = getMixinProp(mixins, 'disconnected')
   const templateMixins = getMixinProp(mixins, 'template')
   const styleMixins = getMixinProp(mixins, 'style')
+  if (!extend && extendsMixins.length) extend = extendsMixins[0]
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement
   class OzElement extends Class {
     // TODO: test if i need to make a helper function from the reactivity side to isolate the constructors
@@ -106,6 +110,7 @@ export const registerElement = element => {
       // Attrs mixins & attrs
       const attrs = context.attrs = r({})
       let ignoreAttrsObserver = false
+      for (const {name, value} of this.attributes) attrs[name] = value
       const attributeObserver = context._attributeObserver = new MutationObserver(records =>
         records
           .forEach(({attributeName}) => {
