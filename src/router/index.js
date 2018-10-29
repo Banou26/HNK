@@ -24,9 +24,11 @@ export const Router = ({
 
   const go = (replace = false) =>
     location =>
-      (replace
-        ? history.replaceState
-        : history.pushState).call(history, {}, '', (_state._url = resolve(location)))
+      isNaN(location)
+        ? (replace
+          ? history.replaceState
+          : history.pushState).call(history, {}, '', (_state._url = resolve(location)))
+        : undefined // history.go(Number(location))
 
   const push = go()
 
