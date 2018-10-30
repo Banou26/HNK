@@ -38,7 +38,7 @@ const makeUniqueId = (
   }
 }
 
-const getPropsObject = obj =>
+const arrayToObjectWithProperties = obj =>
   (Array.isArray(obj)
     ? obj.reduce((obj, prop) => ((obj[prop] = undefined), obj), {})
     : obj) ||
@@ -50,6 +50,8 @@ export const registerElement = element => {
     mixins: elementMixins,
     shadowDom: elementShadowDom,
     state: _state,
+    attrs: _attrs,
+    events: _events,
     props: _props,
     watchers: elementWatchers = [],
     template: buildHTMLTemplate,
@@ -64,10 +66,12 @@ export const registerElement = element => {
     extends: extend,
   } = element
   const mixins = globalMixins.concat(elementMixins || [])
-  const extendsMixins = getMixinProp(mixins, 'extends').flat(1)
-  const propsMixins = getMixinProp(mixins, 'props').flat(1)
-  const states = getMixinProp(mixins, 'state').flat(1)
-  const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat(1))
+  const extendsMixins = getMixinProp(mixins, 'extends').flat()
+  const eventsMixins = getMixinProp(mixins, 'events').flat()
+  const attrsMixins = getMixinProp(mixins, 'attrs').flat()
+  const propsMixins = getMixinProp(mixins, 'props').flat()
+  const states = getMixinProp(mixins, 'state').flat()
+  const watchers = elementWatchers.concat(getMixinProp(mixins, 'watchers').flat())
   const shadowDom = 'shadowDom' in element ? elementShadowDom : getMixinProp(mixins, 'shadowDom').pop()
   const createdMixins = getMixinProp(mixins, 'created')
   const beforeConnectedMixins = getMixinProp(mixins, 'beforeConnected')
@@ -95,19 +99,46 @@ export const registerElement = element => {
         dataset: {},
         template: undefined,
         style: undefined,
-        get refs () { return (this.template?.refs && Array.from(this.template?.refs).reduce((obj, [attr, val]) => ((obj[attr] = val), obj), {})) || {} },
-        get references () { return this.template?.refs }
+        get refs () {
+          return this.template?.refs &&
+            Array.from(this.template?.refs)
+            .reduce((obj, [attr, val]) =>
+              ((obj[attr] = val), obj), {}) ||
+            {}
+        },
+        get references () {
+          return this.template?.refs
+        }
       })
       /* FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL */
       Object.defineProperties(context, Object.getOwnPropertyDescriptors({
-        get refs () { return this.template?.refs && Array.from(this.template?.refs).reduce((obj, [attr, val]) => ((obj[attr] = val), obj), {}) || {} },
-        get references () { return this.template?.refs }
+        get refs () {
+          return this.template?.refs &&
+            Array.from(this.template?.refs)
+              .reduce((obj, [attr, val]) =>
+                ((obj[attr] = val), obj), {}) ||
+              {}
+        },
+        get references () {
+          return this.template?.refs
+        }
       }))
       /*/ FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL /*/
-      Object.entries(rest) // binding functions with the context
-        .filter(([, value]) => typeof value === 'function')
-        .forEach(([k, v]) => void (context[k] = v.bind(context, context)))
-      // Attrs mixins & attrs
+      // attributes shouldn't be appended to the element a construction time(isn't an expected behavior)
+      // so think about doing it at connection time
+      // // Attrs mixins & attrs
+      // attrsMixins
+      //   .concat([_attrs])
+      //   .map(attrs =>
+      //     typeof attrs === 'function'
+      //       ? Object.entries(attrs(context))
+      //       : Object.entries(attrs))
+      //   .map(attrs =>
+      //     arrayToObjectWithProperties(attrs))
+      //   .map(attrs =>
+      //     Object.entries(attrs))
+      //   .forEach(([name, value]) =>
+      //     this.setAttribute(name, value))
       const attrs = context.attrs = r({})
       let ignoreAttrsObserver = false
       for (const {name, value} of this.attributes) attrs[name] = value
@@ -152,24 +183,48 @@ export const registerElement = element => {
         }
       })
       propsMixins
-        .reverse()
-        .forEach(propsMixin =>
-          Object.defineProperties(props, Object.getOwnPropertyDescriptors(getPropsObject(typeof propsMixin === 'function' ? propsMixin(context) : propsMixin))))
-      Object.defineProperties(props, Object.getOwnPropertyDescriptors(getPropsObject(typeof _props === 'function' ? _props.bind(context)(context) : _props)))
+        .concat(_props || [])
+        .forEach(_props =>
+          Object.defineProperties(
+            props,
+            Object.getOwnPropertyDescriptors(
+              arrayToObjectWithProperties(
+                typeof _props === 'function'
+                  ? _props(context)
+                  : _props))))
       // State mixins & state
       const state = context.state = r((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {})
       states
-        .reverse()
         .forEach(stateMixin =>
-          Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context))))
+          Object.defineProperties(
+            state,
+            Object.getOwnPropertyDescriptors(
+              stateMixin(context))))
       // Watchers mixins & watchers
       for (const item of watchers) {
         if (Array.isArray(item)) watch(item[0].bind(context, context), item[1].bind(context, context))
         else watch(item.bind(context, context))
       }
+      // Events mixins & events
+      eventsMixins
+        .concat(_events || [])
+        .map(events =>
+          typeof events === 'function'
+            ? events(context)
+            : events)
+        .map(events =>
+          Object.entries(events))
+        .flat()
+        .forEach(([name, event]) =>
+          this.addEventListener(name, event))
+      // binding functions to the context
+      Object.entries(rest)
+        .filter(([, value]) => typeof value === 'function')
+        .forEach(([k, v]) => void (context[k] = v.bind(context, context)))
       // Created mixins & created
-      createdMixins.forEach(mixin => mixin(context))
-      if (created) created(context)
+      createdMixins
+        .concat(created || [])
+        .forEach(created => created(context))
     }
 
     get [OzElementSymbol] () { return true }
