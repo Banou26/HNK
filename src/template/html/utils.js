@@ -2,6 +2,15 @@ import { comment as makeComment, element as makeElement, text as makeText } from
 import { placeholderRegex, placeholder as toPlaceholder } from '../utils.js'
 
 export const OzHTMLReference = Symbol.for('OzHTMLReference')
+export const OzHTMLReferencePath = Symbol.for('OzHTMLReferencePath')
+
+export const replaceReferencesByValues = (values, references) =>
+  values
+    .map(val =>
+      val?.[OzHTMLReference]
+        ? val[OzHTMLReferencePath]
+            .reduce((val, prop) => val[prop], references.get(val[OzHTMLReference]))
+        : val)
 
 export const replaceNodes = (oldNodes, newNodes) => {
   for (const i in newNodes) {

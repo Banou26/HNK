@@ -17,7 +17,8 @@ class OzHTMLTemplate extends HTMLTemplateElement {
   init (isUpdate) {
     if (this.placeholders) return
 
-    const fragment = this.originalFragment.cloneNode(true)
+    const fragment = document.importNode(this.originalFragment, true)
+    // const fragment = this.originalFragment.cloneNode(true)
     const { placeholders, childNodes } = placeholdersMetadataToPlaceholders({
       template: this,
       placeholdersMetadata: this.placeholdersMetadata,
@@ -48,7 +49,7 @@ class OzHTMLTemplate extends HTMLTemplateElement {
       this.placeholders
         .filter(placeholder => placeholder.metadata.ids.length === 1)
         .filter(({metadata: {values}}) => !values[1] && !values[2] && !values[3])
-        .filter(placeholder => values[placeholder.metadata.ids[0]]?.[OzHTMLReference])
+        .filter(placeholder => values[placeholder.metadata.ids[0]]?.[OzHTMLReference]?.length === 0)
     const otherPlaceholders =
       this.placeholders.filter(placeholder => !referencesPlaceholders.includes(placeholder))
     for (const placeholder of referencesPlaceholders) placeholder({ values, forceUpdate: this.forceUpdate })
