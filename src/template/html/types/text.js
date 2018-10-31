@@ -1,8 +1,12 @@
 import { replace } from '../../utils.js'
+import { replaceReferencesByValues } from '../utils.js'
 import { OzHTMLTemplate } from '../elements/utils.js'
 
 const makeText = ({
   template,
+  template: {
+    references
+  },
   placeholderMetadata,
   arrayFragment,
 
@@ -13,9 +17,10 @@ const makeText = ({
 }) =>
   ({
     values,
-    value = values[placeholderMetadata.ids[0]],
     forceUpdate
   }) => {
+    values = replaceReferencesByValues(values, references)
+    const value = values[placeholderMetadata.ids[0]]
     const type = typeof value
     if (value && type === 'object') {
       if (value instanceof Promise) {

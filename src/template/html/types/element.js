@@ -1,5 +1,6 @@
+import { watch } from '../../../reactivity/index.js'
 import { placeholder, toPlaceholderString, toPlaceholdersNumber, replace } from '../../utils.js'
-import { OzHTMLReference } from '../utils.js'
+import { OzHTMLReference, OzHTMLReferencePath, replaceReferencesByValues } from '../utils.js'
 
 const getDependentsPlaceholders = ({ template, placeholdersMetadata, ids, self }) =>
   placeholdersMetadata
@@ -47,7 +48,7 @@ const makeElement = ({
   for (const id of ids) arrayFragment[0].removeAttribute(placeholder(id))
   const self = ({ values, forceUpdate, element = arrayFragment[0] }) => {
     if (_ref) {
-      references.delete(_ref.value)
+      references.delete(_ref[OzHTMLReference])
       _ref = undefined
     }
     if (!dependents) dependents = getDependentsPlaceholders({ template, placeholdersMetadata, ids, self })
@@ -58,15 +59,11 @@ const makeElement = ({
     } else if (type === 'attribute') {
       const value = values[ids[0]]
       if (!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && value?.[OzHTMLReference]) {
-        references.set(value.value, element)
+        references.set(value[OzHTMLReference], element)
+        values = replaceReferencesByValues(values, references)
         _ref = value
       } else {
-        values =
-          values
-            .map(val =>
-              val?.[OzHTMLReference]
-                ? references.get(val.value)
-                : val)
+        values = replaceReferencesByValues(values, references)
         const attributeName = toAttributeName(values)
         if (unquotedValue) {
           const placeholdersNumber = toPlaceholdersNumber(unquotedValue)

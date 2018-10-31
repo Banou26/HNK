@@ -1,6 +1,6 @@
-import { OzHTMLTemplate } from '../template/html/index.js'
+import { OzHTMLTemplate, html } from '../template/html/index.js'
 import { OzStyle } from '../template/css/index.js'
-import { r, watch } from '../reactivity/index.js'
+import { r, watch, reactivity } from '../reactivity/index.js'
 import {
   OzElementContext,
   mixins as globalMixins,
@@ -99,32 +99,38 @@ export const registerElement = element => {
         dataset: {},
         template: undefined,
         style: undefined,
-        get refs () {
-          return this.template?.refs &&
-            Array.from(this.template?.refs)
-            .reduce((obj, [attr, val]) =>
-              ((obj[attr] = val), obj), {}) ||
-            {}
-        },
+        refs: new Proxy({[reactivity]: false}, {
+          get (target, property, receiver) {
+            if (property in target || property === Symbol.toPrimitive) return Reflect.get(target, property, receiver)
+            return html.ref(property)
+          }
+        }),
+        // get refs () {
+        //   return this.template?.refs &&
+        //     Array.from(this.template?.refs)
+        //     .reduce((obj, [attr, val]) =>
+        //       ((obj[attr] = val), obj), {}) ||
+        //     {}
+        // },
         get references () {
           return this.template?.refs
         }
       })
       /* FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL */
       Object.defineProperties(context, Object.getOwnPropertyDescriptors({
-        get refs () {
-          return this.template?.refs &&
-            Array.from(this.template?.refs)
-              .reduce((obj, [attr, val]) =>
-                ((obj[attr] = val), obj), {}) ||
-              {}
-        },
+        // get refs () {
+        //   return this.template?.refs &&
+        //     Array.from(this.template?.refs)
+        //       .reduce((obj, [attr, val]) =>
+        //         ((obj[attr] = val), obj), {}) ||
+        //       {}
+        // },
         get references () {
           return this.template?.refs
         }
       }))
       /*/ FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL /*/
-      // attributes shouldn't be appended to the element a construction time(isn't an expected behavior)
+      // attributes shouldn't be appended to the element at construction time(isn't an expected behavior)
       // so think about doing it at connection time
       // // Attrs mixins & attrs
       // attrsMixins
@@ -145,7 +151,7 @@ export const registerElement = element => {
       const attributeObserver = context._attributeObserver = new MutationObserver(records =>
         records
           .forEach(({attributeName}) => {
-            if (!ignoreAttrsObserver) {
+            if (!ignoreAttrsObserver && this.hasAttribute(attributeName)) {
               ignoreAttrsObserver = true
               attrs[attributeName] = this.getAttribute(attributeName)
               ignoreAttrsObserver = false
@@ -240,11 +246,11 @@ export const registerElement = element => {
         const _template = buildHTMLTemplate || templateMixins[0]
         let template
         // eslint-disable-next-line no-return-assign
-        context._templateWatcher = watch(_ =>
-          template
-            ? _template.call(context, context)
-            : (template = context.template = _template.call(context, context)),
-        ({newValue: updatedTemplate}) => {
+        context._templateWatcher = watch(_ => {
+          const updatedTemplate =
+            template
+              ? _template.call(context, context)
+              : (template = context.template = _template.call(context, context))
           if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError
           if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
           template.update(...updatedTemplate.values)
@@ -255,11 +261,11 @@ export const registerElement = element => {
         const _style = buildCSSTemplate || styleMixins[0]
         let template
         // eslint-disable-next-line no-return-assign
-        context._styleWatcher = watch(_ =>
-          template
-            ? _style.call(context, context)
-            : (template = context.style = _style.call(context, context)),
-        ({newValue: updatedTemplate}) => {
+        context._styleWatcher = watch(_ => {
+          const updatedTemplate =
+            template
+              ? _style.call(context, context)
+              : (template = context.style = _style.call(context, context))
           if (!updatedTemplate[OzStyle]) throw noOzStyleError
           if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
           template.update(...updatedTemplate.values)
@@ -284,10 +290,10 @@ export const registerElement = element => {
         }
         // style.update(...style.values)
       }
+      if (template) host.appendChild(template.content)
       // Connected mixins & connected
       connectedMixins.forEach(mixin => mixin(context))
       if (connected) connected(context)
-      if (template) host.appendChild(template.content)
     }
 
     disconnectedCallback () {

@@ -1,7 +1,8 @@
 import { placeholder } from '../utils.js'
-import { OzHTMLReference } from './utils.js'
+import { OzHTMLReference, OzHTMLReferencePath } from './utils.js'
 import parse from './parser.js'
 import { createTemplate, OzHTMLTemplate } from './elements/index.js'
+import { reactivity } from '../../reactivity/index.js'
 
 export {
   OzHTMLTemplate
@@ -17,10 +18,13 @@ export const HTMLTag = (transform = str => str) => {
     elements.set(templateId, createTemplate({ templateId, originalFragment: fragment, values, placeholdersMetadata }))
     return elements.get(templateId).clone(values)
   }
-  tag.ref = val => ({
-    [OzHTMLReference]: true,
-    value: val
-  })
+  tag.ref = (val, path = []) =>
+    new Proxy({ [reactivity]: false, [OzHTMLReference]: val, [OzHTMLReferencePath]: path }, {
+      get (target, property, receiver) {
+        if (property in target || property === Symbol.toPrimitive) return Reflect.get(target, property, receiver)
+        return tag.ref(val, path.concat(property))
+      }
+    })
   return tag
 }
 
