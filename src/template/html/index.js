@@ -18,13 +18,9 @@ export const HTMLTag = (transform = str => str) => {
     elements.set(templateId, createTemplate({ templateId, originalFragment: fragment, values, placeholdersMetadata }))
     return elements.get(templateId).clone(values)
   }
-  tag.ref = (val, path = []) =>
-    new Proxy({ [reactivity]: false, [OzHTMLReference]: val, [OzHTMLReferencePath]: path }, {
-      get (target, property, receiver) {
-        if (property in target || property === Symbol.toPrimitive) return Reflect.get(target, property, receiver)
-        return tag.ref(val, path.concat(property))
-      }
-    })
+  tag.ref = val => ({
+    [OzHTMLReference]: val
+  })
   return tag
 }
 
