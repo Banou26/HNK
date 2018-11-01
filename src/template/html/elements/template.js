@@ -2,9 +2,9 @@ import { r } from '../../../reactivity/index.js'
 import { placeholdersMetadataToPlaceholders, replaceNodes, OzHTMLReference } from '../utils.js'
 import { OzHTMLTemplate as OzHTMLTemplateSymbol } from './utils.js'
 class OzHTMLTemplate extends HTMLTemplateElement {
-  constructor ({ templateId, originalFragment, values, placeholdersMetadata }) {
+  constructor ({ templateId, originalFragment, values, placeholdersMetadata, references }) {
     super()
-    this.refs = this.references = r(new Map())
+    this.references = references || r(new Map())
     this.templateId = templateId
     this.values = values
     this.placeholdersMetadata = placeholdersMetadata
@@ -18,7 +18,6 @@ class OzHTMLTemplate extends HTMLTemplateElement {
     if (this.placeholders) return
 
     const fragment = document.importNode(this.originalFragment, true)
-    // const fragment = this.originalFragment.cloneNode(true)
     const { placeholders, childNodes } = placeholdersMetadataToPlaceholders({
       template: this,
       placeholdersMetadata: this.placeholdersMetadata,
@@ -44,12 +43,15 @@ class OzHTMLTemplate extends HTMLTemplateElement {
 
   update (...values) {
     this.init(true)
+    for (const value of values) {
+      if (value?.[OzHTMLTemplateSymbol]) value.references = this.references
+    }
     const oldArrayFragments = this.placeholders.map(({arrayFragment}) => arrayFragment.flat(Infinity))
     const referencesPlaceholders =
       this.placeholders
         .filter(placeholder => placeholder.metadata.ids.length === 1)
         .filter(({metadata: {values}}) => !values[1] && !values[2] && !values[3])
-        .filter(placeholder => values[placeholder.metadata.ids[0]]?.[OzHTMLReference]?.length === 0)
+        .filter(placeholder => values[placeholder.metadata.ids[0]]?.[OzHTMLReference])
     const otherPlaceholders =
       this.placeholders.filter(placeholder => !referencesPlaceholders.includes(placeholder))
     for (const placeholder of referencesPlaceholders) placeholder({ values, forceUpdate: this.forceUpdate })

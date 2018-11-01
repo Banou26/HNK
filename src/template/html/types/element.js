@@ -1,4 +1,4 @@
-import { watch } from '../../../reactivity/index.js'
+import { watch, preventReactivity } from '../../../reactivity/index.js'
 import { placeholder, toPlaceholderString, toPlaceholdersNumber, replace } from '../../utils.js'
 import { OzHTMLReference, OzHTMLReferencePath, replaceReferencesByValues } from '../utils.js'
 
@@ -21,8 +21,7 @@ const removeEventListeners = (element, event, listeners) =>
 const makeElement = ({
   template,
   template: {
-    placeholdersMetadata,
-    references
+    placeholdersMetadata
   },
   placeholderMetadata,
   placeholderMetadata: {
@@ -46,9 +45,9 @@ const makeElement = ({
   _ref
 }) => {
   for (const id of ids) arrayFragment[0].removeAttribute(placeholder(id))
-  const self = ({ values, forceUpdate, element = arrayFragment[0] }) => {
-    if (_ref) {
-      references.delete(_ref[OzHTMLReference])
+  const self = ({ values, forceUpdate, element = arrayFragment[0], references = template.references, value = values[ids[0]] }) => {
+    if (_ref && !(!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && value?.[OzHTMLReference])) {
+      if(references.has(_ref[OzHTMLReference])) references.delete(_ref[OzHTMLReference])
       _ref = undefined
     }
     if (!dependents) dependents = getDependentsPlaceholders({ template, placeholdersMetadata, ids, self })
@@ -57,13 +56,10 @@ const makeElement = ({
       for (const placeholder of dependents) placeholder({ values, forceUpdate: true })
       replace(arrayFragment, newElement)
     } else if (type === 'attribute') {
-      const value = values[ids[0]]
       if (!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && value?.[OzHTMLReference]) {
-        references.set(value[OzHTMLReference], element)
-        values = replaceReferencesByValues(values, references)
+        if(references.get(value[OzHTMLReference]) !== element) references.set(value[OzHTMLReference], element)
         _ref = value
       } else {
-        values = replaceReferencesByValues(values, references)
         const attributeName = toAttributeName(values)
         if (unquotedValue) {
           const placeholdersNumber = toPlaceholdersNumber(unquotedValue)

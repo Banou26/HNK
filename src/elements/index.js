@@ -1,6 +1,6 @@
-import { OzHTMLTemplate, html } from '../template/html/index.js'
+import { OzHTMLTemplate } from '../template/html/index.js'
 import { OzStyle } from '../template/css/index.js'
-import { r, watch, reactivity } from '../reactivity/index.js'
+import { r, watch } from '../reactivity/index.js'
 import {
   OzElementContext,
   mixins as globalMixins,
@@ -12,7 +12,6 @@ import {
   OzElement as OzElementSymbol,
   mixin
 } from './utils.js'
-import { getPropertyDescriptor } from '../utils.js'
 
 export {
   OzElementContext,
@@ -62,9 +61,7 @@ export const registerElement = element => {
     disconnected,
     ...rest
   } = element
-  let {
-    extends: extend,
-  } = element
+  let { extends: extend } = element
   const mixins = globalMixins.concat(elementMixins || [])
   const extendsMixins = getMixinProp(mixins, 'extends').flat()
   const eventsMixins = getMixinProp(mixins, 'events').flat()
@@ -79,7 +76,7 @@ export const registerElement = element => {
   const disconnectedMixins = getMixinProp(mixins, 'disconnected')
   const templateMixins = getMixinProp(mixins, 'template')
   const styleMixins = getMixinProp(mixins, 'style')
-  if (!extend && extendsMixins.length) extend = extendsMixins[0]
+  if (!extend) extend = extendsMixins[0]
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement
   class OzElement extends Class {
     // TODO: test if i need to make a helper function from the reactivity side to isolate the constructors
@@ -99,37 +96,26 @@ export const registerElement = element => {
         dataset: {},
         template: undefined,
         style: undefined,
-        refs: new Proxy({[reactivity]: false}, {
-          get (target, property, receiver) {
-            if (property in target || property === Symbol.toPrimitive) return Reflect.get(target, property, receiver)
-            return html.ref(property)
-          }
-        }),
-        // get refs () {
-        //   return this.template?.refs &&
-        //     Array.from(this.template?.refs)
-        //     .reduce((obj, [attr, val]) =>
-        //       ((obj[attr] = val), obj), {}) ||
-        //     {}
-        // },
-        get references () {
-          return this.template?.refs
+        references: new Map(),
+        get refs () {
+          return (this.references &&
+            Array.from(this.references)
+              .reduce((obj, [attr, val]) =>
+                ((obj[attr] = val), obj), {})) ||
+            {}
         }
       })
       /* FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL */
       Object.defineProperties(context, Object.getOwnPropertyDescriptors({
-        // get refs () {
-        //   return this.template?.refs &&
-        //     Array.from(this.template?.refs)
-        //       .reduce((obj, [attr, val]) =>
-        //         ((obj[attr] = val), obj), {}) ||
-        //       {}
-        // },
-        get references () {
-          return this.template?.refs
+        get refs () {
+          return (this.references &&
+            Array.from(this.references)
+              .reduce((obj, [attr, val]) =>
+                ((obj[attr] = val), obj), {})) ||
+            {}
         }
       }))
-      /*/ FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL /*/
+      /* / FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL / */
       // attributes shouldn't be appended to the element at construction time(isn't an expected behavior)
       // so think about doing it at connection time
       // // Attrs mixins & attrs
@@ -157,7 +143,7 @@ export const registerElement = element => {
               ignoreAttrsObserver = false
             }
           }))
-      attributeObserver.observe(this, { attributes:true })
+      attributeObserver.observe(this, { attributes: true })
       attrs.$watch(({event: { property, value }}) => {
         this.setAttribute(property, value)
         attributeObserver.takeRecords()
@@ -237,43 +223,25 @@ export const registerElement = element => {
     static get name () { return name }
 
     connectedCallback () {
-      const { [OzElementContext]: context, [OzElementContext]: { _templateWatcher, _styleWatcher } } = this
+      const { [OzElementContext]: context, [OzElementContext]: { host, _templateWatcher, _styleWatcher, references } } = this
       // Connected mixins & connected
       beforeConnectedMixins.forEach(mixin => mixin(context))
       if (beforeConnected) beforeConnected(context)
-      // HTML Template
-      if (!_templateWatcher && (buildHTMLTemplate || templateMixins.length)) {
-        const _template = buildHTMLTemplate || templateMixins[0]
-        let template
-        // eslint-disable-next-line no-return-assign
-        context._templateWatcher = watch(_ => {
-          const updatedTemplate =
-            template
-              ? _template.call(context, context)
-              : (template = context.template = _template.call(context, context))
-          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError
-          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
-          template.update(...updatedTemplate.values)
-        })
-      }
+      let { style, template } = context
       // CSS Template
       if (!_styleWatcher && (buildCSSTemplate || styleMixins.length)) {
         const _style = buildCSSTemplate || styleMixins[0]
-        let template
         // eslint-disable-next-line no-return-assign
-        context._styleWatcher = watch(_ => {
-          const updatedTemplate =
-            template
-              ? _style.call(context, context)
-              : (template = context.style = _style.call(context, context))
+        context._styleWatcher = watch(_ =>
+          style
+            ? _style.call(context, context)
+            : (style = context.style = _style.call(context, context)),
+        ({newValue: updatedTemplate}) => {
           if (!updatedTemplate[OzStyle]) throw noOzStyleError
-          if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
-          template.update(...updatedTemplate.values)
+          if (style.templateId !== updatedTemplate.templateId) throw ozStyleChangedError
+          style.update(...updatedTemplate.values)
         })
       }
-
-      const { host, style, template } = context
-
       if (style) {
         if (style.scoped) {
           const uniqueId = makeUniqueId()
@@ -288,9 +256,22 @@ export const registerElement = element => {
           if (root === document) host.getRootNode({composed: true}).head.appendChild(style)
           else root.appendChild(style)
         }
-        // style.update(...style.values)
       }
-      if (template) host.appendChild(template.content)
+      // HTML Template
+      if (!_templateWatcher && (buildHTMLTemplate || templateMixins.length)) {
+        const _template = buildHTMLTemplate || templateMixins[0]
+        template = context.template = _template.call(context, context)
+        template.references = references
+        host.appendChild(template.content)
+        context._templateWatcher = watch(
+          _ => _template.call(context, context),
+          ({newValue: updatedTemplate}) => {
+            if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError
+            if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError
+            template.update(...updatedTemplate.values)
+          })
+      } else if (template) host.appendChild(template.content)
+
       // Connected mixins & connected
       connectedMixins.forEach(mixin => mixin(context))
       if (connected) connected(context)

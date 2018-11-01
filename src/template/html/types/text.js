@@ -1,12 +1,8 @@
 import { replace } from '../../utils.js'
-import { replaceReferencesByValues } from '../utils.js'
 import { OzHTMLTemplate } from '../elements/utils.js'
 
 const makeText = ({
   template,
-  template: {
-    references
-  },
   placeholderMetadata,
   arrayFragment,
 
@@ -17,10 +13,9 @@ const makeText = ({
 }) =>
   ({
     values,
+    value = values[placeholderMetadata.ids[0]],
     forceUpdate
   }) => {
-    values = replaceReferencesByValues(values, references)
-    const value = values[placeholderMetadata.ids[0]]
     const type = typeof value
     if (value && type === 'object') {
       if (value instanceof Promise) {
@@ -45,12 +40,13 @@ const makeText = ({
         replace(arrayFragment, value.childNodes)
       } else if (Array.isArray(value)) {
         const values = value
-        const [ placeholders, fragments ] = values.reduce(tuple =>
-          void tuple[0].push(makeText({
-            template,
-            placeholderMetadata,
-            arrayFragment: tuple[1][tuple[1].push([]) - 1] })) || tuple
-          , [[], []])
+        const [ placeholders, fragments ] =
+          values.reduce(tuple =>
+            (tuple[0].push(makeText({
+              template,
+              placeholderMetadata,
+              arrayFragment: tuple[1][tuple[1].push([]) - 1] })), tuple)
+            , [[], []])
         placeholders.forEach((placeholder, i) => placeholder({value: value[i]}))
         replace(arrayFragment, fragments)
         _placeholders = placeholders
@@ -71,7 +67,19 @@ const makeText = ({
         })({ value: value(arrayFragment) })
       }
     } else {
-      replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value))
+      if (arrayFragment[0]?.nodeType === Node.TEXT_NODE) {
+        const textNode = arrayFragment[0]
+        replace(arrayFragment, arrayFragment[0])
+        const newValue =
+          value === undefined
+            ? ''
+            : type === 'symbol'
+              ? value.toString()
+              : '' + value
+        if (textNode.data !== newValue) textNode.data = newValue
+      } else {
+        replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value))
+      }
     }
     if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment())
     _value = value
