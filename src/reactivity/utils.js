@@ -194,5 +194,3 @@ export const watch = target => (getter, handler) => {
     unwatch = true
   }
 }
-
-export const isolate = func => registerWatcher(func, _ => {})

@@ -18,7 +18,6 @@ export const ReactiveType = class ReactiveSet extends Set {
 
   add (val) {
     const value = r(val)
-    registerDependency({ target: this, property: value, value })
     try {
       return super.add(value)
     } finally {
@@ -28,7 +27,6 @@ export const ReactiveType = class ReactiveSet extends Set {
 
   delete (val) {
     const value = r(val)
-    registerDependency({ target: this, property: value, value })
     try {
       return super.delete(value)
     } finally {
@@ -42,7 +40,6 @@ export const ReactiveType = class ReactiveSet extends Set {
     try {
       return super.clear()
     } finally {
-      registerDependency({ target: this })
       notify({ target: this })
       const { properties } = this[reactivity]
       for (const value of this) {
