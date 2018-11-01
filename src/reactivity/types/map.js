@@ -18,7 +18,6 @@ export const ReactiveType = class ReactiveMap extends Map {
 
   set (key, val) {
     const value = r(val)
-    registerDependency({ target: this, property: key, value })
     try {
       return super.set(key, value)
     } finally {
@@ -27,7 +26,6 @@ export const ReactiveType = class ReactiveMap extends Map {
   }
 
   delete (key) {
-    registerDependency({ target: this, property: key })
     try {
       return super.delete(key)
     } finally {
@@ -38,7 +36,6 @@ export const ReactiveType = class ReactiveMap extends Map {
   }
 
   clear () {
-    registerDependency({ target: this })
     try {
       return super.clear()
     } finally {

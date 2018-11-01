@@ -26,7 +26,6 @@ export default object => {
     },
     deleteProperty (target, property) {
       if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property)
-      registerDependency({ target: target, property })
       try {
         return Reflect.deleteProperty(target, property)
       } finally {
@@ -37,7 +36,6 @@ export default object => {
     },
     defineProperty (target, property, desc, { value: _value, ...rest } = desc/* desc */) {
       if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc)
-      registerDependency({ target, property })
       if (!_value) {
         try {
           // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
