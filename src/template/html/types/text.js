@@ -7,6 +7,7 @@ const makeText = ({
   arrayFragment,
 
   _value,
+  _template,
   _placeholders,
   _fragments,
   _arrayFragment
@@ -36,8 +37,9 @@ const makeText = ({
               : undefined)
         }
       } else if (value && value[OzHTMLTemplate]) {
-        // if (_value.) todo: update the current template if its the same id
-        replace(arrayFragment, value.childNodes)
+        if (value.templateId === _template?.templateId) _template.update(...value.values)
+        else replace(arrayFragment, value.childNodes)
+        _template = value
       } else if (Array.isArray(value)) {
         const values = value
         const [ placeholders, fragments ] =
