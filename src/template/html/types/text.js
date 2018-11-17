@@ -9,8 +9,7 @@ const makeText = ({
   _value,
   _template,
   _placeholders,
-  _fragments,
-  _arrayFragment
+  _fragments
 }) =>
   ({
     values,
@@ -37,7 +36,10 @@ const makeText = ({
               : undefined)
         }
       } else if (value && value[OzHTMLTemplate]) {
-        if (value.templateId === _template?.templateId) _template.update(...value.values)
+        if (value.templateId === _template?.templateId) {
+          _template.update(...value.values)
+          replace(arrayFragment, _template.childNodes)
+        }
         else replace(arrayFragment, value.childNodes)
         _template = value
       } else if (Array.isArray(value)) {
@@ -69,9 +71,9 @@ const makeText = ({
         })({ value: value(arrayFragment) })
       }
     } else {
-      if (arrayFragment[0]?.nodeType === Node.TEXT_NODE) {
-        const textNode = arrayFragment[0]
-        replace(arrayFragment, arrayFragment[0])
+      const textNode = arrayFragment[0]
+      if (textNode?.nodeType === Node.TEXT_NODE) {
+        replace(arrayFragment, textNode)
         const newValue =
           value === undefined
             ? ''
@@ -85,7 +87,6 @@ const makeText = ({
     }
     if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment())
     _value = value
-    _arrayFragment = arrayFragment.flat(Infinity)
   }
 
 export default makeText
