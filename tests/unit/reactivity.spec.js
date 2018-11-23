@@ -92,7 +92,7 @@ describe('Reactive', () => {
         expect(Object.getOwnPropertyDescriptor(react, '$watch')).to.have.property('enumerable').that.equals(false)
       })
       it('accept a function as single argument', () => {
-        expect(react.$watch(_ => {})).to.not.throw()
+        expect(_ => react.$watch(_ => {})).to.not.throw()
       })
       it('accept a string|function and function as arguments', () => {
         expect(_ => react.$watch('', _ => {})).to.not.throw()
@@ -116,8 +116,8 @@ describe('Reactive', () => {
         react.a = 2
         expect(changed).to.equal(true)
       })
-      it('return a function', () => {
-        expect(react.$watch(_ => {})).to.be.a('function')
+      it('return an object', () => {
+        expect(react.$watch(_ => {})).to.be.an('object')
       })
       it(`doesn't deeply watch changes`, () => {
         let changed
@@ -131,21 +131,21 @@ describe('Reactive', () => {
         react.d.e = 0
         expect(changed).to.equal(true)
       })
-      describe('unwatch', () => {
+      describe('return.unregister', () => {
         it(`--deep unregister the watcher`, () => {
           let changed
-          react.$watch(_ => (changed = true), { deep: true })()
+          react.$watch(_ => (changed = true), { deep: true }).unregister()
           react.d.e = 0
           expect(changed).to.equal(undefined)
         })
         it('unregister the watcher', () => {
           let changed
-          react.$watch(_ => (changed = true))()
+          react.$watch(_ => (changed = true)).unregister()
           react.a = 2
           expect(changed).to.equal(undefined)
         })
         it('return undefined', () => {
-          expect(react.$watch(_ => {})()).to.be.equal(undefined)
+          expect(react.$watch(_ => {}).unregister()).to.be.equal(undefined)
         })
       })
     })
