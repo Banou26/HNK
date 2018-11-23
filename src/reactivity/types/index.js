@@ -28,6 +28,7 @@ export const propertyGetters = new Map([
   object
 ].map(({type, getProperty}) => ([type, getProperty])))
 
-export const getProperty = (reactiveObject, property) =>
-  (propertyGetters.get(isBuiltIn(reactiveObject)) ||
-    (_ => reactiveObject[property]))(reactiveObject, property)
+export const getProperty = (reactiveObject, property, _isBuiltIn = isBuiltIn(reactiveObject)) =>
+  propertyGetters.has(_isBuiltIn)
+    ? propertyGetters.get(_isBuiltIn)(reactiveObject, property)
+    : reactiveObject[property]
