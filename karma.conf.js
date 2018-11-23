@@ -10,7 +10,7 @@ const webpackConfig = {
         loader: 'babel-loader',
         exclude: /node_modules/,
         options: {
-          plugins: [require('@babel/plugin-proposal-object-rest-spread'), require('@babel/plugin-proposal-optional-chaining')]
+          plugins: [require('@babel/plugin-proposal-async-generator-functions'), require('@babel/plugin-proposal-object-rest-spread'), require('@babel/plugin-proposal-optional-chaining')]
         }
       },
       {

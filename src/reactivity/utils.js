@@ -1,4 +1,4 @@
-import { isBuiltIn, getProperty } from './types/index.js'
+import { getProperty } from './types/index.js'
 
 export const reactivity = Symbol.for('OzReactivity')
 
@@ -9,6 +9,8 @@ export let rootObjects = new WeakMap()
 
 export const getReactivityRoot = _ => ({rootWatchers, rootObjects})
 export const setReactivityRoot = ({watchers: w, objects: o}) => (rootWatchers = w) && (rootObjects = o)
+
+const isGenerator = val => val?.[Symbol.toStringTag] === 'AsyncGeneratorFunction'
 
 const callWatcher = (watcher, deep, obj) =>
   deep
@@ -104,12 +106,13 @@ export const setReactivity = ({ target, unreactive, original, object }) => {
   return target
 }
 
-export const registerWatcher = (getter, watcher, options = {}) => {
-  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options))
+export const registerWatcher = (getter, watcher) => {
   rootWatchers.push(watcher)
-  const value = getter()
-  rootWatchers.pop()
-  return value
+  try {
+    return getter()
+  } finally {
+    rootWatchers.pop()
+  }
 }
 
 export const propertyReactivity = (target, property) => {
@@ -123,9 +126,8 @@ export const propertyReactivity = (target, property) => {
   return propertyReactivity
 }
 
-export const pushWatcher = (object, watcher, options = {}) => {
+export const pushWatcher = (object, watcher) => {
   if (
-    Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) &&
     object &&
     typeof object === 'object' &&
     object[reactivity] &&
@@ -159,7 +161,8 @@ export const registerDependency = ({ target, property }) => {
 }
 
 export const watch = target => (getter, handler) => {
-  const options = target && typeof handler === 'object' ? handler : undefined
+  const options = { dependenciesWatchers: [], autoRun: true, returnAtChange: true }
+  if (target && typeof handler === 'object') Object.defineProperties(options, Object.getOwnPropertyDescriptors(handler))
   if (target) {
     if (!handler || typeof handler !== 'function') {
       handler = getter
@@ -168,29 +171,65 @@ export const watch = target => (getter, handler) => {
     const type = typeof getter
     if (type === 'string' || type === 'number' || type === 'symbol') {
       const property = getter
-      getter = _ => isBuiltIn(target) ? getProperty(target, property) : target[property]
+      getter = _ => getProperty(target, property)
     }
   }
-  let unwatch, oldValue
-  const dependenciesWatchers = []
+  const isGetterGenerator = isGenerator(getter)
+  let unregister, oldValue, currentWatcherRegistering
+  const abort = _ => currentWatcherRegistering.abort()
   const watcher = (event, deep) => {
-    dependenciesWatchers.length = 0
-    if (unwatch) return
-    if (getter) {
-      let newValue = registerWatcher(getter, watcher, options)
-      pushWatcher(newValue, watcher, options)
-      if (handler) handler({ newValue, oldValue, event, deep })
-      oldValue = newValue
+    options.dependenciesWatchers.length = 0 // Empty the dependenciesWatchers array
+    if (unregister) return // Return without registering the watcher
+    if (getter) { // If there's a getter function
+      if (isGetterGenerator) {
+        if (options.returnAtChange) oldValue?.return()
+        const iterator = getter()
+        const _next = iterator.next.bind(iterator)
+        let previousValue
+        iterator.next = (...args) => {
+          let resolve, reject
+          const promise = new Promise((_resolve, _reject) => (resolve = _resolve) && (reject = _reject))
+          promise.finally(_ => rootWatchers.pop())
+          if (!previousValue) rootWatchers.push(watcher)
+          const value = _next(args.length ? args[0] : previousValue)
+          if (!previousValue) rootWatchers.pop()
+          value.finally(_ => rootWatchers.push(watcher))
+          value.then(resolve).catch(reject)
+          previousValue = value
+          return value
+        }
+        if (options.autoRun) {
+          const autoRun = promise =>
+          promise && promise.then(({done}) => !done && autoRun(iterator.next()))
+          autoRun(iterator.next())
+        }
+        if (handler) handler({ newValue, oldValue, event, deep })
+        oldValue = iterator
+      } else {
+        let newValue = registerWatcher(getter, watcher)
+        // pushWatcher(newValue, watcher)
+        if (handler) handler({ newValue, oldValue, event, deep })
+        oldValue = newValue
+      }
     } else {
       handler({ newValue: target, oldValue: target, event, deep })
-      pushWatcher(target, watcher, options)
+      pushWatcher(target, watcher)
     }
+    currentWatcherRegistering = undefined
   }
-  watcher.dependenciesWatchers = dependenciesWatchers
-  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options)
-  pushWatcher(getter ? oldValue : target, watcher, options)
-  return _ => {
-    for (const watchers of dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1)
-    unwatch = true
+  if (options) Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options))
+  watcher.dependenciesWatchers = options.dependenciesWatchers
+  if (getter) {
+    if (isGetterGenerator) watcher()
+    else oldValue = registerWatcher(getter.bind(target, target), watcher)
+  }
+  pushWatcher(getter ? oldValue : target, watcher)
+  return {
+    value: oldValue,
+    unregister: _ => {
+      for (const watchers of options.dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1)
+      unregister = true
+    },
+    abort: undefined
   }
 }
