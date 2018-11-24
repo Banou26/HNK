@@ -3,13 +3,11 @@ import * as object from './object.js'
 import * as array from './array.js'
 import * as map from './map.js'
 import * as set from './set.js'
-// import * as promise from './promise.js'
 import unreactive from './unreactive.js'
 
 const builtIn = [
   map,
   set,
-  // promise,
   ...unreactive
 ]
 
