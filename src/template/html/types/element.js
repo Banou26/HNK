@@ -1,4 +1,4 @@
-import { watch, preventReactivity } from '../../../reactivity/index.js'
+import { watch } from '../../../reactivity/index.js'
 import { placeholder, toPlaceholderString, toPlaceholdersNumber, replace } from '../../utils.js'
 import { OzHTMLReference, OzHTMLReferencePath, replaceReferencesByValues } from '../utils.js'
 
