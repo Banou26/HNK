@@ -19,14 +19,7 @@ const makeText = ({
     const type = typeof value
     if (value && type === 'object') {
       if (value instanceof Promise) {
-        if (value.$resolved) {
-          makeText({
-            template,
-            placeholderMetadata,
-            arrayFragment
-          })({ value: value.$resolvedValue })
-        } else {
-          replace(arrayFragment, new Text())
+        replace(arrayFragment, new Text())
           value.then(resolvedValue =>
             _value === value
               ? template.update(...template.values.map((_, i) =>
@@ -34,7 +27,6 @@ const makeText = ({
                   ? resolvedValue
                   : _))
               : undefined)
-        }
       } else if (value && value[OzHTMLTemplate]) {
         if (value.templateId === _template?.templateId) {
           _template.update(...value.values)

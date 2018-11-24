@@ -1,9 +1,10 @@
 import { setReactivity } from '../utils.js'
 
 export default [
-  Node,
   RegExp,
   URL,
+  Promise,
+  window.Node,
   window.Location
 ].map(type => ({
   type,

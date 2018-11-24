@@ -39,6 +39,831 @@ var makeComment = (({
   forceUpdate
 }) => arrayFragment[0].data = getResult(values));
 
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+    var ownKeys = Object.keys(source);
+
+    if (typeof Object.getOwnPropertySymbols === 'function') {
+      ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(source, sym).enumerable;
+      }));
+    }
+
+    ownKeys.forEach(function (key) {
+      _defineProperty(target, key, source[key]);
+    });
+  }
+
+  return target;
+}
+
+function _objectWithoutPropertiesLoose(source, excluded) {
+  if (source == null) return {};
+  var target = {};
+  var sourceKeys = Object.keys(source);
+  var key, i;
+
+  for (i = 0; i < sourceKeys.length; i++) {
+    key = sourceKeys[i];
+    if (excluded.indexOf(key) >= 0) continue;
+    target[key] = source[key];
+  }
+
+  return target;
+}
+
+function _objectWithoutProperties(source, excluded) {
+  if (source == null) return {};
+
+  var target = _objectWithoutPropertiesLoose(source, excluded);
+
+  var key, i;
+
+  if (Object.getOwnPropertySymbols) {
+    var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
+
+    for (i = 0; i < sourceSymbolKeys.length; i++) {
+      key = sourceSymbolKeys[i];
+      if (excluded.indexOf(key) >= 0) continue;
+      if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
+      target[key] = source[key];
+    }
+  }
+
+  return target;
+}
+
+const OzElement = Symbol.for('OzElement');
+const OzElementContext = Symbol.for('OzElementContext');
+const mixins = [];
+const mixin = obj => mixins.push(obj);
+const getMixinProp = (mixins, prop) => mixins.filter(mixin => prop in mixin).map(mixin => mixin[prop]);
+const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed');
+const noHTMLTemplateError = new Error('No HTML template returned in the template method');
+const ozStyleChangedError = new Error('The OzStyle element returned in the style changed');
+const noOzStyleError = new Error('No OzStyle element returned in the style method');
+
+const getPropertyDescriptorPair = (prototype, property) => {
+  let descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+
+  while (!descriptor) {
+    prototype = Object.getPrototypeOf(prototype);
+    if (!prototype) return;
+    descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+  }
+
+  return {
+    prototype,
+    descriptor
+  };
+};
+const getPropertyDescriptor = (object, property) => {
+  var _getPropertyDescripto;
+
+  return (_getPropertyDescripto = getPropertyDescriptorPair(object, property)) === null || _getPropertyDescripto === void 0 ? void 0 : _getPropertyDescripto.descriptor;
+};
+const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) => isOzElement ? parentNode : parentNode && getClosestOzElementParent(parentNode);
+
+var proxify = (object => {
+  const proxy = new Proxy(object, {
+    get(target, property, receiver) {
+      if (reactivityProperties.includes(property)) return Reflect.get(target, property, receiver);
+      registerDependency({
+        target,
+        property
+      });
+
+      const propertyReactivity$$1 = propertyReactivity(target, property);
+
+      const descriptor = getPropertyDescriptor(target, property);
+      let value;
+
+      if (descriptor && 'value' in descriptor) {
+        // property
+        value = Reflect.get(target, property, receiver);
+      } else {
+        // getter
+        if ('cache' in propertyReactivity$$1) {
+          value = propertyReactivity$$1.cache;
+        } else {
+          value = registerWatcher(_ => propertyReactivity$$1.cache = Reflect.get(target, property, receiver), _ => notify({
+            target: proxy,
+            property
+          }), {
+            object,
+            property,
+            propertyReactivity: propertyReactivity$$1,
+            cache: true
+          });
+        }
+      }
+
+      return value;
+    },
+
+    deleteProperty(target, property) {
+      if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property);
+
+      try {
+        return Reflect.deleteProperty(target, property);
+      } finally {
+        notify({
+          target: proxy,
+          property
+        });
+        const {
+          properties
+        } = target[reactivity];
+        if (!properties.get(property).watchers.length) properties.delete(property);
+      }
+    },
+
+    defineProperty(target, property, desc, _ref = desc
+    /* desc */
+    ) {
+      let {
+        value: _value
+      } = _ref,
+          rest = _objectWithoutProperties(_ref, ["value"]);
+
+      if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc);
+
+      if (!_value) {
+        try {
+          // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
+          return Reflect.defineProperty(target, property, _objectSpread({}, _value !== undefined && {
+            value: _value
+          }, rest));
+        } finally {
+          notify({
+            target: proxy,
+            property,
+            value: _value
+          });
+        }
+      }
+
+      let value = reactify(_value);
+
+      try {
+        return Reflect.defineProperty(target, property, _objectSpread({}, value !== undefined && {
+          value: value
+        }, rest));
+      } finally {
+        if (value && typeof value === 'object' && value[reactivity]) {
+          let unwatch = value.$watch(_ => target[property] === value ? notify({
+            target: proxy,
+            property,
+            value,
+            deep: true
+          }) : unwatch(), {
+            deep: true
+          });
+        }
+
+        notify({
+          target: proxy,
+          property,
+          value
+        });
+      }
+    }
+
+  });
+  return proxy;
+});
+
+const type = Object;
+var object = (object => {
+  const obj = Object.create(Object.getPrototypeOf(object));
+  const reactiveObject = proxify(obj);
+  setReactivity({
+    target: reactiveObject,
+    original: object,
+    object: obj
+  });
+
+  for (const [prop, {
+    value,
+    ...rest
+  }] of Object.entries(Object.getOwnPropertyDescriptors(object))) {
+    Object.defineProperty(reactiveObject, prop, _objectSpread({}, value !== undefined && {
+      value: value
+    }, rest));
+  }
+
+  return reactiveObject;
+});
+
+var object$1 = /*#__PURE__*/Object.freeze({
+  type: type,
+  default: object
+});
+
+const type$1 = Array;
+let original;
+const ReactiveType = class ReactiveArray extends Array {
+  constructor(...values) {
+    super();
+    const proxy = proxify(this);
+    setReactivity({
+      target: proxy,
+      original,
+      object: this
+    });
+    if (original) original = undefined;
+
+    if (values) {
+      for (const val of values) proxy.push(val);
+    }
+
+    values.forEach((val, i) => proxy[i] = val);
+    return proxy;
+  }
+
+};
+var array = (array => {
+  original = array;
+  return new ReactiveType(...array);
+});
+
+var array$1 = /*#__PURE__*/Object.freeze({
+  type: type$1,
+  ReactiveType: ReactiveType,
+  default: array
+});
+
+const type$2 = Map;
+const getProperty = (reactiveMap, prop) => reactiveMap.get(prop);
+const ReactiveType$1 = class ReactiveMap extends Map {
+  constructor(iterator) {
+    super();
+    setReactivity({
+      target: this,
+      original: iterator,
+      object: this
+    });
+    if (iterator) for (const [key, val] of iterator) this.set(key, val);
+  }
+
+  get size() {
+    registerDependency({
+      target: this
+    });
+    return super.size;
+  }
+
+  set(key, val) {
+    const value = reactify(val);
+
+    try {
+      return super.set(key, value);
+    } finally {
+      notify({
+        target: this,
+        property: key,
+        value
+      });
+    }
+  }
+
+  delete(key) {
+    try {
+      return super.delete(key);
+    } finally {
+      var _properties$get;
+
+      notify({
+        target: this,
+        property: key
+      });
+      const {
+        properties
+      } = this[reactivity];
+      if (!((_properties$get = properties.get(key)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(key);
+    }
+  }
+
+  clear() {
+    try {
+      return super.clear();
+    } finally {
+      notify({
+        target: this
+      });
+      const {
+        properties
+      } = this[reactivity];
+
+      for (const [key] of this) {
+        var _properties$get2;
+
+        if (!((_properties$get2 = properties.get(key)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(key);
+      }
+
+      for (const [key] of properties) {
+        var _properties$get3;
+
+        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
+      }
+    }
+  }
+
+  get(key) {
+    propertyReactivity(this, key);
+    registerDependency({
+      target: this,
+      property: key
+    });
+    return super.get(key);
+  }
+
+  has(key) {
+    registerDependency({
+      target: this,
+      property: key
+    });
+    return super.has(key);
+  }
+
+};
+
+for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
+  ReactiveType$1.prototype[property] = function (...args) {
+    registerDependency({
+      target: this
+    });
+    return type$2.prototype[property].apply(this, args);
+  };
+}
+
+var map = (map => new ReactiveType$1(map));
+
+var map$1 = /*#__PURE__*/Object.freeze({
+  type: type$2,
+  getProperty: getProperty,
+  ReactiveType: ReactiveType$1,
+  default: map
+});
+
+const type$3 = Set;
+const getProperty$1 = (reactiveSet, prop) => reactiveSet.has(prop);
+const ReactiveType$2 = class ReactiveSet extends Set {
+  constructor(iterator) {
+    super();
+    setReactivity({
+      target: this,
+      original: iterator,
+      object: this
+    });
+    if (iterator) for (const val of iterator) this.add(val);
+  }
+
+  get size() {
+    registerDependency({
+      target: this
+    });
+    return super.size;
+  }
+
+  add(val) {
+    const value = reactify(val);
+
+    try {
+      return super.add(value);
+    } finally {
+      notify({
+        target: this,
+        property: value,
+        value
+      });
+    }
+  }
+
+  delete(val) {
+    const value = reactify(val);
+
+    try {
+      return super.delete(value);
+    } finally {
+      var _properties$get;
+
+      notify({
+        target: this,
+        property: value,
+        value
+      });
+      const {
+        properties
+      } = this[reactivity];
+      if (!((_properties$get = properties.get(value)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(value);
+    }
+  }
+
+  clear() {
+    try {
+      return super.clear();
+    } finally {
+      notify({
+        target: this
+      });
+      const {
+        properties
+      } = this[reactivity];
+
+      for (const value of this) {
+        var _properties$get2;
+
+        if (!((_properties$get2 = properties.get(value)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(value);
+      }
+
+      for (const [key] of properties) {
+        var _properties$get3;
+
+        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
+      }
+    }
+  }
+
+  has(val) {
+    const value = reactify(val);
+    propertyReactivity(this, value);
+    registerDependency({
+      target: this,
+      property: value,
+      value
+    });
+    return super.has(value);
+  }
+
+};
+
+for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
+  ReactiveType$2.prototype[property] = function (...args) {
+    registerDependency({
+      target: this
+    });
+    return type$3.prototype[property].apply(this, args);
+  };
+}
+
+var set$1 = (set => new ReactiveType$2(set));
+
+var set$2 = /*#__PURE__*/Object.freeze({
+  type: type$3,
+  getProperty: getProperty$1,
+  ReactiveType: ReactiveType$2,
+  default: set$1
+});
+
+var unreactive = [RegExp, URL, Promise, window.Node, window.Location].map(type => ({
+  type,
+  default: obj => setReactivity({
+    target: obj,
+    unreactive: true
+  })
+}));
+
+const builtIn = [map$1, set$2, // promise,
+...unreactive];
+const isBuiltIn = reactiveObject => {
+  var _builtIn$find;
+
+  return (_builtIn$find = builtIn.find(({
+    type: type$$1
+  }) => reactiveObject instanceof type$$1)) === null || _builtIn$find === void 0 ? void 0 : _builtIn$find.type;
+}; // Has to be from most specific(e.g: Map) to less specific(Object)
+
+var types = new Map([...builtIn, array$1, object$1].map(({
+  type: type$$1,
+  default: reactify
+}) => [type$$1, reactify]));
+const propertyGetters = new Map([...builtIn, array$1, object$1].map(({
+  type: type$$1,
+  getProperty: getProperty$$1
+}) => [type$$1, getProperty$$1]));
+const getProperty$2 = (reactiveObject, property, _isBuiltIn = isBuiltIn(reactiveObject)) => propertyGetters.has(_isBuiltIn) ? propertyGetters.get(_isBuiltIn)(reactiveObject, property) : reactiveObject[property];
+
+const reactivity = Symbol.for('OzReactivity');
+const reactivityProperties = ['$watch', '$watchDependencies', reactivity];
+let rootWatchers = [];
+let rootObjects = new WeakMap();
+const getReactivityRoot = _ => ({
+  rootWatchers,
+  rootObjects
+});
+const setReactivityRoot = ({
+  watchers: w,
+  objects: o
+}) => (rootWatchers = w) && (rootObjects = o);
+
+const isGenerator = val => (val === null || val === void 0 ? void 0 : val[Symbol.toStringTag]) === 'AsyncGeneratorFunction';
+
+const callWatcher = (watcher, deep, obj) => deep ? watcher.deep ? watcher(obj, true) : undefined : watcher(obj, false);
+
+const notify = ({
+  target,
+  property,
+  value,
+  deep
+}) => {
+  const react = target[reactivity]; // eslint-disable-line no-use-before-define
+
+  if (!react) return;
+
+  const callWatchers = watchers => {
+    const currentWatcher = rootWatchers[rootWatchers.length - 1];
+    if (watchers.includes(currentWatcher)) watchers.splice(watchers.indexOf(currentWatcher), 1);
+    const cacheWatchers = watchers.filter(({
+      cache
+    }) => cache);
+    /* .filter(({_target, _property}) => (target === _target && property === _property)) */
+
+    cacheWatchers.forEach(({
+      propertyReactivity
+    }) => delete propertyReactivity.cache);
+    cacheWatchers.forEach(watcher => callWatcher(watcher, deep, {
+      target,
+      property,
+      value
+    }));
+    watchers.filter(({
+      cache
+    }) => !cache).forEach(watcher => callWatcher(watcher, deep, {
+      target,
+      property,
+      value
+    }));
+  };
+
+  if (property) {
+    const watchers = propertyReactivity(target, property).watchers;
+
+    const _watchers = watchers.slice();
+
+    watchers.length = 0;
+    callWatchers(_watchers);
+  }
+
+  const watchers = react.watchers;
+
+  const _watchers = watchers.slice();
+
+  watchers.length = 0;
+  callWatchers(_watchers);
+};
+
+const makeReactivityWatcherArray = (target, property, dependencyListeners) => new Proxy([], {
+  defineProperty(_target, _property, desc, {
+    value
+  } = desc
+  /* desc */
+  ) {
+    const oldValue = _target[_property];
+
+    try {
+      return Reflect.defineProperty(_target, _property, desc);
+    } finally {
+      if (_property === 'length' && oldValue !== value) {
+        // console.log(oldValue, value, oldValue !== value)
+        for (const watcher of dependencyListeners) watcher(target, property, value);
+      }
+    }
+  }
+
+});
+
+const makeReactivityObject = (object, dependencyListeners = []) => ({
+  dependencyListeners,
+  watchers: makeReactivityWatcherArray(object, undefined, dependencyListeners),
+  properties: new Map(),
+  // new ReactivePropertyMap(dependencyListeners, object),
+  object
+});
+
+const setReactivity = ({
+  target,
+  unreactive,
+  original,
+  object
+}) => {
+  if (unreactive) {
+    target[reactivity] = false;
+    return target;
+  }
+
+  if (original) rootObjects.set(original, target);
+  const reactivityObject = makeReactivityObject(object);
+  Object.defineProperty(target, reactivity, {
+    value: reactivityObject,
+    configurable: true,
+    writable: true
+  });
+  Object.defineProperty(target, '$watch', {
+    value: watch(target),
+    configurable: true,
+    writable: true
+  });
+  Object.defineProperty(target, '$watchDependencies', {
+    value: listener => {
+      reactivityObject.dependencyListeners.push(listener);
+      return _ => reactivityObject.dependencyListeners.splice(reactivityObject.dependencyListeners.indexOf(listener - 1), 1);
+    },
+    configurable: true,
+    writable: true
+  });
+  return target;
+};
+const registerWatcher = (getter, watcher) => {
+  rootWatchers.push(watcher);
+
+  try {
+    return getter();
+  } finally {
+    rootWatchers.pop();
+  }
+};
+const propertyReactivity = (target, property) => {
+  const {
+    properties,
+    dependencyListeners
+  } = target[reactivity];
+  if (properties.has(property)) return properties.get(property);
+  const propertyReactivity = {
+    watchers: makeReactivityWatcherArray(target, property, dependencyListeners) // cache: undefined
+
+  };
+  properties.set(property, propertyReactivity);
+  return propertyReactivity;
+};
+const pushWatcher = (object, watcher) => {
+  if (object && typeof object === 'object' && object[reactivity] && !object[reactivity].watchers.includes(watcher)) {
+    var _watcher$dependencies;
+
+    object[reactivity].watchers.push(watcher);
+    (_watcher$dependencies = watcher.dependenciesWatchers) === null || _watcher$dependencies === void 0 ? void 0 : _watcher$dependencies.push(object[reactivity].watchers);
+  }
+};
+const includeWatcher = (arr, watcher) => arr.includes(watcher) || arr.some(_watcher => watcher.object && watcher.property && watcher.object === _watcher.object && watcher.property === _watcher.property);
+
+const pushCurrentWatcher = ({
+  watchers
+}) => {
+  const currentWatcher = rootWatchers[rootWatchers.length - 1];
+
+  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) {
+    var _currentWatcher$depen;
+
+    (_currentWatcher$depen = currentWatcher.dependenciesWatchers) === null || _currentWatcher$depen === void 0 ? void 0 : _currentWatcher$depen.push(watchers);
+    watchers.push(currentWatcher);
+  }
+};
+
+const registerDependency = ({
+  target,
+  property
+}) => {
+  if (!rootWatchers.length || !target[reactivity]) return;
+  if (property) pushCurrentWatcher(propertyReactivity(target, property));else pushCurrentWatcher(target[reactivity]);
+};
+const watch = target => (getter, handler) => {
+  const options = {
+    dependenciesWatchers: [],
+    autoRun: true,
+    returnAtChange: true
+  };
+  if (target && typeof handler === 'object') Object.defineProperties(options, Object.getOwnPropertyDescriptors(handler));
+
+  if (target) {
+    if (!handler || typeof handler !== 'function') {
+      handler = getter;
+      getter = undefined;
+    }
+
+    const type = typeof getter;
+
+    if (type === 'string' || type === 'number' || type === 'symbol') {
+      const property = getter;
+
+      getter = _ => getProperty$2(target, property);
+    }
+  }
+
+  const isGetterGenerator = isGenerator(getter);
+  let unregister, oldValue;
+
+  const watcher = (event, deep) => {
+    options.dependenciesWatchers.length = 0; // Empty the dependenciesWatchers array
+
+    if (unregister) return; // Return without registering the watcher
+
+    if (getter) {
+      // If there's a getter function
+      if (isGetterGenerator) {
+        var _oldValue;
+
+        if (options.returnAtChange) (_oldValue = oldValue) === null || _oldValue === void 0 ? void 0 : _oldValue.return();
+        const iterator = getter();
+
+        const _next = iterator.next.bind(iterator);
+
+        let previousValue;
+
+        iterator.next = (...args) => {
+          let resolve, reject;
+          const promise = new Promise((_resolve, _reject) => (resolve = _resolve) && (reject = _reject));
+          promise.finally(_ => rootWatchers.pop());
+          if (!previousValue) rootWatchers.push(watcher);
+
+          const value = _next(args.length ? args[0] : previousValue);
+
+          if (!previousValue) rootWatchers.pop();
+          value.finally(_ => rootWatchers.push(watcher));
+          value.then(resolve).catch(reject);
+          previousValue = value;
+          return value;
+        };
+
+        if (options.autoRun) {
+          const autoRun = promise => promise && promise.then(({
+            done
+          }) => !done && autoRun(iterator.next()));
+
+          autoRun(iterator.next());
+        }
+
+        if (handler) handler({
+          newValue,
+          oldValue,
+          event,
+          deep
+        });
+        oldValue = iterator;
+      } else {
+        let newValue = registerWatcher(getter, watcher); // pushWatcher(newValue, watcher)
+
+        if (handler) handler({
+          newValue,
+          oldValue,
+          event,
+          deep
+        });
+        oldValue = newValue;
+      }
+    } else {
+      handler({
+        newValue: target,
+        oldValue: target,
+        event,
+        deep
+      });
+      pushWatcher(target, watcher);
+    }
+  };
+
+  if (options) Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options));
+  watcher.dependenciesWatchers = options.dependenciesWatchers;
+
+  if (getter) {
+    if (isGetterGenerator) watcher();else oldValue = registerWatcher(getter.bind(target, target), watcher);
+  }
+
+  pushWatcher(getter ? oldValue : target, watcher);
+  return {
+    value: oldValue,
+    unregister: _ => {
+      for (const watchers of options.dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1);
+
+      unregister = true;
+    },
+    abort: undefined
+  };
+};
+
+const reactify = obj => {
+  if (!obj || typeof obj !== 'object' || reactivity in obj) return obj;
+  if (rootObjects.has(obj)) return rootObjects.get(obj);
+  return Array.from(types).find(([type]) => obj instanceof type)[1](obj);
+};
+
+const watch$1 = watch();
+
 const getDependentsPlaceholders = ({
   template,
   placeholdersMetadata,
@@ -55,8 +880,7 @@ const removeEventListeners = (element, event, listeners) => listeners.forEach(li
 const makeElement = ({
   template,
   template: {
-    placeholdersMetadata,
-    references
+    placeholdersMetadata
   },
   placeholderMetadata,
   placeholderMetadata: {
@@ -82,10 +906,12 @@ const makeElement = ({
   const self = ({
     values,
     forceUpdate,
-    element = arrayFragment[0]
+    element = arrayFragment[0],
+    references = template.references,
+    value = values[ids[0]]
   }) => {
-    if (_ref) {
-      references.delete(_ref.value);
+    if (_ref && !(!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && (value === null || value === void 0 ? void 0 : value[OzHTMLReference]))) {
+      if (references.has(_ref[OzHTMLReference])) references.delete(_ref[OzHTMLReference]);
       _ref = undefined;
     }
 
@@ -106,13 +932,10 @@ const makeElement = ({
 
       replace(arrayFragment, newElement);
     } else if (type === 'attribute') {
-      const value = values[ids[0]];
-
       if (!_doubleQuoteValue && !_singleQuoteValue && !unquotedValue && (value === null || value === void 0 ? void 0 : value[OzHTMLReference])) {
-        references.set(value.value, element);
+        if (references.get(value[OzHTMLReference]) !== element) references.set(value[OzHTMLReference], element);
         _ref = value;
       } else {
-        values = values.map(val => (val === null || val === void 0 ? void 0 : val[OzHTMLReference]) ? references.get(val.value) : val);
         const attributeName = toAttributeName(values);
 
         if (unquotedValue) {
@@ -159,9 +982,9 @@ const makeText = ({
   placeholderMetadata,
   arrayFragment,
   _value,
+  _template,
   _placeholders,
-  _fragments,
-  _arrayFragment
+  _fragments
 }) => ({
   values,
   value = values[placeholderMetadata.ids[0]],
@@ -171,28 +994,25 @@ const makeText = ({
 
   if (value && type === 'object') {
     if (value instanceof Promise) {
-      if (value.$resolved) {
-        makeText({
-          template,
-          placeholderMetadata,
-          arrayFragment
-        })({
-          value: value.$resolvedValue
-        });
-      } else {
-        replace(arrayFragment, new Text());
-        value.then(resolvedValue => _value === value ? template.update(...template.values.map((_, i) => i === placeholderMetadata.ids[0] ? resolvedValue : _)) : undefined);
-      }
+      replace(arrayFragment, new Text());
+      value.then(resolvedValue => _value === value ? template.update(...template.values.map((_, i) => i === placeholderMetadata.ids[0] ? resolvedValue : _)) : undefined);
     } else if (value && value[OzHTMLTemplate]) {
-      // if (_value.) todo: update the current template if its the same id
-      replace(arrayFragment, value.childNodes);
+      var _template2;
+
+      if (value.templateId === ((_template2 = _template) === null || _template2 === void 0 ? void 0 : _template2.templateId)) {
+        _template.update(...value.values);
+
+        replace(arrayFragment, _template.childNodes);
+      } else replace(arrayFragment, value.childNodes);
+
+      _template = value;
     } else if (Array.isArray(value)) {
       const values = value;
-      const [placeholders, fragments] = values.reduce(tuple => void tuple[0].push(makeText({
+      const [placeholders, fragments] = values.reduce(tuple => (tuple[0].push(makeText({
         template,
         placeholderMetadata,
         arrayFragment: tuple[1][tuple[1].push([]) - 1]
-      })) || tuple, [[], []]);
+      })), tuple), [[], []]);
       placeholders.forEach((placeholder$$1, i) => placeholder$$1({
         value: value[i]
       }));
@@ -216,12 +1036,19 @@ const makeText = ({
       });
     }
   } else {
-    replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value));
+    const textNode = arrayFragment[0];
+
+    if ((textNode === null || textNode === void 0 ? void 0 : textNode.nodeType) === Node.TEXT_NODE) {
+      replace(arrayFragment, textNode);
+      const newValue = value === undefined ? '' : type === 'symbol' ? value.toString() : '' + value;
+      if (textNode.data !== newValue) textNode.data = newValue;
+    } else {
+      replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value));
+    }
   }
 
   if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment());
   _value = value;
-  _arrayFragment = arrayFragment.flat(Infinity);
 };
 
 const OzHTMLReference = Symbol.for('OzHTMLReference');
@@ -450,850 +1277,16 @@ var parse = (({
   };
 });
 
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-    var ownKeys = Object.keys(source);
-
-    if (typeof Object.getOwnPropertySymbols === 'function') {
-      ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
-        return Object.getOwnPropertyDescriptor(source, sym).enumerable;
-      }));
-    }
-
-    ownKeys.forEach(function (key) {
-      _defineProperty(target, key, source[key]);
-    });
-  }
-
-  return target;
-}
-
-function _objectWithoutPropertiesLoose(source, excluded) {
-  if (source == null) return {};
-  var target = {};
-  var sourceKeys = Object.keys(source);
-  var key, i;
-
-  for (i = 0; i < sourceKeys.length; i++) {
-    key = sourceKeys[i];
-    if (excluded.indexOf(key) >= 0) continue;
-    target[key] = source[key];
-  }
-
-  return target;
-}
-
-function _objectWithoutProperties(source, excluded) {
-  if (source == null) return {};
-
-  var target = _objectWithoutPropertiesLoose(source, excluded);
-
-  var key, i;
-
-  if (Object.getOwnPropertySymbols) {
-    var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
-
-    for (i = 0; i < sourceSymbolKeys.length; i++) {
-      key = sourceSymbolKeys[i];
-      if (excluded.indexOf(key) >= 0) continue;
-      if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-      target[key] = source[key];
-    }
-  }
-
-  return target;
-}
-
-const OzElement = Symbol.for('OzElement');
-const OzElementContext = Symbol.for('OzElementContext');
-const mixins = [];
-const mixin = obj => mixins.push(obj);
-const getMixinProp = (mixins, prop) => mixins.filter(mixin => prop in mixin).map(mixin => mixin[prop]);
-const htmlTemplateChangedError = new Error('The HTML template returned in the template method changed');
-const noHTMLTemplateError = new Error('No HTML template returned in the template method');
-const ozStyleChangedError = new Error('The OzStyle element returned in the style changed');
-const noOzStyleError = new Error('No OzStyle element returned in the style method');
-
-const getPropertyDescriptorPair = (prototype, property) => {
-  let descriptor = Object.getOwnPropertyDescriptor(prototype, property);
-
-  while (!descriptor) {
-    prototype = Object.getPrototypeOf(prototype);
-    if (!prototype) return;
-    descriptor = Object.getOwnPropertyDescriptor(prototype, property);
-  }
-
-  return {
-    prototype,
-    descriptor
-  };
-};
-const getPropertyDescriptor = (object, property) => (getPropertyDescriptorPair(object, property) || {}).descriptor;
-const getClosestOzElementParent = (node, parentNode = node.parentNode || node.host, isOzElement = parentNode && parentNode[OzElement]) => isOzElement ? parentNode : parentNode && getClosestOzElementParent(parentNode);
-
-var proxify = (object => {
-  const proxy = new Proxy(object, {
-    get(target, property, receiver) {
-      if (reactivityProperties.includes(property)) return Reflect.get(target, property, receiver);
-      registerDependency({
-        target,
-        property
-      });
-
-      const propertyReactivity$$1 = propertyReactivity(target, property);
-
-      const descriptor = getPropertyDescriptor(target, property);
-      let value;
-
-      if (descriptor && 'value' in descriptor) {
-        // property
-        value = Reflect.get(target, property, receiver);
-      } else {
-        // getter
-        if ('cache' in propertyReactivity$$1) {
-          value = propertyReactivity$$1.cache;
-        } else {
-          value = registerWatcher(_ => propertyReactivity$$1.cache = Reflect.get(target, property, receiver), _ => notify({
-            target,
-            property
-          }), {
-            object,
-            property,
-            propertyReactivity: propertyReactivity$$1,
-            cache: true
-          });
-        }
-      }
-
-      return value;
-    },
-
-    deleteProperty(target, property) {
-      if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property);
-      registerDependency({
-        target: target,
-        property
-      });
-
-      try {
-        return Reflect.deleteProperty(target, property);
-      } finally {
-        notify({
-          target,
-          property
-        });
-        const {
-          properties
-        } = target[reactivity];
-        if (!properties.get(property).watchers.length) properties.delete(property);
-      }
-    },
-
-    defineProperty(target, property, desc, _ref = desc
-    /* desc */
-    ) {
-      let {
-        value: _value
-      } = _ref,
-          rest = _objectWithoutProperties(_ref, ["value"]);
-
-      if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc);
-      registerDependency({
-        target,
-        property
-      });
-
-      if (!_value) {
-        try {
-          // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
-          return Reflect.defineProperty(target, property, _objectSpread({}, _value !== undefined && {
-            value: _value
-          }, rest));
-        } finally {
-          notify({
-            target,
-            property,
-            value: _value
-          });
-        }
-      }
-
-      let value = reactify(_value);
-      if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue;else if (typeof value === 'function' && value.$promise) {
-        value.$promise.then(val => target[property] === value ? proxy[property] = val : undefined);
-      }
-
-      try {
-        return Reflect.defineProperty(target, property, _objectSpread({}, value !== undefined && {
-          value: value
-        }, rest));
-      } finally {
-        if (value && typeof value === 'object' && value[reactivity]) {
-          let unwatch = value.$watch(_ => target[property] === value ? notify({
-            target,
-            property,
-            value,
-            deep: true
-          }) : unwatch(), {
-            deep: true
-          });
-        }
-
-        notify({
-          target,
-          property,
-          value
-        });
-      }
-    }
-
-  });
-  return proxy;
-});
-
-const type = Object;
-var object = (object => {
-  const obj = Object.create(Object.getPrototypeOf(object));
-  const reactiveObject = proxify(obj);
-  setReactivity({
-    target: reactiveObject,
-    original: object,
-    object: obj
-  });
-
-  for (const [prop, {
-    value,
-    ...rest
-  }] of Object.entries(Object.getOwnPropertyDescriptors(object))) {
-    Object.defineProperty(reactiveObject, prop, _objectSpread({}, value !== undefined && {
-      value: value
-    }, rest));
-  }
-
-  return reactiveObject;
-});
-
-var object$1 = /*#__PURE__*/Object.freeze({
-  type: type,
-  default: object
-});
-
-const type$1 = Array;
-let original;
-const ReactiveType = class ReactiveArray extends Array {
-  constructor(...values) {
-    super();
-    const proxy = proxify(this);
-    setReactivity({
-      target: proxy,
-      original,
-      object: this
-    });
-    if (original) original = undefined;
-
-    if (values) {
-      for (const val of values) proxy.push(val);
-    }
-
-    values.forEach((val, i) => proxy[i] = val);
-    return proxy;
-  }
-
-};
-var array = (array => {
-  original = array;
-  return new ReactiveType(...array);
-});
-
-var array$1 = /*#__PURE__*/Object.freeze({
-  type: type$1,
-  ReactiveType: ReactiveType,
-  default: array
-});
-
-const type$2 = Map;
-const getProperty = (reactiveMap, prop) => reactiveMap.get(prop);
-const ReactiveType$1 = class ReactiveMap extends Map {
-  constructor(iterator) {
-    super();
-    setReactivity({
-      target: this,
-      original: iterator,
-      object: this
-    });
-    if (iterator) for (const [key, val] of iterator) this.set(key, val);
-  }
-
-  get size() {
-    registerDependency({
-      target: this
-    });
-    return super.size;
-  }
-
-  set(key, val) {
-    const value = reactify(val);
-    registerDependency({
-      target: this,
-      property: key,
-      value
-    });
-
-    try {
-      return super.set(key, value);
-    } finally {
-      notify({
-        target: this,
-        property: key,
-        value
-      });
-    }
-  }
-
-  delete(key) {
-    registerDependency({
-      target: this,
-      property: key
-    });
-
-    try {
-      return super.delete(key);
-    } finally {
-      var _properties$get;
-
-      notify({
-        target: this,
-        property: key
-      });
-      const {
-        properties
-      } = this[reactivity];
-      if (!((_properties$get = properties.get(key)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(key);
-    }
-  }
-
-  clear() {
-    registerDependency({
-      target: this
-    });
-
-    try {
-      return super.clear();
-    } finally {
-      notify({
-        target: this
-      });
-      const {
-        properties
-      } = this[reactivity];
-
-      for (const [key] of this) {
-        var _properties$get2;
-
-        if (!((_properties$get2 = properties.get(key)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(key);
-      }
-
-      for (const [key] of properties) {
-        var _properties$get3;
-
-        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
-      }
-    }
-  }
-
-  get(key) {
-    propertyReactivity(this, key);
-    registerDependency({
-      target: this,
-      property: key
-    });
-    return super.get(key);
-  }
-
-  has(key) {
-    registerDependency({
-      target: this,
-      property: key
-    });
-    return super.has(key);
-  }
-
-};
-
-for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
-  ReactiveType$1.prototype[property] = function (...args) {
-    registerDependency({
-      target: this
-    });
-    return type$2.prototype[property].apply(this, args);
-  };
-}
-
-var map = (map => new ReactiveType$1(map));
-
-var map$1 = /*#__PURE__*/Object.freeze({
-  type: type$2,
-  getProperty: getProperty,
-  ReactiveType: ReactiveType$1,
-  default: map
-});
-
-const type$3 = Set;
-const getProperty$1 = (reactiveSet, prop) => reactiveSet.has(prop);
-const ReactiveType$2 = class ReactiveSet extends Set {
-  constructor(iterator) {
-    super();
-    setReactivity({
-      target: this,
-      original: iterator,
-      object: this
-    });
-    if (iterator) for (const val of iterator) this.add(val);
-  }
-
-  get size() {
-    registerDependency({
-      target: this
-    });
-    return super.size;
-  }
-
-  add(val) {
-    const value = reactify(val);
-    registerDependency({
-      target: this,
-      property: value,
-      value
-    });
-
-    try {
-      return super.add(value);
-    } finally {
-      notify({
-        target: this,
-        property: value,
-        value
-      });
-    }
-  }
-
-  delete(val) {
-    const value = reactify(val);
-    registerDependency({
-      target: this,
-      property: value,
-      value
-    });
-
-    try {
-      return super.delete(value);
-    } finally {
-      var _properties$get;
-
-      notify({
-        target: this,
-        property: value,
-        value
-      });
-      const {
-        properties
-      } = this[reactivity];
-      if (!((_properties$get = properties.get(value)) === null || _properties$get === void 0 ? void 0 : _properties$get.watchers.length)) properties.delete(value);
-    }
-  }
-
-  clear() {
-    try {
-      return super.clear();
-    } finally {
-      registerDependency({
-        target: this
-      });
-      notify({
-        target: this
-      });
-      const {
-        properties
-      } = this[reactivity];
-
-      for (const value of this) {
-        var _properties$get2;
-
-        if (!((_properties$get2 = properties.get(value)) === null || _properties$get2 === void 0 ? void 0 : _properties$get2.watchers.length)) properties.delete(value);
-      }
-
-      for (const [key] of properties) {
-        var _properties$get3;
-
-        if (!((_properties$get3 = properties.get(key)) === null || _properties$get3 === void 0 ? void 0 : _properties$get3.watchers.length)) properties.delete(key);
-      }
-    }
-  }
-
-  has(val) {
-    const value = reactify(val);
-    propertyReactivity(this, value);
-    registerDependency({
-      target: this,
-      property: value,
-      value
-    });
-    return super.has(value);
-  }
-
-};
-
-for (const property of ['entries', 'forEach', 'keys', 'values', Symbol.iterator]) {
-  ReactiveType$2.prototype[property] = function (...args) {
-    registerDependency({
-      target: this
-    });
-    return type$3.prototype[property].apply(this, args);
-  };
-}
-
-var set$1 = (set => new ReactiveType$2(set));
-
-var set$2 = /*#__PURE__*/Object.freeze({
-  type: type$3,
-  getProperty: getProperty$1,
-  ReactiveType: ReactiveType$2,
-  default: set$1
-});
-
-const type$4 = Promise;
-const ReactiveType$3 = class ReactivePromise extends Promise {
-  constructor(executor, promise) {
-    super((resolve, reject) => {
-      executor(value => {
-        let reactiveValue;
-
-        if (value && typeof value === 'object') {
-          reactiveValue = reactify(value);
-          const {
-            object
-          } = reactiveValue[reactivity];
-          object.$promise = promise;
-          object.$resolved = true;
-          object.$resolvedValue = value;
-        }
-
-        this.$resolved = true;
-        this.$resolvedValue = reactiveValue || value;
-        notify({
-          target: this
-        });
-        resolve(value);
-      }, error => {
-        this.$rejected = true;
-        this.$rejectedValue = error;
-        reject(error);
-      });
-    });
-    setReactivity({
-      target: this,
-      original: promise,
-      object: this
-    });
-    this.$promise = promise;
-    this.$resolved = false;
-    this.$rejected = false;
-  }
-
-};
-var promise = (promise => new ReactiveType$3((resolve, reject) => promise.then(resolve).catch(reject), promise));
-
-var promise$1 = /*#__PURE__*/Object.freeze({
-  type: type$4,
-  ReactiveType: ReactiveType$3,
-  default: promise
-});
-
-var unreactive = [Node, RegExp, URL, window.Location].map(type => ({
-  type,
-  default: obj => setReactivity({
-    target: obj,
-    unreactive: true
-  })
-}));
-
-const builtIn = [map$1, set$2, promise$1, ...unreactive];
-const isBuiltIn = reactiveObject => {
-  var _builtIn$find;
-
-  return (_builtIn$find = builtIn.find(({
-    type: type$$1
-  }) => reactiveObject instanceof type$$1)) === null || _builtIn$find === void 0 ? void 0 : _builtIn$find.type;
-}; // Has to be from most specific(e.g: Map) to less specific(Object)
-
-var types = new Map([...builtIn, array$1, object$1].map(({
-  type: type$$1,
-  default: reactify
-}) => [type$$1, reactify]));
-const propertyGetters = new Map([...builtIn, array$1, object$1].map(({
-  type: type$$1,
-  getProperty: getProperty$$1
-}) => [type$$1, getProperty$$1]));
-const getProperty$2 = (reactiveObject, property) => (propertyGetters.get(isBuiltIn(reactiveObject)) || (_ => reactiveObject[property]))(reactiveObject, property);
-
-const reactivity = Symbol.for('OzReactivity');
-const reactivityProperties = ['$watch', '$watchDependencies', reactivity];
-let rootWatchers = [];
-let rootObjects = new WeakMap();
-const getReactivityRoot = _ => ({
-  rootWatchers,
-  rootObjects
-});
-const setReactivityRoot = ({
-  watchers: w,
-  objects: o
-}) => (rootWatchers = w) && (rootObjects = o);
-
-const callWatcher = (watcher, deep, obj) => deep ? watcher.deep ? watcher(obj) : undefined : watcher(obj);
-
-const notify = ({
-  target,
-  property,
-  value,
-  deep
-}) => {
-  const react = target[reactivity]; // eslint-disable-line no-use-before-define
-
-  if (!react) return;
-
-  const callWatchers = watchers => {
-    const currentWatcher = rootWatchers[rootWatchers.length - 1];
-    if (watchers.includes(currentWatcher)) watchers.splice(watchers.indexOf(currentWatcher), 1);
-    const cacheWatchers = watchers.filter(({
-      cache
-    }) => cache);
-    /* .filter(({_target, _property}) => (target === _target && property === _property)) */
-
-    cacheWatchers.forEach(({
-      propertyReactivity
-    }) => delete propertyReactivity.cache);
-    cacheWatchers.forEach(watcher => callWatcher(watcher, deep, {
-      target,
-      property,
-      value
-    }));
-    watchers.filter(({
-      cache
-    }) => !cache).forEach(watcher => callWatcher(watcher, deep, {
-      target,
-      property,
-      value
-    }));
-  };
-
-  if (property) {
-    const watchers = propertyReactivity(target, property).watchers;
-
-    const _watchers = watchers.slice();
-
-    watchers.length = 0;
-    callWatchers(_watchers);
-  }
-
-  const watchers = react.watchers;
-
-  const _watchers = watchers.slice();
-
-  watchers.length = 0;
-  callWatchers(_watchers);
-};
-
-const makeReactivityWatcherArray = (target, property, dependencyListeners) => new Proxy([], {
-  defineProperty(_target, _property, desc, {
-    value
-  } = desc
-  /* desc */
-  ) {
-    const oldValue = _target[_property];
-
-    try {
-      return Reflect.defineProperty(_target, _property, desc);
-    } finally {
-      if (_property === 'length' && oldValue !== value) {
-        // console.log(oldValue, value, oldValue !== value)
-        for (const watcher of dependencyListeners) watcher(target, property, value);
-      }
-    }
-  }
-
-});
-
-const makeReactivityObject = (object, dependencyListeners = []) => ({
-  dependencyListeners,
-  watchers: makeReactivityWatcherArray(object, undefined, dependencyListeners),
-  properties: new Map(),
-  // new ReactivePropertyMap(dependencyListeners, object),
-  object
-});
-
-const setReactivity = ({
-  target,
-  unreactive,
-  original,
-  object
-}) => {
-  if (unreactive) {
-    target[reactivity] = false;
-    return target;
-  }
-
-  if (original) rootObjects.set(original, target);
-  const reactivityObject = makeReactivityObject(object);
-  Object.defineProperty(target, reactivity, {
-    value: reactivityObject,
-    configurable: true,
-    writable: true
-  });
-  Object.defineProperty(target, '$watch', {
-    value: watch(target),
-    configurable: true,
-    writable: true
-  });
-  Object.defineProperty(target, '$watchDependencies', {
-    value: listener => {
-      reactivityObject.dependencyListeners.push(listener);
-      return _ => reactivityObject.dependencyListeners.splice(reactivityObject.dependencyListeners.indexOf(listener - 1), 1);
-    },
-    configurable: true,
-    writable: true
-  });
-  return target;
-};
-const registerWatcher = (getter, watcher, options = {}) => {
-  Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options));
-  rootWatchers.push(watcher);
-  const value = getter();
-  rootWatchers.pop();
-  return value;
-};
-const propertyReactivity = (target, property) => {
-  const {
-    properties,
-    dependencyListeners
-  } = target[reactivity];
-  if (properties.has(property)) return properties.get(property);
-  const propertyReactivity = {
-    watchers: makeReactivityWatcherArray(target, property, dependencyListeners) // cache: undefined
-
-  };
-  properties.set(property, propertyReactivity);
-  return propertyReactivity;
-};
-const pushWatcher = (object, watcher, options = {}) => {
-  if (Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options)) && object && typeof object === 'object' && object[reactivity] && !object[reactivity].watchers.includes(watcher)) {
-    var _watcher$dependencies;
-
-    object[reactivity].watchers.push(watcher);
-    (_watcher$dependencies = watcher.dependenciesWatchers) === null || _watcher$dependencies === void 0 ? void 0 : _watcher$dependencies.push(object[reactivity].watchers);
-  }
-};
-const includeWatcher = (arr, watcher) => arr.includes(watcher) || arr.some(_watcher => watcher.object && watcher.property && watcher.object === _watcher.object && watcher.property === _watcher.property);
-
-const pushCurrentWatcher = ({
-  watchers
-}) => {
-  const currentWatcher = rootWatchers[rootWatchers.length - 1];
-
-  if (currentWatcher && !includeWatcher(watchers, currentWatcher)) {
-    var _currentWatcher$depen;
-
-    (_currentWatcher$depen = currentWatcher.dependenciesWatchers) === null || _currentWatcher$depen === void 0 ? void 0 : _currentWatcher$depen.push(watchers);
-    watchers.push(currentWatcher);
-  }
-};
-
-const registerDependency = ({
-  target,
-  property
-}) => {
-  if (!rootWatchers.length || !target[reactivity]) return;
-  if (property) pushCurrentWatcher(propertyReactivity(target, property));else pushCurrentWatcher(target[reactivity]);
-};
-const watch = target => (getter, handler) => {
-  const options = target && typeof handler === 'object' ? handler : undefined;
-
-  if (target) {
-    if (!handler || typeof handler !== 'function') {
-      handler = getter;
-      getter = undefined;
-    }
-
-    const type = typeof getter;
-
-    if (type === 'string' || type === 'number' || type === 'symbol') {
-      const property = getter;
-
-      getter = _ => isBuiltIn(target) ? getProperty$2(target, property) : target[property];
-    }
-  }
-
-  let unwatch, oldValue;
-  const dependenciesWatchers = [];
-
-  const watcher = _ => {
-    dependenciesWatchers.length = 0;
-    if (unwatch) return;
-
-    if (getter) {
-      let newValue = registerWatcher(getter, watcher, options);
-      pushWatcher(newValue, watcher, options);
-      if (handler) handler(newValue, oldValue);
-      oldValue = newValue;
-    } else {
-      handler(target, target);
-      pushWatcher(target, watcher, options);
-    }
-  };
-
-  watcher.dependenciesWatchers = dependenciesWatchers;
-  if (getter) oldValue = registerWatcher(getter.bind(target, target), watcher, options);
-  pushWatcher(getter ? oldValue : target, watcher, options);
-  return _ => {
-    for (const watchers of dependenciesWatchers) watchers.splice(watchers.indexOf(watcher) - 1, 1);
-
-    unwatch = true;
-  };
-};
-const isolate = func => registerWatcher(func, _ => {});
-
-const reactify = obj => {
-  if (!obj || typeof obj !== 'object' || reactivity in obj) return obj;
-  if (rootObjects.has(obj)) return rootObjects.get(obj);
-  return Array.from(types).find(([type]) => obj instanceof type)[1](obj);
-};
-
-const watch$1 = watch();
-
 class OzHTMLTemplate$1 extends HTMLTemplateElement {
   constructor({
     templateId,
     originalFragment,
     values,
-    placeholdersMetadata
+    placeholdersMetadata,
+    references
   }) {
     super();
-    this.refs = this.references = reactify(new Map());
+    this.references = references || reactify(new Map());
     this.templateId = templateId;
     this.values = values;
     this.placeholdersMetadata = placeholdersMetadata;
@@ -1307,7 +1300,7 @@ class OzHTMLTemplate$1 extends HTMLTemplateElement {
 
   init(isUpdate) {
     if (this.placeholders) return;
-    const fragment = this.originalFragment.cloneNode(true);
+    const fragment = document.importNode(this.originalFragment, true);
     const {
       placeholders,
       childNodes
@@ -1333,6 +1326,11 @@ class OzHTMLTemplate$1 extends HTMLTemplateElement {
 
   update(...values) {
     this.init(true);
+
+    for (const value of values) {
+      if (value === null || value === void 0 ? void 0 : value[OzHTMLTemplate]) value.references = this.references;
+    }
+
     const oldArrayFragments = this.placeholders.map(({
       arrayFragment
     }) => arrayFragment.flat(Infinity));
@@ -1432,8 +1430,7 @@ const HTMLTag = (transform = str => str) => {
   };
 
   tag.ref = val => ({
-    [OzHTMLReference]: true,
-    value: val
+    [OzHTMLReference]: val
   });
 
   return tag;
@@ -2011,11 +2008,11 @@ const CSSTag = (transform = str => str) => {
 const css = CSSTag();
 
 const voidTags = ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
-const regex = /^(\s*)(?:(\|)|(?:([.#\w-]*)(?:\(([\s\S]*?)\))?))(?: ?(.*))?/;
-const gRegex = new RegExp(regex, 'gm');
-const identifierRegex = /(?:(\.)|(#))([a-zA-Z0-9-]*)/;
-const gIdentifierRegex = new RegExp(identifierRegex, 'g');
-const classRegex = /class="(.*)"/;
+const regex = /^(\s*)(?:(\|)|(?:([.#\w--]*)(?:\(([\s\S]*?)\))?))(?: ?(.*))?/u;
+const gRegex = new RegExp(regex, 'gmu');
+const identifierRegex = /(?:(\.)|(#))([a-zA-Z0-9--]*)/u;
+const gIdentifierRegex = new RegExp(identifierRegex, 'gu');
+const classRegex = /class="(.*?)"/;
 
 const makeHTML = ({
   tag,
@@ -2150,14 +2147,17 @@ const makeUniqueId$1 = (n = globalRemovedIds$1.length ? globalRemovedIds$1.shift
   };
 };
 
+const arrayToObjectWithProperties = obj => (Array.isArray(obj) ? obj.reduce((obj, prop) => (obj[prop] = undefined, obj), {}) : obj) || {};
+
 const registerElement = element => {
   const {
     name,
     mixins: elementMixins,
-    extends: extend,
     shadowDom: elementShadowDom,
     state: _state,
-    props: elementProps = [],
+    attrs: _attrs,
+    events: _events,
+    props: _props,
     watchers: elementWatchers = [],
     template: buildHTMLTemplate,
     style: buildCSSTemplate,
@@ -2166,12 +2166,18 @@ const registerElement = element => {
     connected,
     disconnected
   } = element,
-        rest = _objectWithoutProperties(element, ["name", "mixins", "extends", "shadowDom", "state", "props", "watchers", "template", "style", "beforeConnected", "created", "connected", "disconnected"]);
+        rest = _objectWithoutProperties(element, ["name", "mixins", "shadowDom", "state", "attrs", "events", "props", "watchers", "template", "style", "beforeConnected", "created", "connected", "disconnected"]);
 
+  let {
+    extends: extend
+  } = element;
   const mixins$$1 = mixins.concat(elementMixins || []);
-  const props = elementProps.concat(getMixinProp(mixins$$1, 'props')).flat(1);
-  const states = getMixinProp(mixins$$1, 'state').flat(1);
-  const watchers = elementWatchers.concat(getMixinProp(mixins$$1, 'watchers').flat(1));
+  const extendsMixins = getMixinProp(mixins$$1, 'extends').flat();
+  const eventsMixins = getMixinProp(mixins$$1, 'events').flat();
+  const attrsMixins = getMixinProp(mixins$$1, 'attrs').flat();
+  const propsMixins = getMixinProp(mixins$$1, 'props').flat();
+  const states = getMixinProp(mixins$$1, 'state').flat();
+  const watchers = elementWatchers.concat(getMixinProp(mixins$$1, 'watchers').flat());
   const shadowDom = 'shadowDom' in element ? elementShadowDom : getMixinProp(mixins$$1, 'shadowDom').pop();
   const createdMixins = getMixinProp(mixins$$1, 'created');
   const beforeConnectedMixins = getMixinProp(mixins$$1, 'beforeConnected');
@@ -2179,6 +2185,7 @@ const registerElement = element => {
   const disconnectedMixins = getMixinProp(mixins$$1, 'disconnected');
   const templateMixins = getMixinProp(mixins$$1, 'template');
   const styleMixins = getMixinProp(mixins$$1, 'style');
+  if (!extend) extend = extendsMixins[0];
   const Class = extend ? Object.getPrototypeOf(document.createElement(extend)).constructor : HTMLElement;
 
   class OzElement$$1 extends Class {
@@ -2195,21 +2202,13 @@ const registerElement = element => {
       const context = this[OzElementContext] = reactify(_objectSpread({}, rest, {
         element: this,
         host,
-        props: {},
         dataset: {},
         template: undefined,
         style: undefined,
+        references: new Map(),
 
         get refs() {
-          var _this$template, _this$template2;
-
-          return ((_this$template = this.template) === null || _this$template === void 0 ? void 0 : _this$template.refs) && Array.from((_this$template2 = this.template) === null || _this$template2 === void 0 ? void 0 : _this$template2.refs).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
-        },
-
-        get references() {
-          var _this$template3;
-
-          return (_this$template3 = this.template) === null || _this$template3 === void 0 ? void 0 : _this$template3.refs;
+          return this.references && Array.from(this.references).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
         }
 
       }));
@@ -2217,41 +2216,103 @@ const registerElement = element => {
 
       Object.defineProperties(context, Object.getOwnPropertyDescriptors({
         get refs() {
-          var _this$template4, _this$template5;
-
-          return ((_this$template4 = this.template) === null || _this$template4 === void 0 ? void 0 : _this$template4.refs) && Array.from((_this$template5 = this.template) === null || _this$template5 === void 0 ? void 0 : _this$template5.refs).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
-        },
-
-        get references() {
-          var _this$template6;
-
-          return (_this$template6 = this.template) === null || _this$template6 === void 0 ? void 0 : _this$template6.refs;
+          return this.references && Array.from(this.references).reduce((obj, [attr, val]) => (obj[attr] = val, obj), {}) || {};
         }
 
       }));
-      /*/ FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL /*/
+      /* / FIX UNTIL BABEL FIX THE OBJECT REST POLYFILL / */
+      // attributes shouldn't be appended to the element at construction time(isn't an expected behavior)
+      // so think about doing it at connection time
+      // // Attrs mixins & attrs
+      // attrsMixins
+      //   .concat([_attrs])
+      //   .map(attrs =>
+      //     typeof attrs === 'function'
+      //       ? Object.entries(attrs(context))
+      //       : Object.entries(attrs))
+      //   .map(attrs =>
+      //     arrayToObjectWithProperties(attrs))
+      //   .map(attrs =>
+      //     Object.entries(attrs))
+      //   .forEach(([name, value]) =>
+      //     this.setAttribute(name, value))
 
-      Object.entries(rest) // binding functions with the context
-      .filter(([, value]) => typeof value === 'function').forEach(([k, v]) => void (context[k] = v.bind(context, context))); // Props mixins & props
+      const attrs = context.attrs = reactify({});
+      let ignoreAttrsObserver = false;
 
-      props.forEach(prop => context.props[prop] = this[prop]);
-      Object.defineProperties(this, props.reduce((props, prop) => (props[prop] = {
-        enumerable: true,
-        configurable: true,
-        get: _ => context.props[prop],
-        set: val => context.props[prop] = val
-      }) && props, {})); // State mixins & state
+      for (const _ref of this.attributes) {
+        const {
+          name,
+          value
+        } = _ref;
+        attrs[name] = value;
+      }
+
+      const attributeObserver = context._attributeObserver = new MutationObserver(records => records.forEach(({
+        attributeName
+      }) => {
+        if (!ignoreAttrsObserver && this.hasAttribute(attributeName)) {
+          ignoreAttrsObserver = true;
+          attrs[attributeName] = this.getAttribute(attributeName);
+          ignoreAttrsObserver = false;
+        }
+      }));
+      attributeObserver.observe(this, {
+        attributes: true
+      });
+      attrs.$watch(({
+        event: {
+          property,
+          value
+        }
+      }) => {
+        this.setAttribute(property, value);
+        attributeObserver.takeRecords();
+      }); // Props mixins & props
+
+      const setProps = [];
+
+      const setProp = prop => {
+        if (setProps.includes(prop)) return;
+        setProps.push(prop);
+        Object.defineProperty(this, prop, {
+          enumerable: true,
+          configurable: true,
+          get: _ => context.props[prop],
+          set: val => context.props[prop] = val
+        });
+      };
+
+      const props = context.props = new Proxy(reactify({}), {
+        get: (target, property, receiver) => {
+          if (property in target) return Reflect.get(target, property, receiver);else {
+            target[property] = this[property];
+            setProp(property);
+            return Reflect.get(target, property, receiver);
+          }
+        },
+
+        defineProperty(target, property, desc) {
+          setProp(property);
+          return Reflect.defineProperty(target, property, desc);
+        }
+
+      });
+      propsMixins.concat(_props || []).forEach(_props => Object.defineProperties(props, Object.getOwnPropertyDescriptors(arrayToObjectWithProperties(typeof _props === 'function' ? _props(context) : _props)))); // State mixins & state
 
       const state = context.state = reactify((typeof _state === 'function' ? _state.bind(context)(context) : _state) || {});
-      states.reverse().forEach(stateMixin => Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context)))); // Watchers mixins & watchers
+      states.forEach(stateMixin => Object.defineProperties(state, Object.getOwnPropertyDescriptors(stateMixin(context)))); // Watchers mixins & watchers
 
       for (const item of watchers) {
         if (Array.isArray(item)) watch$1(item[0].bind(context, context), item[1].bind(context, context));else watch$1(item.bind(context, context));
-      } // Created mixins & created
+      } // Events mixins & events
 
 
-      createdMixins.forEach(mixin$$1 => mixin$$1(context));
-      if (created) created(context);
+      eventsMixins.concat(_events || []).map(events => typeof events === 'function' ? events(context) : events).map(events => Object.entries(events)).flat().forEach(([name, event]) => this.addEventListener(name, event)); // binding functions to the context
+
+      Object.entries(rest).filter(([, value]) => typeof value === 'function').forEach(([k, v]) => void (context[k] = v.bind(context, context))); // Created mixins & created
+
+      createdMixins.concat(created || []).forEach(created => created(context));
     }
 
     get [OzElement]() {
@@ -2262,60 +2323,36 @@ const registerElement = element => {
       return name;
     }
 
-    static get observedAttributes() {
-      return props;
-    }
-
-    attributeChangedCallback(attr, oldValue, newValue) {
-      if (attr.match(/-\w/)) this[OzElementContext].dataset[attr.slice(5).replace(/-\w/g, m => m[1].toUpperCase())] = newValue;
-      if (props.includes(attr)) this[attr] = newValue;
-    }
-
     connectedCallback() {
       const {
         [OzElementContext]: context,
         [OzElementContext]: {
+          host,
           _templateWatcher,
-          _styleWatcher
+          _styleWatcher,
+          references
         }
       } = this; // Connected mixins & connected
 
       beforeConnectedMixins.forEach(mixin$$1 => mixin$$1(context));
-      if (beforeConnected) beforeConnected(context); // HTML Template
-
-      if (!_templateWatcher && (buildHTMLTemplate || templateMixins.length)) {
-        const _template = buildHTMLTemplate || templateMixins[0];
-
-        let template; // eslint-disable-next-line no-return-assign
-
-        context._templateWatcher = watch$1(_ => template ? _template.call(context, context) : template = context.template = _template.call(context, context), updatedTemplate => {
-          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError;
-          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
-          template.update(...updatedTemplate.values);
-        });
-      } // CSS Template
-
-
-      if (!_styleWatcher && (buildCSSTemplate || styleMixins.length)) {
-        const _style = buildCSSTemplate || styleMixins[0];
-
-        let template; // eslint-disable-next-line no-return-assign
-
-        context._styleWatcher = watch$1(_ => template ? _style.call(context, context) : template = context.style = _style.call(context, context), updatedTemplate => {
-          if (!updatedTemplate[OzStyle]) throw noOzStyleError;
-          if (template.templateId !== updatedTemplate.templateId) throw ozStyleChangedError;
-          template.update(...updatedTemplate.values);
-        }); // Connected mixins & connected
-
-        connectedMixins.forEach(mixin$$1 => mixin$$1(context));
-        if (connected) connected(context);
-      }
-
-      const {
-        host,
+      if (beforeConnected) beforeConnected(context);
+      let {
         style,
         template
-      } = context;
+      } = context; // CSS Template
+
+      if (!_styleWatcher && (buildCSSTemplate || styleMixins.length)) {
+        const _style = buildCSSTemplate || styleMixins[0]; // eslint-disable-next-line no-return-assign
+
+
+        context._styleWatcher = watch$1(_ => style ? _style.call(context, context) : style = context.style = _style.call(context, context), ({
+          newValue: updatedTemplate
+        }) => {
+          if (!updatedTemplate[OzStyle]) throw noOzStyleError;
+          if (style.templateId !== updatedTemplate.templateId) throw ozStyleChangedError;
+          style.update(...updatedTemplate.values);
+        });
+      }
 
       if (style) {
         if (style.scoped) {
@@ -2331,10 +2368,28 @@ const registerElement = element => {
           if (root === document) host.getRootNode({
             composed: true
           }).head.appendChild(style);else root.appendChild(style);
-        } // style.update(...style.values)
-      }
+        }
+      } // HTML Template
 
-      if (template) host.appendChild(template.content);
+
+      if (!_templateWatcher && (buildHTMLTemplate || templateMixins.length)) {
+        const _template = buildHTMLTemplate || templateMixins[0];
+
+        template = context.template = _template.call(context, context);
+        template.references = references;
+        host.appendChild(template.content);
+        context._templateWatcher = watch$1(_ => _template.call(context, context), ({
+          newValue: updatedTemplate
+        }) => {
+          if (!updatedTemplate[OzHTMLTemplate]) throw noHTMLTemplateError;
+          if (template.templateId !== updatedTemplate.templateId) throw htmlTemplateChangedError;
+          template.update(...updatedTemplate.values);
+        });
+      } else if (template) host.appendChild(template.content); // Connected mixins & connected
+
+
+      connectedMixins.forEach(mixin$$1 => mixin$$1(context));
+      if (connected) connected(context);
     }
 
     disconnectedCallback() {
@@ -2376,7 +2431,18 @@ const getClosestRouterView = (node, closestOzElementParent = getClosestOzElement
 
 
 const RouterViewMixin = {
-  props: ['name'],
+  props: ctx => ({
+    [RouterView]: true,
+
+    get route() {
+      return ctx.state.route;
+    },
+
+    get childPathname() {
+      return ctx.state.childPathname;
+    }
+
+  }),
   state: ctx => ({
     get url() {
       var _getClosestRouterView, _ctx$router;
@@ -2420,36 +2486,33 @@ const RouterViewMixin = {
     state: {
       content
     }
-  }) => html`${content}`,
-
-  created({
-    element
-  }) {
-    element[RouterView] = true;
-  },
-
-  watchers: [({
-    element,
-    state: {
-      route
-    }
-  }) => element.route = route, ({
-    element,
-    state: {
-      childPathname
-    }
-  }) => element.childPathname = childPathname]
+  }) => html`${content}`
 };
 var registerRouterView = (_ => customElements.get('router-view') || registerElement({
   name: 'router-view',
   mixins: [RouterViewMixin]
 }));
 
+const RouterLinkMixin = {
+  extends: 'a',
+  created: (ctx, {
+    element,
+    attrs
+  } = ctx) => element.addEventListener('click', ev => ctx.router.push(attrs.to))
+};
+var registerRouterLink = (_ => customElements.get('router-link') || registerElement({
+  name: 'router-link',
+  mixins: [RouterLinkMixin]
+}));
+
 const routerGlobalMixin = {
   beforeConnected: (ctx, closestOzElementParent = getClosestOzElementParent(ctx.element)) => ctx.router = closestOzElementParent && closestOzElementParent[OzElementContext].router
 };
 const registerRouterMixins = _ => mixins.includes(routerGlobalMixin) || mixin(routerGlobalMixin);
-const registerCustomElements = _ => registerRouterView();
+const registerCustomElements = _ => {
+  registerRouterView();
+  registerRouterLink();
+};
 const compileRoutes = ({
   routes = []
 } = {}) => routes.map(route => Array.isArray(route.path) ? route.path.map(path => _objectSpread({}, route, {
@@ -2484,7 +2547,8 @@ const Router = ({
 
   let _state;
 
-  const go = (replace = false) => location => (replace ? history.replaceState : history.pushState).call(history, {}, '', _state._url = resolve(location));
+  const go = (replace = false) => location => isNaN(location) ? (replace ? history.replaceState : history.pushState).call(history, {}, '', _state._url = resolve(location)) : undefined; // history.go(Number(location))
+
 
   const push = go();
 
@@ -2536,7 +2600,6 @@ exports.registerElement = registerElement;
 exports.watch = watch$1;
 exports.getReactivityRoot = getReactivityRoot;
 exports.setReactivityRoot = setReactivityRoot;
-exports.isolate = isolate;
 exports.r = reactify;
 exports.react = reactify;
 exports.reactivity = reactivity;

@@ -48,13 +48,6 @@ export default object => {
         }
       }
       let value = r(_value)
-      if (typeof value === 'function' && value.$promise && value.$resolved) value = value.$resolvedValue
-      else if (typeof value === 'function' && value.$promise) {
-        value.$promise.then(val =>
-          target[property] === value
-            ? (proxy[property] = val)
-            : undefined)
-      }
       try {
         return Reflect.defineProperty(target, property, {
           ...value !== undefined && { value: value },
