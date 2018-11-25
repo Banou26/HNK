@@ -175,8 +175,7 @@ export const watch = target => (getter, handler) => {
     }
   }
   const isGetterGenerator = isGenerator(getter)
-  let unregister, oldValue, currentWatcherRegistering
-  const abort = _ => currentWatcherRegistering.abort()
+  let unregister, oldValue
   const watcher = (event, deep) => {
     options.dependenciesWatchers.length = 0 // Empty the dependenciesWatchers array
     if (unregister) return // Return without registering the watcher
@@ -215,10 +214,8 @@ export const watch = target => (getter, handler) => {
       handler({ newValue: target, oldValue: target, event, deep })
       pushWatcher(target, watcher)
     }
-    currentWatcherRegistering = undefined
   }
   if (options) Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options))
-  watcher.dependenciesWatchers = options.dependenciesWatchers
   if (getter) {
     if (isGetterGenerator) watcher()
     else oldValue = registerWatcher(getter.bind(target, target), watcher)

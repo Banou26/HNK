@@ -67,7 +67,8 @@ const makeText = ({
       if (textNode?.nodeType === Node.TEXT_NODE) {
         replace(arrayFragment, textNode)
         const newValue =
-          value === undefined
+          value === undefined ||
+          value === false
             ? ''
             : type === 'symbol'
               ? value.toString()
