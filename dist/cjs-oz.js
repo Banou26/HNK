@@ -280,7 +280,7 @@ const type$1 = Array;
 let original;
 const ReactiveType = class ReactiveArray extends Array {
   constructor(...values) {
-    super();
+    super(...values.map(val => reactify(val)));
     const proxy = proxify(this);
     setReactivity({
       target: proxy,
@@ -288,12 +288,6 @@ const ReactiveType = class ReactiveArray extends Array {
       object: this
     });
     if (original) original = undefined;
-
-    if (values) {
-      for (const val of values) proxy.push(val);
-    }
-
-    values.forEach((val, i) => proxy[i] = val);
     return proxy;
   }
 
@@ -540,8 +534,7 @@ var unreactive = [RegExp, URL, Promise, window.Node, window.Location].map(type =
   })
 }));
 
-const builtIn = [map$1, set$2, // promise,
-...unreactive];
+const builtIn = [map$1, set$2, ...unreactive];
 const isBuiltIn = reactiveObject => {
   var _builtIn$find;
 
