@@ -220,12 +220,14 @@ var proxify = (object => {
         }, rest));
       } finally {
         if (value && typeof value === 'object' && value[reactivity]) {
-          let unwatch = value.$watch(_ => target[property] === value ? notify({
+          let {
+            unregister
+          } = value.$watch(_ => target[property] === value ? notify({
             target: proxy,
             property,
             value,
             deep: true
-          }) : unwatch(), {
+          }) : unregister(), {
             deep: true
           });
         }
