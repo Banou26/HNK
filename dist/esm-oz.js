@@ -826,7 +826,6 @@ const watch = target => (getter, handler) => {
   };
 
   if (options) Object.defineProperties(watcher, Object.getOwnPropertyDescriptors(options));
-  watcher.dependenciesWatchers = options.dependenciesWatchers;
 
   if (getter) {
     if (isGetterGenerator) watcher();else oldValue = registerWatcher(getter.bind(target, target), watcher);
@@ -1028,7 +1027,7 @@ const makeText = ({
 
     if ((textNode === null || textNode === void 0 ? void 0 : textNode.nodeType) === Node.TEXT_NODE) {
       replace(arrayFragment, textNode);
-      const newValue = value === undefined ? '' : type === 'symbol' ? value.toString() : '' + value;
+      const newValue = value === undefined || value === false ? '' : type === 'symbol' ? value.toString() : '' + value;
       if (textNode.data !== newValue) textNode.data = newValue;
     } else {
       replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value));
