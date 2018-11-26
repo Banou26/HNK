@@ -36,7 +36,7 @@ export default ({transform, strings, values}) => {
         type,
         ids:
           vals
-            .filter(_ => _)
+            .filter(Boolean)
             .map(val => (val.match(placeholderRegex) || [])
               .map(char => charToN(char)))
             .flat(Infinity),

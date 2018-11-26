@@ -70,7 +70,7 @@ const findPlaceholdersAndPaths = (
       values: vals,
       ids:
         vals
-          .filter(_ => _)
+          .filter(Boolean)
           .map(val => (val.match(placeholderRegex) || [])
             .map(char => charToN(char)))
           .flat(Infinity),
