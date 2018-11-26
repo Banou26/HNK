@@ -45,8 +45,10 @@ export const Router = ({
       ).resolve(location.params)
       }${
         new URLSearchParams(location.query).toString()
-      }#${
+      }${
         location.hash
+          ? `#${location.hash}`
+          : ''
       }`, window.location)) =>
     url.pathname.startsWith(base.pathname)
       ? url
