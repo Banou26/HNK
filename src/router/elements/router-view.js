@@ -32,7 +32,7 @@ export const RouterViewMixin = {
     get route () { return this.matches?.[0] },
     get content () {
       const content = this.route?.content
-      return typeof content === 'function'
+      return typeof content === 'function' && !content?.prototype
         ? content().then(module => module.default)
         : content
     },
