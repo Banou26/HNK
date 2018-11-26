@@ -64,18 +64,18 @@ const makeText = ({
       }
     } else {
       const textNode = arrayFragment[0]
+      const newValue =
+        value === undefined ||
+        value === false
+          ? ''
+          : type === 'symbol'
+            ? value.toString()
+            : '' + value
       if (textNode?.nodeType === Node.TEXT_NODE) {
         replace(arrayFragment, textNode)
-        const newValue =
-          value === undefined ||
-          value === false
-            ? ''
-            : type === 'symbol'
-              ? value.toString()
-              : '' + value
         if (textNode.data !== newValue) textNode.data = newValue
       } else {
-        replace(arrayFragment, new Text(type === 'symbol' ? value.toString() : value))
+        replace(arrayFragment, new Text(newValue))
       }
     }
     if (!arrayFragment.flat(Infinity).length) replace(arrayFragment, new Comment())
