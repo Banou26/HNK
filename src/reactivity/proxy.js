@@ -16,10 +16,9 @@ export default object => {
         if ('cache' in propertyReactivity) {
           value = propertyReactivity.cache
         } else {
-          value = registerWatcher(
-            _ => (propertyReactivity.cache = Reflect.get(target, property, receiver)),
-            _ => notify({ target: proxy, property }),
-            { object, property, propertyReactivity, cache: true })
+          const watcher = _ => notify({ target: proxy, property })
+          Object.defineProperties(watcher, Object.getOwnPropertyDescriptors({ object, property, propertyReactivity, cache: true }))
+          value = registerWatcher(_ => (propertyReactivity.cache = Reflect.get(target, property, receiver)), watcher)
         }
       }
       return value
