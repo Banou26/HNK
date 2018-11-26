@@ -34,11 +34,14 @@ export const Router = ({
 
   const resolve = (
     location,
-    url = typeof location === 'string' || location instanceof URL || location instanceof window.Location
+    url =
+    typeof location === 'string' ||
+    location instanceof URL ||
+    location instanceof window.Location
       ? new URL(location, window.location)
       : new URL(`${(
         location.route ||
-        routes.find(({name}) => name === location.route.name)
+        routes.find(({name}) => name === location.name)
       ).resolve(location.params)
       }${
         new URLSearchParams(location.query).toString()
