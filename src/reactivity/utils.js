@@ -120,7 +120,7 @@ export const propertyReactivity = (target, property) => {
   if (properties.has(property)) return properties.get(property)
   const propertyReactivity = {
     watchers: makeReactivityWatcherArray(target, property, dependencyListeners)
-    // cache: undefined
+    // cache: undefined // is commented because if the cache property is set, then it use this value as cached value
   }
   properties.set(property, propertyReactivity)
   return propertyReactivity
@@ -206,7 +206,6 @@ export const watch = target => (getter, handler) => {
         oldValue = iterator
       } else {
         let newValue = registerWatcher(getter, watcher)
-        // pushWatcher(newValue, watcher)
         if (handler) handler({ newValue, oldValue, event, deep })
         oldValue = newValue
       }
