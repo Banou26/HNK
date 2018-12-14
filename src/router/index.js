@@ -6,8 +6,6 @@ export {
   registerRouterMixins
 }
 
-const history = window.history
-
 export const Router = ({
   routes: _routes,
   base: _base = '',
@@ -20,15 +18,13 @@ export const Router = ({
   registerRouterMixins()
   registerCustomElements()
 
-  let _state
-
   const go = (replace = false) =>
     location =>
       isNaN(location)
         ? (replace
-          ? history.replaceState
-          : history.pushState).call(history, {}, '', (_state._url = resolve(location)))
-        : undefined // history.go(Number(location))
+          ? window.history.replaceState
+          : window.history.pushState).call(window.history, { history: [], index: undefined }, '', (router._url = resolve(location)))
+        : undefined // window.history.go(Number(location))
 
   const push = go()
 
@@ -54,7 +50,7 @@ export const Router = ({
       ? url
       : new URL(url.pathname, base)
 
-  const state = r({
+  const router = r({
     routes,
     matchRoutes,
     _url: new URL(window.location),
@@ -62,11 +58,16 @@ export const Router = ({
     get url () { return this._url },
     resolve,
     push,
-    replace: go(true)
+    replace: go(true),
+    get index () {
+
+    },
+    get length () {
+
+    }
   })
-  _state = state
 
-  window.onpopstate = ev => state.replace(window.location)
+  window.onpopstate = ev => router.replace(window.location)
 
-  return state
+  return router
 }
