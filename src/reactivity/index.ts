@@ -1,19 +1,25 @@
-import { reactivity, watch as _watch, rootObjects, getReactivityRoot, setReactivityRoot, reactivityProperties } from './utils'
+import { Observable, race } from 'rxjs'
 import types from './types/index'
+import { ReactiveObject } from '../types'
+import { hasReactive, getReactive } from './utils'
 
-const reactify = (obj) => {
-  if (!obj || typeof obj !== 'object' || (reactivity in obj)) return obj
-  if (rootObjects.has(obj)) return rootObjects.get(obj)
-  return Array.from(types).find(([type]) => obj instanceof type)[1](obj)
+export const react = (object: Object | any): ReactiveObject | any => {
+  if (!object || typeof object !== 'object') return object
+  if (hasReactive(object)) return getReactive(object)
+  return Array.from(types).find(([ type ]) => object instanceof (type as any))[1](object)
 }
-
-export const watch = _watch()
 
 export {
-  getReactivityRoot,
-  setReactivityRoot,
-  reactify as r,
-  reactify as react,
-  reactivity,
-  reactivityProperties
+  react as r,
+  react as reactify
 }
+
+export const watch = (watcher: Function) =>
+  Observable.create(observer => {
+    
+
+    
+    return () => {
+
+    }
+  })

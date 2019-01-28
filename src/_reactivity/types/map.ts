@@ -1,15 +1,13 @@
 import { r } from '../index'
-import { setReactive, notify, registerDependency, setReactivity, reactivity, propertyReactivity } from '../utils'
-import { NativeReactiveObject } from '../../types'
+import { notify, registerDependency, setReactivity, reactivity, propertyReactivity } from '../utils'
 
 export const type = Map
 
 export const getProperty = (reactiveMap, prop) => reactiveMap.get(prop)
-export const ReactiveType = class ReactiveMap extends Map implements NativeReactiveObject{
+export const ReactiveType = class ReactiveMap extends Map {
   constructor (iterator) {
     super()
-    setReactive(iterator, this)
-    setReactivity(this)
+    setReactivity({target: this, original: iterator, object: this})
     if (iterator) for (const [key, val] of iterator) this.set(key, val)
   }
 
