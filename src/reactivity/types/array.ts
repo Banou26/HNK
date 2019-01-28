@@ -1,21 +1,23 @@
-import { setReactivity } from '../utils'
+import { setReactive, setReactivity } from '../utils'
 import proxify from '../proxy'
 import { r } from '../index'
+import { ReactiveObject } from '../../types'
 
 export const type = Array
 
-let original
-export const ReactiveType = class ReactiveArray extends Array {
+let original: any[]
+// todo @banou26: try to fix the typescript Proxy Array typing problem
+export const ReactiveType = class ReactiveArray extends Array /* implements ReactiveObject */ {
   constructor (...values) {
-    super(...values.map(val => r(val)))
+    super()
     const proxy = proxify(this)
-    setReactivity({target: proxy, original, object: this})
+    setReactive(original, proxy)
+    setReactivity(proxy)
+    Object.assign(proxy, Array.from(values).map((val, i) => this[i] = r(val)))
     if (original) original = undefined
-    return proxy
+    return proxy as unknown as any[]
   }
 }
 
-export default array => {
-  original = array
-  return new ReactiveType(...array)
-}
+export default array =>
+  new ReactiveType(...(original = array))

@@ -1,12 +1,10 @@
-import { setReactivity } from '../utils'
-
 export default [
   RegExp,
   URL,
   Promise,
-  window.Node,
-  window.Location
+  Node,
+  Location
 ].map(type => ({
   type,
-  default: obj => setReactivity({target: obj, unreactive: true})
+  default: object => object
 }))

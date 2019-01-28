@@ -1,15 +1,13 @@
 import { r } from '../index'
-import { setReactive, notify, registerDependency, setReactivity, reactivity, propertyReactivity } from '../utils'
-import { NativeReactiveObject } from '../../types';
+import { notify, registerDependency, setReactivity, reactivity, propertyReactivity } from '../utils'
 
 export const type = Set
 
 export const getProperty = (reactiveSet, prop) => reactiveSet.has(prop)
-export const ReactiveType = class ReactiveSet extends Set implements NativeReactiveObject{
+export const ReactiveType = class ReactiveSet extends Set {
   constructor (iterator) {
     super()
-    setReactive(iterator, this)
-    setReactivity(this)
+    setReactivity({target: this, original: iterator, object: this})
     if (iterator) for (const val of iterator) this.add(val)
   }
 

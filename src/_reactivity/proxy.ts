@@ -1,10 +1,11 @@
-import { setReactivity, getReactivity, setReactive } from './utils'
-import { Reactivity, ReactiveObject, NativeReactiveObject } from '../types'
+import { r } from './index'
+import { reactivity, notify, registerWatcher, registerDependency, reactivityProperties, propertyReactivity as _propertyReactivity } from './utils'
+import { getPropertyDescriptor } from '../utils'
 
-export default (object: Object): ReactiveObject | NativeReactiveObject => {
-  let reactivity: Reactivity<Object>
+export default object => {
   const proxy = new Proxy(object, {
     get (target, property, receiver) {
+      if (reactivityProperties.includes(property)) return Reflect.get(target, property, receiver)
       registerDependency({ target, property })
       const propertyReactivity = _propertyReactivity(target, property)
       const descriptor = getPropertyDescriptor(target, property)
@@ -23,6 +24,7 @@ export default (object: Object): ReactiveObject | NativeReactiveObject => {
       return value
     },
     deleteProperty (target, property) {
+      if (reactivityProperties.includes(property)) return Reflect.deleteProperty(target, property)
       try {
         return Reflect.deleteProperty(target, property)
       } finally {
@@ -32,6 +34,7 @@ export default (object: Object): ReactiveObject | NativeReactiveObject => {
       }
     },
     defineProperty (target, property, desc, { value: _value, ...rest } = desc/* desc */) {
+      if (reactivityProperties.includes(property)) return Reflect.defineProperty(target, property, desc)
       if (!_value) {
         try {
           // return Reflect.defineProperty(target, property, desc) // TODO: find why the hell this doesn't work
@@ -61,8 +64,5 @@ export default (object: Object): ReactiveObject | NativeReactiveObject => {
       }
     }
   })
-  setReactive(object, proxy)
-  setReactivity(proxy)
-  reactivity = getReactivity(proxy)
   return proxy
 }
