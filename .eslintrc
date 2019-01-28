@@ -1,31 +1,3 @@
 {
-  "extends": "standard",
-  "globals": {
-    "fetch": true,
-    "DOMParser": true,
-    "chai": true,
-    "assert": true,
-    "self": true,
-    "xdescribe": true,
-    "describe": true,
-    "fdescribe": true,
-    "expect": true,
-    "xit": true,
-    "fit": true,
-    "it": true,
-    "beforeEach": true,
-    "afterEach": true,
-    "Node": true,
-    "HTMLElement": true,
-    "Text": true,
-    "Comment": true,
-    "NodeFilter": true,
-    "HTMLUnknownElement": true,
-    "HTMLTemplateElement": true,
-    "MouseEvent": true,
-    "HTMLStyleElement": true,
-    "File": true,
-    "ResizeObserver": true,
-    "MutationObserver": true
-  }
+  "extends": "standard"
 }
