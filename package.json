@@ -1,36 +1,10 @@
 {
-  "name": "oz.js",
-  "version": "1.4.0",
-  "main": "dist/index.js",
-  "source": "src/index.js",
-  "license": "MIT",
-  "devDependencies": {
-    "@babel/core": "^7.0.0-0",
-    "@babel/plugin-proposal-optional-chaining": "^7.2.0",
-    "@babel/plugin-proposal-pipeline-operator": "^7.3.0",
-    "@babel/preset-typescript": "^7.1.0",
-    "concurrently": "^3.6.0",
-    "parcel-bundler": "^1.11.0",
-    "parcel-plugin-babel-typescript": "^0.0.3",
-    "typescript": "^3.2.4"
-  },
-  "alias": {
-    "epk": "C:\\Users\\Banou\\Desktop\\epk"
-  },
+  "name": "root",
+  "private": true,
   "scripts": {
-    "index": "parcel src/index.ts",
-    "test": "node C:\\Users\\Banou\\Desktop\\epk\\dist\\index.js tests/unit/*.spec.js",
-    "dev": "concurrently \"yarn run index\" \"yarn run test\""
+    "test": "lerna run test --stream"
   },
-  "dependencies": {
-    "path-to-regexp": "^2.4.0",
-    "rxjs": "^6.4.0",
-    "shady-css-parser": "^0.1.0"
-  },
-  "engines": {
-    "node": ">= 11.0.0"
-  },
-  "browserslist": [
-    "last 1 Chrome versions"
-  ]
+  "devDependencies": {
+    "lerna": "^3.13.1"
+  }
 }

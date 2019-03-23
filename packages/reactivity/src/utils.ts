@@ -1,5 +1,5 @@
 import { Subject, Observable } from 'rxjs'
-import { Reactivity, ReactiveObject, ChangeSubject, Change, PropertyMap, NativeReactiveObject } from '../types'
+import { Reactivity, ReactiveObject, ChangeSubject, Change, PropertyMap, NativeReactiveObject } from './types'
 
 const isAsyncGenerator = val => val?.[Symbol.toStringTag] === 'AsyncGeneratorFunction'
 

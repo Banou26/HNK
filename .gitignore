@@ -1,8 +1,2 @@
-.vscode
-.cache
-.epk
-
 node_modules
-yarn-error.log
-yarn.lock
-Cargo.lock
+lerna-debug.log
