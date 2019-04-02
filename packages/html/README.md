@@ -49,7 +49,9 @@ ${'Some dynamic text'}
 
 <${'div'}></${'div'}>
 
-<div ${'attributeName'}=${'attributeValue'}></div>
+<div ${'propertyName'}=${'propertyValue'}></div>
+
+<div ${'attributeName'}="${'attributeValue'}"></div>
 
 <-- The event listener name can also be dynamic if you want ! -->
 <div onClick=${() => console.log('Clicked !')}></div>
