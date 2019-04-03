@@ -1,2 +1,4 @@
+.vscode
+.epk
 node_modules
 lerna-debug.log
