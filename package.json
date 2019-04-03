@@ -5,6 +5,7 @@
     "test": "lerna run test --stream"
   },
   "devDependencies": {
-    "lerna": "^3.13.1"
+    "lerna": "^3.13.1",
+    "standard": "^12.0.1"
   }
 }
