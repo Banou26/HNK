@@ -15,6 +15,25 @@
       ],
       "port": 9229
     },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "nodemon",
+      "runtimeExecutable": "C:\\Users\\Banou\\Desktop\\epk\\node_modules\\.bin\\nodemon",
+      "program": "C:\\Users\\Banou\\Desktop\\epk\\src\\index.ts",
+      "outFiles": ["C:\\Users\\Banou\\Desktop\\epk\\dist\\*.js"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "restart": true,
+      "args": [
+        "tests/*.spec.js"
+      ],
+      "runtimeArgs": [
+        "--watch",
+        "C:\\Users\\Banou\\Desktop\\epk\\dist"
+      ],
+      "cwd": "${workspaceFolder}/packages/reactivity"
+    }
     // {
       // "version": "0.2.0",
       // "configurations": [
