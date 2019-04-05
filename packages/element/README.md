@@ -11,9 +11,9 @@ const Example = Element({ name: 'app-button', extends: 'button' }, () => {
   const [ count, setCount ] = useState(0)
   
   return html`\
-    <button onClick=${() => setCount(count + 1)}>
+    <app-button onClick=${() => setCount(count + 1)}>
       Click me to increase this number: ${count}
-    </button>`
+    </app-button>`
 })
 
 document.body.appendChild(Example)
