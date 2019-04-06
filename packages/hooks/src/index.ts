@@ -9,13 +9,14 @@ export const withHooks = fn =>
     const run = (firstRun = false) => {
       let index = 0
       useState = initialValue => {
-        if (firstRun) state[index] = initialValue
+        let currentIndex = index
+        if (firstRun) state[currentIndex] = initialValue
         const tuple =
           [
-            state[index],
+            state[currentIndex],
             newValue => {
-              if (Object.is(newValue, state[index])) return
-              state[index] = newValue
+              if (Object.is(newValue, state[currentIndex])) return
+              state[currentIndex] = newValue
               observer.next(run())
             }
           ]
