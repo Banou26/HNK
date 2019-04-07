@@ -23,11 +23,13 @@ export const withHooks = fn =>
         index++
         return tuple
       }
-      useEffect = (fn, values) => {
-        if (firstRun) fn()
-        if (!state[index].some((value, i) => !Object.is(value, values[i]))) return
+      useEffect = (effect, values) => {
+        if (firstRun) {
+          setTimeout(effect)
+        } else if (!values || (state[index] && state[index]?.some((value, i) => !Object.is(value, values[i])))) {
+          setTimeout(effect)
+        }
         state[index] = values
-        if (!firstRun) fn()
       }
 
       const value = fn()
