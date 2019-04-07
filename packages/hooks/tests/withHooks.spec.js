@@ -1,8 +1,7 @@
 import { test, assert } from 'epk'
-import { withHooks, useState, useEffect } from '../src/index'
+import { withHooks, useState, useEffect } from '../src/index.ts'
 import { isObservable } from 'rxjs'
-import { take } from 'rxjs/operators'
-import { map } from 'rxjs/operators';
+import { take, map } from 'rxjs/operators'
 
 test('is observable', () => {
   const obs = withHooks(() => true)

@@ -1,20 +1,20 @@
 import { Observable } from 'rxjs'
 
-export let useState
-export let useEffect
+export let useState:  <T>(initialValue: T) => [T, (value: T) => void]
+export let useEffect: (effect: Function, values: any[]) => void
 
-export const withHooks = fn =>
+export const withHooks = <T>(fn: () => T): Observable<T> =>
   Observable.create(observer => {
     const state = {}
     const run = (firstRun = false) => {
       let index = 0
       useState = initialValue => {
-        let currentIndex = index
+        const currentIndex = index
         if (firstRun) state[currentIndex] = initialValue
-        const tuple =
+        const tuple: [any, (value: any) => void] =
           [
             state[currentIndex],
-            newValue => {
+            (newValue: any) => {
               if (Object.is(newValue, state[currentIndex])) return
               state[currentIndex] = newValue
               observer.next(run())
