@@ -10,7 +10,7 @@ test('is observable', () => {
     |> take(1)
 })
 
-test('emit value returned', () =>
+test('emit returned value', () =>
   withHooks(() => true)
   |> take(1)
   |> map(value => assert(value === true)))
