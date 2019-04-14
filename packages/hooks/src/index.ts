@@ -10,8 +10,9 @@ export let useEffect: (effect: Function, values: any[]) => void
 
 export const withHooks = <T>(fn: () => T): Observable<T> =>
   Observable.create(observer => {
-    const states = []
-    const effects = []
+    const states = new Map()
+    const effects = new Map()
+    const refs = new Map()
 
     const run = (firstRun = false) => {
       let index = 0
@@ -19,14 +20,14 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
 
       useState = initialValue => {
         const currentIndex = index
-        if (firstRun) states.splice(currentIndex, 1, initialValue)
-        const value = states[currentIndex]
+        if (firstRun) states.set(currentIndex, initialValue)
+        const value = states.get(currentIndex)
         const tuple: [any, (value: any) => void] =
           [
             value,
             (newValue: any) => {
               if (Object.is(newValue, value)) return
-              states.splice(currentIndex, 1, newValue)
+              states.set(currentIndex, newValue)
               if (!nextRunQueued) {
                 nextRunQueued = true
                 setTimeout(() => observer.next(run()))
@@ -40,10 +41,11 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
       useEffect = (effect, newValues) => {
         if (!(newValues === undefined || Array.isArray(newValues))) throw new Error('useEffect second argument should either be undefined or an Array')
         const currentIndex = index
-        const values = effects[currentIndex]?.[1]
+        const values = effects.get(currentIndex)?.[1]
         if (firstRun || !newValues || newValues?.some((value, i) =>!Object.is(value, values?.[i]))) {
-          effects.splice(currentIndex, 1, [effect, newValues])
+          effects.set(currentIndex, [effect, newValues])
         }
+        index++
       }
 
       const lastEffects = Array.from(effects)
@@ -51,15 +53,15 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
 
       setTimeout(() => {
         lastEffects
-          .filter((_, i) =>
-            effects[i][1]?.some((value, i2) =>
-              !Object.is(value, effects[i][i2])))
-          .forEach(([cleanup]) => cleanup?.())
+          .filter(([i]) =>
+            effects.get(i)[1]?.some((value, i2) =>
+              !Object.is(value, effects.get(i)[i2])))
+          .forEach(([, [cleanup]]) => cleanup?.())
 
         effects
           .forEach(([effect], i) =>
             typeof effect === 'function' &&
-            (effects[i][0] = effect()))
+            (effects.get(i)[0] = effect()))
       })
 
       useState = undefined
