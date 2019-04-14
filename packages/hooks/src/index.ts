@@ -7,6 +7,7 @@ enum HookType {
 
 export let useState:  <T>(initialValue: T) => [T, (value: T) => void]
 export let useEffect: (effect: Function, values: any[]) => void
+export let useRef: (initialValue) => ({ current })
 
 export const withHooks = <T>(fn: () => T): Observable<T> =>
   Observable.create(observer => {
@@ -48,6 +49,16 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
         index++
       }
 
+      useRef = initialValue => {
+        try {
+          return firstRun
+            ? refs.set(index, { current: initialValue }).get(index)
+            : refs.get(index)
+        } finally {
+          index++
+        }
+      }
+
       const lastEffects = Array.from(effects)
       const value = fn()
 
@@ -66,6 +77,7 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
 
       useState = undefined
       useEffect = undefined
+      useRef = undefined
 
       return value
     }
