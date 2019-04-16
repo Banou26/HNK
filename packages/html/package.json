@@ -2,7 +2,17 @@
   "name": "@honoki/html",
   "version": "2.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "epk tests/*.spec.js"
+  },
+  "browserslist": [
+    "Last 1 Chrome versions"
+  ],
+  "devDependencies": {
+    "epk": "^0.2.2",
+    "puppeteer": "^1.14.0"
+  },
   "dependencies": {
     "rxjs": "^6.4.0"
   }
