@@ -23,6 +23,18 @@ test('withHooks evaluation on setValue', () =>
   |> toArray()
   |> map(values => assert.deepStrictEqual(values, [false, true])))
 
+test('useState returns a direct value and a getValue function', () =>
+  withHooks(() => {
+    const [ value, setValue, getValue ] = useState(false)
+
+    if (!value) setTimeout(() => setValue(true))
+
+    return [value, getValue()]
+  })
+  |> takeUntil(timer(50))
+  |> toArray()
+  |> map(values => assert.deepStrictEqual(values, [[false, false], [true, true]])))
+
 test('withHooks shouldn\'t evaluate when setValue is called with the same value', () =>
   withHooks(() => {
     const [ value, setValue ] = useState(false)

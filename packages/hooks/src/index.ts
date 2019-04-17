@@ -34,7 +34,8 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
                 setTimeout(() => observer.next(run()))
               }
 
-            }
+            },
+            () => states.get(currentIndex)
           ]
         index++
         return tuple
