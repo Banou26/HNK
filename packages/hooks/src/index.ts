@@ -5,8 +5,8 @@ enum HookType {
   effect
 }
 
-export let useState:  <T>(initialValue: T) => [T, (value: T) => void]
-export let useEffect: (effect: Function, values: any[]) => void
+export let useState: (initialValue) => [any, (value) => void, () => any]
+export let useEffect: (effect: Function, values?: any[]) => void
 export let useRef: (initialValue) => ({ current })
 
 export const withHooks = <T>(fn: () => T): Observable<T> =>
@@ -23,7 +23,7 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
         const currentIndex = index
         if (firstRun) states.set(currentIndex, initialValue)
         const value = states.get(currentIndex)
-        const tuple: [any, (value: any) => void] =
+        const tuple: [any, (value) => void, () => any] =
           [
             value,
             (newValue: any) => {
