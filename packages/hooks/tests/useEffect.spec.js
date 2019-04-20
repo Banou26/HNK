@@ -44,3 +44,19 @@ test('only run if second argument is passed and has different values', () =>
   |> takeUntil(timer(50))
   |> toArray()
   |> map(values => assert.deepStrictEqual(values, [[0, 0], [1, 1], [1, 2]])))
+
+test('call effects cleanup at hook unsubscription', async () => {
+  let value
+
+  withHooks(() => {
+    useEffect(() => {
+      return () => (value = 1)
+    }, [])
+  })
+  .subscribe()
+  .unsubscribe()
+
+  await new Promise(setTimeout)
+
+  assert(value === 1)
+})

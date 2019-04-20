@@ -85,5 +85,9 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
 
     observer.next(run(true))
 
-    return () => {}
+    return () =>
+      setTimeout(() =>
+          Array.from(effects)
+            .filter(([, [cleanup]]) => cleanup)
+            .forEach(([, [cleanup]]) => cleanup?.()))
   })
