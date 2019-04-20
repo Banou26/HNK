@@ -14,7 +14,7 @@
     "@babel/core": "^7.4.0",
     "@babel/plugin-proposal-optional-chaining": "^7.2.0",
     "@babel/plugin-proposal-pipeline-operator": "^7.3.2",
-    "epk": "^0.2.2",
+    "epk": "^0.2.4",
     "puppeteer": "^1.13.0"
   },
   "dependencies": {
