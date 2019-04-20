@@ -31,11 +31,12 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
               states.set(currentIndex, newValue)
               if (!nextRunQueued) {
                 nextRunQueued = true
-                setTimeout(() => observer.next(run()))
+                setTimeout(() =>
+                  observer.next(run()))
               }
-
             },
-            () => states.get(currentIndex)
+            () =>
+              states.get(currentIndex)
           ]
         index++
         return tuple
@@ -44,9 +45,15 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
         if (!(newValues === undefined || Array.isArray(newValues))) throw new Error('useEffect second argument should either be undefined or an Array')
         const currentIndex = index
         const values = effects.get(currentIndex)?.[1]
-        if (firstRun || !newValues || newValues?.some((value, i) =>!Object.is(value, values?.[i]))) {
-          effects.set(currentIndex, [effect, newValues])
-        }
+
+        const shouldRun =
+          firstRun ||
+          !newValues ||
+          newValues?.some((value, i) =>
+            !Object.is(value, values?.[i]))
+
+        if (shouldRun) effects.set(currentIndex, [effect, newValues])
+
         index++
       }
 
