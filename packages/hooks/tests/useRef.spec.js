@@ -8,11 +8,14 @@ test('is undefined outside of withHooks', () =>
   assert(useRef === undefined))
 
 test('is a function inside withHooks', () =>
+  // @ts-ignore
   withHooks(() =>
     assert(typeof useRef === 'function'))
+  // @ts-ignore
   |> take(1))
 
 test('return mutable object with initial value as current property', () =>
+  // @ts-ignore
   withHooks(() => {
     const ref = useRef(false)
 
@@ -20,7 +23,11 @@ test('return mutable object with initial value as current property', () =>
 
     return ref
   })
+  // @ts-ignore
   |> tap(value => assert.deepStrictEqual(value, { current: false }))
+  // @ts-ignore
   |> takeUntil(timer(50))
+  // @ts-ignore
   |> toArray()
+  // @ts-ignore
   |> tap(values => assert.deepStrictEqual(values, [{ current: true }])))
