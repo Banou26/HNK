@@ -32,7 +32,7 @@
         "--watch",
         "C:\\Users\\Banou\\Desktop\\epk\\dist"
       ],
-      "cwd": "${workspaceFolder}/packages/reactivity"
+      "cwd": "${workspaceFolder}/packages/hooks"
     }
     // {
       // "version": "0.2.0",
