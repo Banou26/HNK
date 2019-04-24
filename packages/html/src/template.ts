@@ -37,7 +37,7 @@ export const replaceNodes =
         }
       })
 
-      for (node of oldNodes.filter(node => !newNodes.includes(node)) node.remove()
+      for (node of oldNodes.filter(node => !newNodes.includes(node))) node.remove()
 
     }, initialArrayFragment)
 
