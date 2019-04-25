@@ -1,5 +1,5 @@
 import { Subject, from, zip, Observable } from 'rxjs'
-import { mergeMap, switchMap, map, tap } from 'rxjs/operators'
+import { mergeMap, switchMap, map, tap, scan } from 'rxjs/operators'
 
 import { 
   PlaceholderMetadata,
