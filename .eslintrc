@@ -1,9 +1,4 @@
 {
   "extends": "standard",
-  "parser": "@typescript-eslint/parser",
-  "globals": {
-    "HTMLTemplateElement": true,
-    "NodeFilter": true,
-    "Node": true
-  }
+  "parser": "@typescript-eslint/parser"
 }
