@@ -23,26 +23,25 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
         const currentIndex = index
         if (firstRun) states.set(currentIndex, initialValue)
         const value = states.get(currentIndex)
-        const tuple: [any, (value) => void, () => any] =
-          [
-            value,
-            (newValue: any) => {
-              if (Object.is(newValue, value)) return
-              states.set(currentIndex, newValue)
-              if (!nextRunQueued) {
-                nextRunQueued = true
-                setTimeout(() =>
-                  observer.next(run()))
-              }
-            },
-            () =>
-              states.get(currentIndex)
-          ]
+        const tuple: [any, (value) => void, () => any] = [
+          value,
+          (newValue: any) => {
+            if (Object.is(newValue, value)) return
+            states.set(currentIndex, newValue)
+            if (!nextRunQueued) {
+              nextRunQueued = true
+              setTimeout(() => observer.next(run()), 0)
+            }
+          },
+          () => states.get(currentIndex)
+        ]
         index++
         return tuple
       }
       useEffect = (effect, newValues) => {
-        if (!(newValues === undefined || Array.isArray(newValues))) throw new Error('useEffect second argument should either be undefined or an Array')
+        if (!(newValues === undefined || Array.isArray(newValues))) {
+          throw new Error('useEffect second argument should either be undefined or an Array') 
+        }
         const currentIndex = index
         const values = effects.get(currentIndex)?.[1]
 
@@ -73,14 +72,14 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
       setTimeout(() => {
         lastEffects
           .filter(([i]) =>
-            effects.get(i)[1]?.some((value, i2) =>
-              !Object.is(value, effects.get(i)[i2])))
+            effects.get(i)[1]
+              ?.some((value, i2) => !Object.is(value, effects.get(i)[i2]))
+          )
           .forEach(([, [cleanup]]) => cleanup?.())
 
         effects
-          .forEach(([effect], i) =>
-            typeof effect === 'function' &&
-            (effects.get(i)[0] = effect()))
+          .filter(([effect]) => typeof effect === 'function')
+          .forEach(([effect], i) => (effects.get(i)[0] = effect()))
       })
 
       useState = undefined
@@ -95,6 +94,6 @@ export const withHooks = <T>(fn: () => T): Observable<T> =>
     return () =>
       setTimeout(() =>
           Array.from(effects)
-            .filter(([, [cleanup]]) => cleanup)
-            .forEach(([, [cleanup]]) => cleanup?.()))
+            .forEach(([, [cleanup]]) => cleanup?.())
+       , 0)
   })
