@@ -1,4 +1,4 @@
-# Component
+# HTML Templates
 
 ## Introduction
 
