@@ -23,7 +23,7 @@ or [dedicated](https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerG
 
 - GraphQL and cache, The [Service Worker API](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)
 
-We will provide a set of ways to easily make PWAs, because we know it's hard make the use of the cache API.
+We will provide a set of ways to easily make PWAs, because we know it's hard make use of the cache API.
 This will mainly be accompanied by an optimised system to use GraphQL schemas in your components to reduce bandwith consumption.
 
 - Router, The [History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API)
