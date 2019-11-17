@@ -21,19 +21,37 @@ const textRegex = new RegExp(`([${placeholderMinRangeChar}-${placeholderMaxRange
 
 const getNodePath = (node, path = [], { parentNode: parent } = node) =>
   parent
-    ? getNodePath(parent, path.concat(Array.from(parent.childNodes).indexOf(node)))
+    ? getNodePath(
+      parent,
+      path.concat(
+        Array
+          .from(parent.childNodes)
+          .indexOf(node)
+      )
+    )
     : path.reverse()
 
 const getNodeFilter = placeholders =>
-  (placeholders.some(({ type }) => type === PlaceholderType.START_TAG || type === PlaceholderType.END_TAG)
-    ? NodeFilter.SHOW_ELEMENT
-    : 0) +
-  (placeholders.some(({ type }) => type === PlaceholderType.COMMENT)
-    ? NodeFilter.SHOW_COMMENT
-    : 0) +
-  (placeholders.some(({ type }) => type === PlaceholderType.TEXT)
-    ? NodeFilter.SHOW_TEXT
-    : 0)
+  (
+    placeholders.some(({ type }) =>
+      type === PlaceholderType.START_TAG
+      || type === PlaceholderType.END_TAG
+    )
+      ? NodeFilter.SHOW_ELEMENT
+      : 0
+  )
+  +
+  (
+    placeholders.some(({ type }) => type === PlaceholderType.COMMENT)
+      ? NodeFilter.SHOW_COMMENT
+      : 0
+  )
+  +
+  (
+    placeholders.some(({ type }) => type === PlaceholderType.TEXT)
+      ? NodeFilter.SHOW_TEXT
+      : 0
+  )
 
 const acceptNode = ({ nodeType, outerHTML, innerHTML, data }: Element & CharacterData) =>
   nodeType === Node.ELEMENT_NODE
@@ -42,9 +60,13 @@ const acceptNode = ({ nodeType, outerHTML, innerHTML, data }: Element & Characte
       : innerHTML.match(placeholdersRegex)
         ? NodeFilter.FILTER_SKIP
         : NodeFilter.FILTER_REJECT
-    : (nodeType === Node.TEXT_NODE || nodeType === Node.COMMENT_NODE) && data.match(placeholdersRegex)
-      ? NodeFilter.FILTER_ACCEPT
-      : NodeFilter.FILTER_REJECT
+    : (
+      nodeType === Node.TEXT_NODE
+      || nodeType === Node.COMMENT_NODE
+      )
+      && data.match(placeholdersRegex)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT
 
 const setCharacterDataNodePath = (node: CharacterData, placeholders: PlaceholderMetadata[]) => {
   const match = node.data.match(placeholderRegex)
@@ -53,7 +75,9 @@ const setCharacterDataNodePath = (node: CharacterData, placeholders: Placeholder
     const placeholderNode = isTextNode ? (<Text>node).splitText(match.index) : node
     if (isTextNode) {
       placeholderNode.data = placeholderNode.data.substring(match[0].length)
-      if (placeholderNode.data.length) (<Text>placeholderNode).splitText(0)
+      if (placeholderNode.data.length) {
+        (<Text>placeholderNode).splitText(0)
+      }
     }
     placeholders[fromPlaceholder(match[0])].path = getNodePath(placeholderNode)
   }
@@ -65,8 +89,9 @@ const setElementNodePath =
       .replace(node.innerHTML, '')
       .match(placeholdersRegex)
       .map(fromPlaceholder)
-      .forEach(id =>
-        (placeholders[id].path = getNodePath(node)))
+      .forEach(id => {
+        placeholders[id].path = getNodePath(node)
+      })
 
 const walkPlaceholders = (html: string, placeholders: PlaceholderMetadata[]) => {
   const template = document.createElement('template')

@@ -31,6 +31,7 @@ export const replaceNodes =
           } else { // Will place the new node after the previous newly placed new node
             const previousNewNode = newNodes[i - 1]
             const { parentNode } = previousNewNode
+
             parentNode.insertBefore(newNode, previousNewNode.nextSibling)
             if (oldNode) oldNode.remove()
           }
@@ -38,7 +39,6 @@ export const replaceNodes =
       })
 
       for (node of oldNodes.filter(node => !newNodes.includes(node))) node.remove()
-
     }, initialArrayFragment)
 
 export const makePlaceholders =
@@ -48,33 +48,43 @@ export const makePlaceholders =
     placeholdersMetadata
       .map(placeholderMetadata => {
         const { placeholderType, path, ids } = placeholderMetadata
-
         if (placeholderType === PlaceholderType.END_TAG) return
 
         const arrayFragment =
-          placeholderType === PlaceholderType.START_TAG ||
-          placeholderType === PlaceholderType.ATTRIBUTE
+          placeholderType === PlaceholderType.START_TAG
+          || placeholderType === PlaceholderType.ATTRIBUTE
             ? fragment.querySelector(`[${toPlaceholder(ids[0])}]`)
-            : path.reduce((node, nodeIndex) => node.childNodes[nodeIndex], fragment)
+            : path.reduce((node, nodeIndex) =>
+              node.childNodes[nodeIndex], fragment
+            )
 
         return [
           placeholderType === PlaceholderType.COMMENT
             ? makeComment(<CommentMetadata>placeholderMetadata, arrayFragment)
             : placeholderType === PlaceholderType.TEXT
               ? makeText(<TextMetadata>placeholderMetadata, arrayFragment)
-              : (placeholderType === PlaceholderType.START_TAG ||
-                placeholderType === PlaceholderType.ATTRIBUTE) &&
-                makeElement(<ElementMetadata>placeholderMetadata, arrayFragment),
+              : (
+                  placeholderType === PlaceholderType.START_TAG
+                  || placeholderType === PlaceholderType.ATTRIBUTE
+                )
+                && makeElement(<ElementMetadata>placeholderMetadata, arrayFragment),
           arrayFragment
         ]
       })
-      .reduce(([ placeholders, rootArrayFragment ], [ placeholder, arrayFragment ]) => [
-        [...placeholders, placeholder],
-        rootArrayFragment.map(node =>
-          node === arrayFragment[0]
-            ? arrayFragment
-            : node)
-      ], [[], Array.from(fragment.childNodes)])
+      .reduce(([ placeholders, rootArrayFragment ], [ placeholder, arrayFragment ]) =>
+        [
+          [...placeholders, placeholder],
+          rootArrayFragment.map(node =>
+            node === arrayFragment[0]
+              ? arrayFragment
+              : node
+          )
+        ],
+        [
+          [],
+          Array.from(fragment.childNodes)
+        ]
+      )
 
 export const Element = class HNKHTMLTemplateElement extends HTMLTemplateElement {
   templateId: string
@@ -117,18 +127,12 @@ export const Element = class HNKHTMLTemplateElement extends HTMLTemplateElement 
     const [ placeholders, arrayFragment ] = makePlaceholders(this.placeholdersMetadata, fragment)
     this.arrayContent = arrayFragment
 
-    // @ts-ignore
     this.arrayContentObservable =
-      // @ts-ignore
       from(placeholders)
-      // @ts-ignore
       |> mergeMap(placeholder =>
-        // @ts-ignore
         this.subject
-        // @ts-ignore
-        |> placeholder)
-      // Update 
-      // @ts-ignore
+        |> placeholder
+      )
       |> scan(
         (previousArrayFragment, [ oldPlaceholderArrayFragment, newPlaceholderArrayFragment ]) => [
             previousArrayFragment,
@@ -140,11 +144,10 @@ export const Element = class HNKHTMLTemplateElement extends HTMLTemplateElement 
           ],
         arrayFragment
       )
-      // @ts-ignore
       |> replaceNodes(arrayFragment)
-      // @ts-ignore
       |> tap(([, newArrayFragment]) =>
-        (this.arrayContent = newArrayFragment))
+        (this.arrayContent = newArrayFragment)
+      )
 
     this.update(...this.values)
   }

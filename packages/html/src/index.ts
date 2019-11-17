@@ -15,10 +15,14 @@ export const tag = (
   ...values: any[]
 ) => {
   const templateId = 'html' + strings.reduce((str, str2, i) => str + fromPlaceholder(i - 1) + str2)
-  if (elements.has(templateId)) return elements.get(templateId).clone({ key, values })
 
+  if (elements.has(templateId)) {
+    return elements.get(templateId).clone({ key, values })
+  }
+  
   const [ fragment, placeholdersMetadata ] = parse({ transform, strings, values })
   elements.set(templateId, makeTemplate({ templateId, originalFragment: fragment, values, placeholdersMetadata }))
+
   return elements.get(templateId).clone({ key, values })
 }
 
@@ -26,4 +30,5 @@ export const html =
   (strings, ...values: any[]) =>
     strings?.raw
       ? tag(undefined, strings, ...values)
-      : (_strings: string[], ...values: any[]) => tag({ key: /* is key */strings }, _strings, ...values)
+      : (_strings: string[], ...values: any[]) =>
+        tag({ key: /* is key */strings }, _strings, ...values)

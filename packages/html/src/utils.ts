@@ -10,11 +10,17 @@ export const placeholderMaxRangeCode = placeholderMaxRangeChar.codePointAt(0)
 export const placeholdersRegex = new RegExp(`[${placeholderMinRangeChar}-${placeholderMaxRangeChar}]`, 'umg') // /[-]/umg
 export const placeholderRegex = new RegExp(placeholdersRegex, 'um')
 
-export const toPlaceholder = (n = 0) => String.fromCodePoint(placeholderMinRangeCode + n)
+export const toPlaceholder =
+  (n = 0) =>
+    String.fromCodePoint(placeholderMinRangeCode + n)
 
-export const fromPlaceholder = str => str.codePointAt() - placeholderMinRangeCode
+export const fromPlaceholder =
+  str =>
+    str.codePointAt() - placeholderMinRangeCode
 
-export const toPlaceholdersNumber = str => (str.match(placeholdersRegex) || []).map(i => fromPlaceholder(i))
+export const toPlaceholdersNumber =
+  str =>
+    str.match(placeholdersRegex)?.map(i => fromPlaceholder(i))
 
 export const toPlaceholderString =
   (str, placeholders = toPlaceholdersNumber(str)) =>
